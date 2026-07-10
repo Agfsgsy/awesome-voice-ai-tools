@@ -3,202 +3,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice AI Studio Arabic</title>
+    <title>Voice AI Studio v3</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * { font-family: 'Cairo', sans-serif; }
-        body { background: #0f0f1a; color: #e0e0e0; }
-        .card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; }
-        .btn-primary { background: linear-gradient(135deg, #0f6b6b, #0d9488); transition: all 0.3s; }
-        .btn-primary:hover { background: linear-gradient(135deg, #0d9488, #14b8a6); }
-        .nav-item.active { background: rgba(13, 148, 136, 0.15); border-right: 3px solid #0d9488; }
-        input, textarea, select { background: #16213e; border: 1px solid #2a2a4a; color: #e0e0e0; }
-        input:focus, textarea:focus, select:focus { border-color: #0d9488; outline: none; }
-        audio { width: 100%; }
-        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #0d9488; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        :root { --primary: #0d9488; --primary-dark: #0f766e; --secondary: #6366f1; --bg-dark: #0f0f1a; --bg-card: #1a1a2e; --bg-input: #16213e; --border: #2a2a4a; --text: #e0e0e0; --text-muted: #9ca3af; }
+        .light-mode { --bg-dark: #f3f4f6; --bg-card: #ffffff; --bg-input: #f9fafb; --border: #e5e7eb; --text: #1f2937; --text-muted: #6b7280; }
+        * { font-family: 'Cairo', 'Inter', sans-serif; }
+        body { background: var(--bg-dark); color: var(--text); transition: all 0.3s; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; transition: all 0.3s; }
+        .card:hover { border-color: var(--primary); }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-dark), var(--primary)); transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,148,136,0.3); }
+        .nav-item { transition: all 0.2s; border-radius: 8px; }
+        .nav-item:hover { background: rgba(13,148,136,0.1); }
+        .nav-item.active { background: rgba(13,148,136,0.15); border-right: 3px solid var(--primary); }
+        input, textarea, select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); transition: all 0.2s; }
+        input:focus, textarea:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+        .tab-btn { transition: all 0.2s; }
+        .tab-btn.active { background: var(--primary); color: white; }
+        .progress-bar { background: var(--bg-input); border-radius: 999px; overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg, var(--primary-dark), var(--primary)); transition: width 0.3s; }
+        .status-badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+        .status-ok { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .status-warn { background: rgba(234,179,8,0.2); color: #eab308; }
+        .status-error { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid var(--primary); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .sidebar { background: var(--bg-card); border-left: 1px solid var(--border); }
+        .top-bar { background: var(--bg-card); border-bottom: 1px solid var(--border); }
+        @media (max-width: 768px) { .sidebar { display: none; } .mobile-menu { display: block !important; } }
     </style>
 </head>
 <body class="min-h-screen">
-    <div class="flex min-h-screen">
+    <!-- Top Bar -->
+    <header class="top-bar fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4">
+        <div class="flex items-center gap-3">
+            <button class="md:hidden text-xl" onclick="toggleMobileMenu()"><i class="fas fa-bars"></i></button>
+            <h1 class="text-lg font-bold" style="color: var(--primary)"><i class="fas fa-microphone-lines mr-2"></i>Voice AI Studio <span class="text-xs opacity-60">v3</span></h1>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="toggleTheme()" class="p-2 rounded-lg hover:bg-gray-700/20 transition"><i class="fas fa-sun" id="theme-icon"></i></button>
+            <div class="status-badge status-ok" id="connection-status"><i class="fas fa-circle text-xs mr-1"></i>متصل</div>
+        </div>
+    </header>
+
+    <div class="flex pt-14 min-h-screen">
         <!-- Sidebar -->
-        <aside class="w-64 card min-h-screen p-4 flex-shrink-0 hidden md:block">
-            <h1 class="text-xl font-bold text-teal-400 mb-6">🎙️ Voice AI Studio</h1>
-            <nav class="space-y-1">
-                <a href="#" class="nav-item active block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="dashboard">لوحة التحكم</a>
-                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="tts">توليد الصوت</a>
-                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="clone">استنساخ الصوت</a>
-                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="effects">المؤثرات الصوتية</a>
-                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="religious">المحتوى الإسلامي</a>
-                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="library">المكتبة</a>
-                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="settings">الإعدادات</a>
+        <aside class="sidebar w-64 fixed right-0 top-14 bottom-0 overflow-y-auto p-3 hidden md:block z-40" id="sidebar">
+            <nav class="space-y-1" id="nav-menu">
+                <a href="#" class="nav-item active block px-4 py-2.5 text-sm" data-page="dashboard"><i class="fas fa-chart-line w-5"></i> لوحة التحكم</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="tts"><i class="fas fa-waveform w-5"></i> توليد الصوت</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="clone"><i class="fas fa-clone w-5"></i> استنساخ الصوت</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="plugins"><i class="fas fa-puzzle-piece w-5"></i> مدير الإضافات</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="models"><i class="fas fa-cube w-5"></i> مكتبة النماذج</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="voices"><i class="fas fa-users w-5"></i> مكتبة الأصوات</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="downloads"><i class="fas fa-download w-5"></i> التحميلات</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="uploads"><i class="fas fa-upload w-5"></i> الملفات المرفوعة</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="tasks"><i class="fas fa-tasks w-5"></i> المهام</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="health"><i class="fas fa-heartbeat w-5"></i> صحة النظام</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="logs"><i class="fas fa-file-alt w-5"></i> السجلات</a>
+                <a href="#" class="nav-item block px-4 py-2.5 text-sm" data-page="settings"><i class="fas fa-cog w-5"></i> الإعدادات</a>
             </nav>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 md:mr-64 max-w-7xl mx-auto w-full" id="main-content">
             <!-- Dashboard -->
-            <div id="page-dashboard" class="page">
-                <h2 class="text-2xl font-bold mb-6">لوحة التحكم</h2>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="card p-4">
-                        <p class="text-teal-400 text-sm">الملفات</p>
-                        <p class="text-2xl font-bold" id="stat-files">-</p>
-                    </div>
-                    <div class="card p-4">
-                        <p class="text-teal-400 text-sm">المحركات</p>
-                        <p class="text-2xl font-bold" id="stat-engines">-</p>
-                    </div>
-                    <div class="card p-4">
-                        <p class="text-teal-400 text-sm">الإضافات</p>
-                        <p class="text-2xl font-bold" id="stat-plugins">-</p>
-                    </div>
-                    <div class="card p-4">
-                        <p class="text-teal-400 text-sm">الحالة</p>
-                        <p class="text-2xl font-bold text-green-400" id="stat-status">-</p>
-                    </div>
+            <div id="page-dashboard" class="page fade-in">
+                <h2 class="text-2xl font-bold mb-4">لوحة التحكم</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="card p-4"><p class="text-sm opacity-60">الملفات</p><p class="text-2xl font-bold" id="stat-files">-</p></div>
+                    <div class="card p-4"><p class="text-sm opacity-60">المحركات</p><p class="text-2xl font-bold" id="stat-engines">-</p></div>
+                    <div class="card p-4"><p class="text-sm opacity-60">الإضافات</p><p class="text-2xl font-bold" id="stat-plugins">-</p></div>
+                    <div class="card p-4"><p class="text-sm opacity-60">الحالة</p><p class="text-2xl font-bold status-ok inline-block px-3 py-1 rounded-lg text-sm" id="stat-status">نشط</p></div>
                 </div>
-                <div class="card p-6">
-                    <h3 class="text-lg font-bold mb-4">أحدث الملفات</h3>
-                    <div id="recent-files" class="space-y-2">
-                        <p class="text-gray-500">جارٍ التحميل...</p>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="card p-4">
+                        <h3 class="font-bold mb-3"><i class="fas fa-microchip mr-2"></i>نظرة عامة على النظام</h3>
+                        <div id="system-overview" class="space-y-2 text-sm"><p class="opacity-50">جارٍ التحميل...</p></div>
+                    </div>
+                    <div class="card p-4">
+                        <h3 class="font-bold mb-3"><i class="fas fa-waveform mr-2"></i>المحركات المتاحة</h3>
+                        <div id="engines-list" class="space-y-2"><p class="opacity-50">جارٍ التحميل...</p></div>
                     </div>
                 </div>
             </div>
 
             <!-- TTS -->
-            <div id="page-tts" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">توليد الصوت</h2>
-                <div class="card p-6">
-                    <label class="block text-sm mb-2 text-teal-400">النص</label>
+            <div id="page-tts" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">توليد الصوت</h2>
+                <div class="card p-6 max-w-3xl">
+                    <label class="block text-sm mb-2 opacity-80">النص</label>
                     <textarea id="tts-text" rows="5" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص هنا..."></textarea>
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm mb-2 text-teal-400">المحرك</label>
-                            <select id="tts-engine" class="w-full p-2 rounded-lg">
-                                <option value="kokoro">Kokoro TTS</option>
-                                <option value="piper">Piper TTS</option>
-                                <option value="gemini">Google Gemini TTS</option>
-                                <option value="xtts">XTTS-v2</option>
-                                <option value="bark">Bark</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm mb-2 text-teal-400">اللغة</label>
-                            <select id="tts-language" class="w-full p-2 rounded-lg">
-                                <option value="ar">العربية</option>
-                                <option value="en">English</option>
-                            </select>
-                        </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div><label class="block text-sm mb-1 opacity-80">المحرك</label><select id="tts-engine" class="w-full p-2 rounded-lg"><option value="auto">تلقائي</option><option value="kokoro">Kokoro</option><option value="piper">Piper</option><option value="gemini">Gemini</option><option value="xtts">XTTS</option><option value="melotts">MeloTTS</option></select></div>
+                        <div><label class="block text-sm mb-1 opacity-80">اللغة</label><select id="tts-language" class="w-full p-2 rounded-lg"><option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option></select></div>
+                        <div><label class="block text-sm mb-1 opacity-80">السرعة</label><input type="range" id="tts-speed" min="0.5" max="2" step="0.1" value="1" class="w-full mt-2"></div>
+                        <div><label class="block text-sm mb-1 opacity-80">الصوت</label><input type="text" id="tts-voice" value="default" class="w-full p-2 rounded-lg"></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm mb-2 text-teal-400">السرعة</label>
-                            <input type="range" id="tts-speed" min="0.5" max="2" step="0.1" value="1" class="w-full">
-                        </div>
-                        <div>
-                            <label class="block text-sm mb-2 text-teal-400">الصوت</label>
-                            <input type="text" id="tts-voice" value="default" class="w-full p-2 rounded-lg">
-                        </div>
-                    </div>
-                    <button id="tts-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">توليد الصوت</button>
+                    <button id="tts-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full"><i class="fas fa-play mr-2"></i>توليد الصوت</button>
                     <div id="tts-result" class="mt-4 hidden">
-                        <audio id="tts-audio" controls class="mb-2"></audio>
-                        <a id="tts-download" class="btn-primary px-4 py-2 rounded-lg inline-block text-sm">تحميل</a>
+                        <audio id="tts-audio" controls class="w-full mb-2"></audio>
+                        <div class="flex gap-2">
+                            <a id="tts-download" class="btn-primary px-4 py-2 rounded-lg text-sm inline-block" download><i class="fas fa-download mr-1"></i>تحميل</a>
+                            <button onclick="applyEffect()" class="px-4 py-2 rounded-lg text-sm border border-gray-600 hover:border-teal-500 transition"><i class="fas fa-magic mr-1"></i>تطبيق مؤثرات</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Clone -->
-            <div id="page-clone" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">استنساخ الصوت</h2>
-                <div class="card p-6">
-                    <div class="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4 mb-4">
-                        <p class="text-yellow-400 text-sm">⚠️ يجب استخدام استنساخ الصوت بإذن صريح من صاحب الصوت.</p>
-                    </div>
-                    <label class="block text-sm mb-2 text-teal-400">رفع ملف صوتي مرجعي</label>
-                    <input type="file" id="clone-file" accept=".wav,.mp3" class="w-full p-2 mb-4">
-                    <label class="block text-sm mb-2 text-teal-400">النص</label>
-                    <textarea id="clone-text" rows="3" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص المراد استنساخه..."></textarea>
-                    <button id="clone-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">استنساخ الصوت</button>
-                    <div id="clone-result" class="mt-4 hidden">
-                        <audio id="clone-audio" controls class="mb-2"></audio>
-                    </div>
+            <div id="page-clone" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">استنساخ الصوت</h2>
+                <div class="card p-6 max-w-3xl">
+                    <div class="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-3 mb-4 text-sm"><i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i> يجب استخدام استنساخ الصوت بإذن صريح من صاحب الصوت.</div>
+                    <label class="block text-sm mb-2 opacity-80">ملف صوتي مرجعي</label>
+                    <input type="file" id="clone-file" accept=".wav,.mp3,.flac" class="w-full p-2 mb-4 rounded-lg">
+                    <label class="block text-sm mb-2 opacity-80">النص</label>
+                    <textarea id="clone-text" rows="4" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص..."></textarea>
+                    <div class="mb-4"><label class="block text-sm mb-1 opacity-80">المحرك</label><select id="clone-engine" class="w-full p-2 rounded-lg"><option value="xtts">XTTS-v2</option><option value="openvoice">OpenVoice</option></select></div>
+                    <button id="clone-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full"><i class="fas fa-clone mr-2"></i>استنساخ الصوت</button>
+                    <div id="clone-result" class="mt-4 hidden"><audio id="clone-audio" controls class="w-full"></audio></div>
                 </div>
             </div>
 
-            <!-- Effects -->
-            <div id="page-effects" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">المؤثرات الصوتية</h2>
-                <div class="card p-6">
-                    <label class="block text-sm mb-2 text-teal-400">رفع ملف صوت</label>
-                    <input type="file" id="effects-file" accept=".wav,.mp3" class="w-full p-2 mb-4">
-                    <label class="block text-sm mb-2 text-teal-400">الإعداد المسبق</label>
-                    <select id="effects-preset" class="w-full p-2 rounded-lg mb-4">
-                        <option value="studio">صوت استوديو</option>
-                        <option value="lecture">محاضرة</option>
-                        <option value="mosque">صوت مسجد</option>
-                        <option value="deep_voice">صوت عميق</option>
-                        <option value="podcast">بودكاست</option>
-                        <option value="video_commentary">تعليق فيديو</option>
-                    </select>
-                    <button id="effects-apply" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">تطبيق المؤثرات</button>
-                </div>
+            <!-- Plugins -->
+            <div id="page-plugins" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">مدير الإضافات</h2>
+                <div id="plugins-list" class="grid-cards"></div>
             </div>
 
-            <!-- Religious -->
-            <div id="page-religious" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">المحتوى الإسلامي</h2>
-                <div class="card p-6">
-                    <div class="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4 mb-4">
-                        <p class="text-yellow-400 text-sm">⚠️ يجب مراجعة النصوص القرآنية والدينية من مصدر موثوق قبل النشر، ولا تنسب صوتاً مولداً إلى قارئ أو شيخ حقيقي.</p>
+            <!-- Models -->
+            <div id="page-models" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">مكتبة النماذج</h2>
+                <div class="card p-4 mb-4">
+                    <div class="flex gap-2 flex-wrap">
+                        <input type="text" id="model-search" placeholder="بحث..." class="p-2 rounded-lg flex-1 min-w-[200px]">
+                        <select id="model-engine-filter" class="p-2 rounded-lg"><option value="">كل المحركات</option></select>
+                        <button onclick="searchModels()" class="btn-primary px-4 py-2 rounded-lg"><i class="fas fa-search"></i></button>
                     </div>
-                    <label class="block text-sm mb-2 text-teal-400">نوع المحتوى</label>
-                    <select id="religious-type" class="w-full p-2 rounded-lg mb-4">
-                        <option value="advice">موعظة</option>
-                        <option value="dua">دعاء</option>
-                        <option value="azkar">أذكار</option>
-                        <option value="lesson">درس</option>
-                    </select>
-                    <label class="block text-sm mb-2 text-teal-400">النص</label>
-                    <textarea id="religious-text" rows="5" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص هنا..."></textarea>
-                    <button id="religious-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">توليد الصوت</button>
                 </div>
+                <div id="models-list" class="grid-cards"></div>
             </div>
 
-            <!-- Library -->
-            <div id="page-library" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">المكتبة</h2>
-                <div class="card p-6">
-                    <div id="library-files" class="space-y-2">
-                        <p class="text-gray-500">جارٍ التحميل...</p>
+            <!-- Voices -->
+            <div id="page-voices" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">مكتبة الأصوات</h2>
+                <div class="card p-4 mb-4">
+                    <div class="flex gap-2 flex-wrap">
+                        <input type="text" id="voice-search" placeholder="بحث..." class="p-2 rounded-lg flex-1 min-w-[200px]">
+                        <select id="voice-lang-filter" class="p-2 rounded-lg"><option value="">كل اللغات</option><option value="ar">العربية</option><option value="en">English</option></select>
+                        <button onclick="searchVoices()" class="btn-primary px-4 py-2 rounded-lg"><i class="fas fa-search"></i></button>
                     </div>
                 </div>
+                <div id="voices-list" class="grid-cards"></div>
+            </div>
+
+            <!-- Downloads -->
+            <div id="page-downloads" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">التحميلات</h2>
+                <div class="card p-4 mb-4">
+                    <div class="flex gap-2">
+                        <input type="url" id="dl-url" placeholder="رابط التحميل" class="p-2 rounded-lg flex-1">
+                        <button onclick="createDownload()" class="btn-primary px-4 py-2 rounded-lg"><i class="fas fa-plus mr-1"></i>جديد</button>
+                    </div>
+                </div>
+                <div id="downloads-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Uploads -->
+            <div id="page-uploads" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">الملفات المرفوعة</h2>
+                <div class="card p-6 mb-4 text-center border-dashed border-2" style="border-color: var(--border)">
+                    <i class="fas fa-cloud-upload-alt text-4xl mb-2 opacity-40"></i>
+                    <p class="opacity-60 mb-2">اسحب الملفات هنا أو انقر للاختيار</p>
+                    <input type="file" id="upload-file-input" accept=".wav,.mp3,.flac,.ogg,.m4a" multiple class="hidden" onchange="handleUpload(this.files)">
+                    <button onclick="document.getElementById('upload-file-input').click()" class="btn-primary px-6 py-2 rounded-lg">اختيار ملف</button>
+                </div>
+                <div id="uploads-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Tasks -->
+            <div id="page-tasks" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">المهام</h2>
+                <div id="tasks-stats" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+                <div id="tasks-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Health -->
+            <div id="page-health" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">صحة النظام</h2>
+                <div id="health-checks" class="space-y-2"></div>
+            </div>
+
+            <!-- Logs -->
+            <div id="page-logs" class="page hidden fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">السجلات</h2>
+                    <div class="flex gap-2">
+                        <select id="log-level" onchange="loadLogs()" class="p-2 rounded-lg text-sm"><option value="">الكل</option><option value="ERROR">أخطاء</option><option value="WARNING">تحذيرات</option><option value="INFO">معلومات</option></select>
+                        <button onclick="loadLogs()" class="px-3 py-2 rounded-lg border border-gray-600 hover:border-teal-500 transition"><i class="fas fa-sync"></i></button>
+                    </div>
+                </div>
+                <div class="card p-4 overflow-x-auto"><pre id="logs-content" class="text-xs font-mono whitespace-pre-wrap" style="max-height: 70vh; overflow-y: auto;"></pre></div>
             </div>
 
             <!-- Settings -->
-            <div id="page-settings" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">الإعدادات</h2>
-                <div class="card p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm mb-2 text-teal-400">Gemini API Key</label>
-                        <input type="password" id="settings-gemini-key" class="w-full p-2 rounded-lg" placeholder="••••••••">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-2 text-teal-400">Gemini TTS Model</label>
-                        <input type="text" id="settings-gemini-model" class="w-full p-2 rounded-lg" value="gemini-3.1-flash-tts-preview">
-                    </div>
-                    <div id="settings-status" class="text-sm text-gray-400"></div>
-                </div>
+            <div id="page-settings" class="page hidden fade-in">
+                <h2 class="text-2xl font-bold mb-4">الإعدادات</h2>
+                <div class="grid md:grid-cols-2 gap-4" id="settings-container"></div>
             </div>
         </main>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 left-4 z-50 transform translate-y-20 transition-transform duration-300">
+        <div class="card px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
+            <i class="fas" id="toast-icon"></i>
+            <span id="toast-message"></span>
+        </div>
     </div>
 
     <script>
         const API = window.location.origin;
         let currentPage = "dashboard";
+        let isDark = true;
 
+        // Navigation
         document.querySelectorAll(".nav-item").forEach(item => {
             item.addEventListener("click", (e) => {
                 e.preventDefault();
@@ -208,95 +244,91 @@
                 const page = item.dataset.page;
                 document.getElementById("page-" + page).classList.remove("hidden");
                 currentPage = page;
-                if (page === "dashboard") loadDashboard();
-                if (page === "library") loadLibrary();
-                if (page === "settings") loadSettings();
+                loadPage(page);
             });
         });
 
-        async function apiGet(path) {
-            const res = await fetch(API + path);
-            return res.json();
-        }
-        async function apiPost(path, data) {
-            const res = await fetch(API + path, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(data)
-            });
-            return res.json();
+        async function loadPage(page) {
+            const loaders = {
+                dashboard: loadDashboard,
+                plugins: loadPlugins,
+                models: loadModels,
+                voices: loadVoices,
+                downloads: loadDownloads,
+                uploads: loadUploads,
+                tasks: loadTasks,
+                health: loadHealth,
+                logs: loadLogs,
+                settings: loadSettings,
+            };
+            if (loaders[page]) await loaders[page]();
         }
 
+        // API helpers
+        async function apiGet(path) { const res = await fetch(API + path); return res.json(); }
+        async function apiPost(path, data) { const res = await fetch(API + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); return res.json(); }
+        async function apiDelete(path) { const res = await fetch(API + path, { method: "DELETE" }); return res.json(); }
+
+        function showToast(msg, type = "info") {
+            const toast = document.getElementById("toast");
+            document.getElementById("toast-message").textContent = msg;
+            document.getElementById("toast-icon").className = "fas fa-" + (type === "error" ? "exclamation-circle" : type === "success" ? "check-circle" : "info-circle");
+            toast.classList.remove("translate-y-20");
+            setTimeout(() => toast.classList.add("translate-y-20"), 3000);
+        }
+
+        // Theme toggle
+        function toggleTheme() {
+            isDark = !isDark;
+            document.body.classList.toggle("light-mode", !isDark);
+            document.getElementById("theme-icon").className = isDark ? "fas fa-sun" : "fas fa-moon";
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById("sidebar").classList.toggle("hidden");
+        }
+
+        // Dashboard
         async function loadDashboard() {
             try {
-                const [status, downloads, info] = await Promise.all([
-                    apiGet("/status"), apiGet("/api/downloads"), apiGet("/api/info")
+                const [status, outputs, info, sys] = await Promise.all([
+                    apiGet("/status"), apiGet("/api/outputs/stats"),
+                    apiGet("/api/info"), apiGet("/api/system")
                 ]);
-                document.getElementById("stat-files").textContent = downloads.count;
-                document.getElementById("stat-engines").textContent = info.engines.length;
-                document.getElementById("stat-plugins").textContent = status.plugins_loaded;
-                document.getElementById("stat-status").textContent = "نشط";
-                const filesHtml = downloads.files.slice(0, 5).map(f =>
-                    `<div class="flex justify-between items-center p-2 hover:bg-teal-900/10 rounded">
-                        <span>${f.name}</span>
-                        <span class="text-xs text-gray-400">${(f.size/1024).toFixed(1)} KB</span>
+                document.getElementById("stat-files").textContent = outputs.total_files || 0;
+                document.getElementById("stat-engines").textContent = (info.engines || []).length;
+                document.getElementById("stat-plugins").textContent = status.plugins_loaded || 0;
+
+                // System overview
+                document.getElementById("system-overview").innerHTML = `
+                    <div class="flex justify-between"><span>المنصة</span><span class="opacity-60">${sys.platform || '-'}</span></div>
+                    <div class="flex justify-between"><span>Python</span><span class="opacity-60">${sys.python || '-'}</span></div>
+                    <div class="flex justify-between"><span>المعالج</span><span class="opacity-60">${sys.cpu_count || '-'} أنوية</span></div>
+                    <div class="flex justify-between"><span>القرص</span><span class="opacity-60">${sys.disk_free_gb || '-'} GB متاح</span></div>
+                    <div class="flex justify-between"><span>GPU</span><span class="opacity-60">${(sys.gpu || {}).device_name || 'CPU Only'}</span></div>
+                `;
+
+                // Engines
+                const enginesHtml = (info.engines || []).map(e =>
+                    `<div class="flex items-center justify-between p-2 rounded-lg" style="background: var(--bg-input)">
+                        <span>${e.label}</span>
+                        <span class="status-badge ${e.available ? 'status-ok' : 'status-error'}">${e.available ? 'متاح' : 'غير متاح'}</span>
                     </div>`
-                ).join("") || "<p class=\'text-gray-500\'>لا توجد ملفات</p>";
-                document.getElementById("recent-files").innerHTML = filesHtml;
-            } catch (e) {
-                console.error("Dashboard load error:", e);
-            }
+                ).join("");
+                document.getElementById("engines-list").innerHTML = enginesHtml || '<p class="opacity-50">لا توجد محركات</p>';
+            } catch (e) { console.error(e); }
         }
 
-        async function loadLibrary() {
-            try {
-                const downloads = await apiGet("/api/downloads");
-                const html = downloads.files.map(f =>
-                    `<div class="flex justify-between items-center p-3 hover:bg-teal-900/10 rounded-lg">
-                        <div>
-                            <p class="font-bold">${f.name}</p>
-                            <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")}</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <audio controls style="max-width:200px"><source src="/api/downloads/${f.name}"></audio>
-                            <a href="/api/downloads/${f.name}" download class="btn-primary px-3 py-1 rounded text-xs">تحميل</a>
-                            <button onclick="deleteFile(\'${f.name}\')" class="bg-red-900 px-3 py-1 rounded text-xs">حذف</button>
-                        </div>
-                    </div>`
-                ).join("") || "<p class=\'text-gray-500\'>لا توجد ملفات</p>";
-                document.getElementById("library-files").innerHTML = html;
-            } catch (e) {
-                console.error("Library load error:", e);
-            }
-        }
-
-        async function deleteFile(name) {
-            if (!confirm("حذف " + name + "?")) return;
-            await fetch(API + "/api/downloads/" + name, {method: "DELETE"});
-            loadLibrary();
-        }
-
-        async function loadSettings() {
-            try {
-                const s = await apiGet("/api/settings");
-                document.getElementById("settings-status").textContent =
-                    "Gemini: " + (s.gemini_api_key_set ? "مُفعّل ✓" : "غير مُفعّل ✗") +
-                    " | النموذج: " + s.gemini_tts_model;
-            } catch (e) {
-                console.error("Settings load error:", e);
-            }
-        }
-
+        // TTS
         document.getElementById("tts-generate")?.addEventListener("click", async () => {
             const btn = document.getElementById("tts-generate");
             const text = document.getElementById("tts-text").value.trim();
-            if (!text) return alert("اكتب نصاً أولاً");
+            if (!text) return showToast("اكتب نصاً أولاً", "error");
             btn.disabled = true;
-            btn.innerHTML = \'<span class="loading"></span> جارٍ التوليد...\';
+            btn.innerHTML = '<span class="loading mr-2"></span> جارٍ التوليد...';
             try {
                 const result = await apiPost("/api/tts", {
-                    text: text,
-                    engine: document.getElementById("tts-engine").value,
+                    text, engine: document.getElementById("tts-engine").value,
                     language: document.getElementById("tts-language").value,
                     voice: document.getElementById("tts-voice").value,
                     speed: parseFloat(document.getElementById("tts-speed").value),
@@ -305,67 +337,288 @@
                     document.getElementById("tts-result").classList.remove("hidden");
                     document.getElementById("tts-audio").src = result.url;
                     document.getElementById("tts-download").href = result.url;
+                    showToast("تم التوليد بنجاح!", "success");
                 } else {
-                    alert(result.message || "فشل التوليد");
+                    showToast(result.message || "فشل التوليد", "error");
                 }
-            } catch (e) {
-                alert("خطأ: " + e.message);
-            }
+            } catch (e) { showToast("خطأ: " + e.message, "error"); }
             btn.disabled = false;
-            btn.textContent = "توليد الصوت";
+            btn.innerHTML = '<i class="fas fa-play mr-2"></i>توليد الصوت';
         });
 
+        // Clone
         document.getElementById("clone-generate")?.addEventListener("click", async () => {
             const btn = document.getElementById("clone-generate");
             const fileInput = document.getElementById("clone-file");
             const text = document.getElementById("clone-text").value.trim();
-            if (!fileInput.files[0] || !text) return alert("ارفع ملفاً واكتب نصاً");
+            if (!fileInput.files[0] || !text) return showToast("ارفع ملفاً واكتب نصاً", "error");
             btn.disabled = true;
-            btn.innerHTML = \'<span class="loading"></span> جارٍ الاستنساخ...\';
+            btn.innerHTML = '<span class="loading mr-2"></span> جارٍ الاستنساخ...';
             try {
                 const formData = new FormData();
                 formData.append("file", fileInput.files[0]);
-                const upRes = await fetch(API + "/api/uploads", {method: "POST", body: formData});
+                const upRes = await fetch(API + "/api/uploads", { method: "POST", body: formData });
                 const upData = await upRes.json();
+                if (!upData.success) { showToast("فشل رفع الملف", "error"); return; }
                 const result = await apiPost("/api/audio/clone", {
-                    reference_audio: upData.path, text: text, engine: "xtts"
+                    reference_audio: upData.path, text: text,
+                    engine: document.getElementById("clone-engine").value,
                 });
                 if (result.url) {
                     document.getElementById("clone-result").classList.remove("hidden");
                     document.getElementById("clone-audio").src = result.url;
-                } else {
-                    alert(result.message || "فشل الاستنساخ");
-                }
-            } catch (e) {
-                alert("خطأ: " + e.message);
-            }
+                    showToast("تم الاستنساخ بنجاح!", "success");
+                } else { showToast(result.message || "فشل الاستنساخ", "error"); }
+            } catch (e) { showToast("خطأ: " + e.message, "error"); }
             btn.disabled = false;
-            btn.textContent = "استنساخ الصوت";
+            btn.innerHTML = '<i class="fas fa-clone mr-2"></i>استنساخ الصوت';
         });
 
-        document.getElementById("religious-generate")?.addEventListener("click", async () => {
-            const text = document.getElementById("religious-text").value.trim();
-            if (!text) return alert("اكتب نصاً أولاً");
-            document.getElementById("religious-text").value = text;
-            document.querySelector(\'[data-page="tts"]\').click();
-            document.getElementById("tts-text").value = text;
-        });
-
-        document.getElementById("effects-apply")?.addEventListener("click", async () => {
-            const fileInput = document.getElementById("effects-file");
-            if (!fileInput.files[0]) return alert("ارفع ملفاً أولاً");
-            const formData = new FormData();
-            formData.append("file", fileInput.files[0]);
+        // Plugins
+        async function loadPlugins() {
             try {
-                const res = await fetch(API + "/api/uploads", {method: "POST", body: formData});
-                const data = await res.json();
-                alert("تم رفع الملف: " + data.filename + "\nالمؤثرات قيد التطوير - استخدم API للمعالجة المتقدمة");
-            } catch (e) {
-                alert("خطأ: " + e.message);
-            }
-        });
+                const data = await apiGet("/api/plugins");
+                const container = document.getElementById("plugins-list");
+                const plugins = [...(data.tts_plugins || []), ...(data.builtin_plugins || [])];
+                container.innerHTML = plugins.map(p => `
+                    <div class="card p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold">${p.label || p.name}</h3>
+                            <span class="status-badge ${p.installed ? 'status-ok' : 'status-warn'}">${p.installed ? 'مثبت' : 'غير مثبت'}</span>
+                        </div>
+                        <p class="text-sm opacity-60 mb-2">${p.description || ''}</p>
+                        <div class="text-xs opacity-40 mb-3">${p.models_count || 0} نماذج | ${p.voices_count || 0} أصوات</div>
+                        <div class="flex gap-2">
+                            ${!p.installed ? `<button onclick="pluginAction('${p.name}', 'install')" class="btn-primary px-3 py-1 rounded text-sm flex-1">تثبيت</button>` : ''}
+                            <button onclick="pluginAction('${p.name}', 'reload')" class="px-3 py-1 rounded text-sm border border-gray-600 hover:border-teal-500 transition">إعادة تحميل</button>
+                        </div>
+                    </div>
+                `).join("");
+            } catch (e) { showToast("فشل تحميل الإضافات", "error"); }
+        }
 
+        async function pluginAction(name, action) {
+            try {
+                const result = await apiPost("/api/plugins/action", { name, action });
+                showToast(result.message || "تم", result.success ? "success" : "error");
+                loadPlugins();
+            } catch (e) { showToast("خطأ", "error"); }
+        }
+
+        // Models
+        async function loadModels() {
+            try {
+                const data = await apiGet("/api/models");
+                const container = document.getElementById("models-list");
+                container.innerHTML = (data.models || []).map(m => `
+                    <div class="card p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold">${m.name}</h3>
+                            <span class="status-badge ${m.downloaded ? 'status-ok' : 'status-warn'}">${m.downloaded ? 'محمل' : 'متاح'}</span>
+                        </div>
+                        <p class="text-sm opacity-60 mb-1">المحرك: ${m.engine || '-'}</p>
+                        <p class="text-sm opacity-60 mb-2">اللغة: ${m.language || '-'}</p>
+                        <div class="flex gap-2">
+                            ${!m.downloaded ? `<button onclick="downloadModel('${m.engine}', '${m.name}')" class="btn-primary px-3 py-1 rounded text-sm flex-1">تحميل</button>` : ''}
+                            ${m.downloaded ? `<button onclick="verifyModel('${m.engine}', '${m.name}')" class="px-3 py-1 rounded text-sm border border-gray-600">تحقق</button>` : ''}
+                        </div>
+                    </div>
+                `).join("") || '<p class="opacity-50 col-span-full text-center">لا توجد نماذج</p>';
+            } catch (e) {}
+        }
+
+        async function downloadModel(engine, model) {
+            showToast("جارٍ بدء التحميل...");
+            await apiPost("/api/models/download", { engine, model_name: model });
+            showToast("تم بدء التحميل", "success");
+        }
+
+        async function verifyModel(engine, model) {
+            const result = await apiPost(`/api/models/${engine}/${model}/verify`, {});
+            showToast(result.verified ? "النموذج سليم" : "فشل التحقق", result.verified ? "success" : "error");
+        }
+
+        async function searchModels() {
+            const query = document.getElementById("model-search").value;
+            const engine = document.getElementById("model-engine-filter").value;
+            const result = await apiPost("/api/models/search", { query, engine });
+            const container = document.getElementById("models-list");
+            container.innerHTML = (result.models || []).map(m => `
+                <div class="card p-4">
+                    <h3 class="font-bold">${m.name}</h3>
+                    <p class="text-sm opacity-60">${m.engine} | ${m.language}</p>
+                    <span class="status-badge ${m.downloaded ? 'status-ok' : 'status-warn'} mt-2 inline-block">${m.downloaded ? 'محمل' : 'غير محمل'}</span>
+                </div>
+            `).join("");
+        }
+
+        // Voices
+        async function loadVoices() {
+            try {
+                const data = await apiGet("/api/voices");
+                const container = document.getElementById("voices-list");
+                container.innerHTML = (data.voices || []).map(v => `
+                    <div class="card p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold">${v.name}</h3>
+                            <button onclick="toggleFav('${v.id}')" class="text-lg ${v.is_favorite ? 'text-yellow-500' : 'opacity-30 hover:opacity-60'}"><i class="fas fa-star"></i></button>
+                        </div>
+                        <p class="text-sm opacity-60">${v.engine} | ${v.language}</p>
+                        <div class="flex gap-1 mt-2 flex-wrap">
+                            ${(v.tags || []).map(t => `<span class="text-xs px-2 py-0.5 rounded-full" style="background: var(--bg-input)">${t}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join("");
+            } catch (e) {}
+        }
+
+        async function toggleFav(id) { await apiPost(`/api/voices/${id}/favorite`); loadVoices(); }
+        async function searchVoices() {
+            const query = document.getElementById("voice-search").value;
+            const lang = document.getElementById("voice-lang-filter").value;
+            const result = await apiPost("/api/voices/search", { query, language: lang });
+            document.getElementById("voices-list").innerHTML = (result.voices || []).map(v => `
+                <div class="card p-4"><h3 class="font-bold">${v.name}</h3><p class="text-sm opacity-60">${v.engine}</p></div>
+            `).join("");
+        }
+
+        // Downloads
+        async function loadDownloads() {
+            try {
+                const data = await apiGet("/api/downloads/tasks");
+                document.getElementById("downloads-list").innerHTML = (data.downloads || []).map(d => `
+                    <div class="card p-3 flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-sm">${d.filename || d.url}</p>
+                            <p class="text-xs opacity-50">${d.status} | ${d.progress || 0}%</p>
+                            ${d.progress > 0 ? `<div class="progress-bar w-48 h-2 mt-1"><div class="progress-fill h-full" style="width: ${d.progress}%"></div></div>` : ''}
+                        </div>
+                        <div class="flex gap-2">
+                            ${d.status === 'pending' ? `<button onclick="startDownload('${d.id}')" class="btn-primary px-3 py-1 rounded text-sm">بدء</button>` : ''}
+                            <button onclick="cancelDownload('${d.id}')" class="px-3 py-1 rounded text-sm border border-red-600 text-red-400 hover:bg-red-900/20">إلغاء</button>
+                        </div>
+                    </div>
+                `).join("") || '<p class="opacity-50 text-center">لا توجد تحميلات</p>';
+            } catch (e) {}
+        }
+
+        async function createDownload() {
+            const url = document.getElementById("dl-url").value;
+            if (!url) return;
+            await apiPost("/api/downloads/create", { url });
+            document.getElementById("dl-url").value = "";
+            loadDownloads();
+        }
+
+        async function startDownload(id) { await apiPost(`/api/downloads/${id}/start`); loadDownloads(); }
+
+        // Uploads
+        async function loadUploads() {
+            try {
+                const data = await apiGet("/api/uploads");
+                document.getElementById("uploads-list").innerHTML = (data.uploads || []).map(u => `
+                    <div class="card p-3 flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-sm">${u.original_name}</p>
+                            <p class="text-xs opacity-50">${u.size_human} | ${u.content_type}</p>
+                        </div>
+                        <button onclick="deleteUpload('${u.id}')" class="px-3 py-1 rounded text-sm border border-red-600 text-red-400 hover:bg-red-900/20">حذف</button>
+                    </div>
+                `).join("") || '<p class="opacity-50 text-center">لا توجد ملفات مرفوعة</p>';
+            } catch (e) {}
+        }
+
+        async function handleUpload(files) {
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append("file", file);
+                showToast(`جارٍ رفع ${file.name}...`);
+                await fetch(API + "/api/uploads", { method: "POST", body: formData });
+            }
+            showToast("تم الرفع بنجاح!", "success");
+            loadUploads();
+        }
+
+        async function deleteUpload(id) { await apiDelete(`/api/uploads/${id}`); loadUploads(); }
+
+        // Tasks
+        async function loadTasks() {
+            try {
+                const [tasks, stats] = await Promise.all([apiGet("/api/tasks"), apiGet("/api/tasks/stats")]);
+                document.getElementById("tasks-stats").innerHTML = Object.entries(stats.by_status || {}).map(([k, v]) => `
+                    <div class="card p-3 text-center"><p class="text-2xl font-bold">${v}</p><p class="text-xs opacity-60">${k}</p></div>
+                `).join("");
+                document.getElementById("tasks-list").innerHTML = (tasks.tasks || []).slice(0, 20).map(t => `
+                    <div class="card p-3 flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-sm">${t.name}</p>
+                            <p class="text-xs opacity-50">${t.task_type} | <span class="status-badge ${t.status === 'completed' ? 'status-ok' : t.status === 'failed' ? 'status-error' : 'status-warn'}">${t.status}</span></p>
+                        </div>
+                        ${t.status === 'queued' || t.status === 'running' ? `<button onclick="cancelTask('${t.id}')" class="px-3 py-1 rounded text-sm border border-red-600 text-red-400">إلغاء</button>` : ''}
+                    </div>
+                `).join("") || '<p class="opacity-50 text-center">لا توجد مهام</p>';
+            } catch (e) {}
+        }
+
+        async function cancelTask(id) { await apiPost(`/api/tasks/${id}/cancel`); loadTasks(); }
+
+        // Health
+        async function loadHealth() {
+            try {
+                const data = await apiGet("/health/detailed");
+                document.getElementById("health-checks").innerHTML = (data.checks || []).map(c => `
+                    <div class="card p-3 flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-sm">${c.name}</p>
+                            <p class="text-xs opacity-50">${c.detail}</p>
+                        </div>
+                        <span class="status-badge ${c.ok ? 'status-ok' : c.severity === 'critical' ? 'status-error' : 'status-warn'}">${c.ok ? 'سليم' : 'مشكلة'}</span>
+                    </div>
+                `).join("");
+            } catch (e) {}
+        }
+
+        // Logs
+        async function loadLogs() {
+            try {
+                const level = document.getElementById("log-level").value;
+                const data = await apiGet(`/api/logs?lines=500&level=${level}`);
+                document.getElementById("logs-content").textContent = (data.logs || []).join("\n");
+            } catch (e) { document.getElementById("logs-content").textContent = "فشل تحميل السجلات"; }
+        }
+
+        // Settings
+        async function loadSettings() {
+            try {
+                const data = await apiGet("/api/settings");
+                const container = document.getElementById("settings-container");
+                container.innerHTML = Object.entries(data).map(([section, values]) => `
+                    <div class="card p-4">
+                        <h3 class="font-bold mb-3 capitalize">${section}</h3>
+                        <div class="space-y-3">
+                            ${Object.entries(values).map(([key, val]) => `
+                                <div>
+                                    <label class="block text-xs opacity-60 mb-1">${key}</label>
+                                    ${typeof val === 'boolean' ?
+                                        `<input type="checkbox" ${val ? 'checked' : ''} onchange="updateSetting('${section}', '${key}', this.checked)" class="w-5 h-5 rounded">` :
+                                        `<input type="${typeof val === 'number' ? 'number' : 'text'}" value="${val}" onchange="updateSetting('${section}', '${key}', this.value)" class="w-full p-2 rounded-lg text-sm">`
+                                    }
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join("");
+            } catch (e) {}
+        }
+
+        async function updateSetting(section, key, value) {
+            await apiPost(`/api/settings/${section}`, { section, values: { [key]: value } });
+            showToast("تم حفظ الإعداد");
+        }
+
+        // Initial load
         loadDashboard();
+        setInterval(() => { if (currentPage === 'dashboard') loadDashboard(); }, 30000);
     </script>
 </body>
 </html>

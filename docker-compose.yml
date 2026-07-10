@@ -1,10 +1,12 @@
 version: "3.8"
 
 services:
-  voice-ai:
+  voice-ai-studio:
     build: .
+    image: voice-ai-studio:latest
+    container_name: voice-ai-studio
     ports:
-      - "7860:8000"
+      - "8000:8000"
     volumes:
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
@@ -12,9 +14,35 @@ services:
       - ./logs:/app/logs
       - ./models:/app/models
       - ./voices:/app/voices
+      - ./downloads:/app/downloads
+      - ./config:/app/config
+      - ./datasets:/app/datasets
     environment:
       - APP_HOST=0.0.0.0
       - APP_PORT=8000
+      - APP_ENV=production
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_TTS_MODEL=${GEMINI_TTS_MODEL:-gemini-3.1-flash-tts-preview}
+      - MAX_UPLOAD_MB=100
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS=120
+      - RATE_LIMIT_WINDOW=60
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    networks:
+      - voice-ai-network
+
+networks:
+  voice-ai-network:
+    driver: bridge
