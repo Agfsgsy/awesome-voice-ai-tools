@@ -4,38 +4,33 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voice-ai-studio-arabic"
-version = "2.0.0"
-description = "منصة صوتيات عربية لتوليد واستنساخ الصوت"
+version = "3.0.0"
+description = "Professional open-source voice AI platform - TTS, voice cloning, audio processing"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [{name = "Voice AI Studio"}]
-
 dependencies = [
     "fastapi>=0.115.0",
-    "uvicorn>=0.34.0",
+    "uvicorn[standard]>=0.34.0",
     "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
     "python-multipart>=0.0.20",
     "httpx>=0.28.0",
     "aiofiles>=24.0.0",
+    "numpy>=1.26.0",
+    "scipy>=1.14.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
-colab = [
-    "google-genai>=0.3.0",
-    "kokoro>=0.8.4",
-    "TTS>=0.22.0",
-    "soundfile>=0.12.0",
-    "librosa>=0.10.0",
-    "pydub>=0.25.1",
-    "nest-asyncio>=1.6.0",
-]
-linux = [
+ai = [
     "torch>=2.1.0",
     "torchaudio>=2.1.0",
     "google-genai>=0.3.0",
     "kokoro>=0.8.4",
     "TTS>=0.22.0",
+    "piper-tts>=1.2.0",
     "soundfile>=0.12.0",
     "librosa>=0.10.0",
     "pydub>=0.25.1",
@@ -43,10 +38,10 @@ linux = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "httpx>=0.28.0",
     "black>=24.0.0",
     "ruff>=0.8.0",
     "isort>=5.13.0",
-    "autopep8>=2.3.0",
 ]
 
 [tool.ruff]
