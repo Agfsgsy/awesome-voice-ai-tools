@@ -1,0 +1,5 @@
+# Kokoro Requirements
+kokoro
+soundfile
+numpy
+gradio>=4.0
