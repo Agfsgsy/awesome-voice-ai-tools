@@ -1,12 +1,19 @@
-"""نقطة تشغيل التطبيق الرئيسية"""
+"""Voice AI Studio Arabic - Main Application Entry Point v3.0"""
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from backend.core.config import APP_NAME, APP_VERSION, APP_HOST, APP_PORT, APP_DEBUG, FRONTEND_DIR
-from backend.core.logger import get_logger
+from backend.core.config import settings
+from backend.core.logger import get_logger, set_request_id
+from backend.core.security import (
+    SecurityHeadersMiddleware, RequestLoggingMiddleware, rate_limiter
+)
+from backend.core.health import health_checker
+from backend.core.cache_manager import cache_manager
+from backend.core.output_manager import output_manager
 from backend.api.routes import router
 
 logger = get_logger("main")
@@ -14,40 +21,84 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info(f"Starting {APP_NAME} v{APP_VERSION}")
+    """Application lifespan management"""
+    logger.info(f"=== Starting {settings.APP_NAME} v{settings.APP_VERSION} ===")
+    logger.info(f"Environment: {settings.APP_ENV}")
+    logger.info(f"Device: {settings.GPUConfig.get_device()}")
+    logger.info(f"Debug: {settings.APP_DEBUG}")
+
+    # Startup tasks
+    try:
+        # Clean old output files
+        cleaned = output_manager.cleanup_old_files()
+        if cleaned > 0:
+            logger.info(f"Cleaned {cleaned} old output files")
+
+        # Clean expired cache
+        expired = await cache_manager.cleanup_expired()
+        if expired > 0:
+            logger.info(f"Cleaned {expired} expired cache entries")
+    except Exception as e:
+        logger.warning(f"Startup cleanup error: {e}")
+
     yield
-    logger.info(f"Shutting down {APP_NAME}")
+
+    # Shutdown tasks
+    logger.info(f"=== Shutting down {settings.APP_NAME} ===")
 
 
+# Create FastAPI application
 app = FastAPI(
-    title=APP_NAME,
-    description="منصة صوتيات عربية لتوليد واستنساخ الصوت - مفتوحة المصدر",
-    version=APP_VERSION,
+    title=settings.APP_NAME,
+    description="Professional open-source voice AI platform - TTS, voice cloning, audio processing",
+    version=settings.APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_url="/openapi.json",
     lifespan=lifespan,
 )
 
+# Security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.CORS_ORIGINS_LIST,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=settings.CORS_ALLOW_METHODS.split(","),
+    allow_headers=settings.CORS_ALLOW_HEADERS.split(","),
 )
 
-app.include_router(router)
+# Include all API routes
+app.include_router(router, prefix="")
 
-static_dir = FRONTEND_DIR / "static"
+# Static files
+static_dir = settings.FRONTEND_DIR / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": request.headers.get("X-Request-ID", "")},
+    )
+
+
 if __name__ == "__main__":
-    logger.info(f"Running on http://{APP_HOST}:{APP_PORT}")
+    logger.info(f"Server running on http://{settings.APP_HOST}:{settings.APP_PORT}")
     uvicorn.run(
         "main:app",
-        host=APP_HOST,
-        port=APP_PORT,
-        reload=APP_DEBUG,
+        host=settings.APP_HOST,
+        port=settings.APP_PORT,
+        reload=settings.APP_DEBUG,
         log_level="info",
+        access_log=False,  # We handle access logging via middleware
     )
