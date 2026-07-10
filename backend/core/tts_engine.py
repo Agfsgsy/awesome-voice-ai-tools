@@ -21,7 +21,6 @@ class TTSEngine:
         self._init_engines()
 
     def _init_engines(self):
-        """تهيئة قائمة المحركات المتاحة"""
         engine_defs = [
             {"name": "kokoro", "label": "Kokoro TTS", "available": self._check_lib("kokoro")},
             {"name": "piper", "label": "Piper TTS", "available": self._check_lib("piper_tts")},
@@ -29,7 +28,7 @@ class TTSEngine:
             {"name": "bark", "label": "Bark", "available": self._check_lib("bark")},
             {"name": "melotts", "label": "MeloTTS", "available": self._check_lib("melotts")},
             {"name": "gemini", "label": "Google Gemini TTS", "available": bool(GEMINI_API_KEY)},
-            {"name": "fallback", "label": "محرك احتياطي (نغمة)", "available": True},
+            {"name": "fallback", "label": "Fallback (tone)", "available": True},
         ]
         for e in engine_defs:
             self.engines[e["name"]] = e
@@ -59,11 +58,13 @@ class TTSEngine:
         speed: float = 1.0,
         pitch: float = 0.0,
     ) -> Dict[str, Any]:
-        """توليد صوت من نص"""
         logger.info(f"TTS request: engine={engine}, lang={language}, text_len={len(text)}")
 
         if not text.strip():
-            return {"success": False, "engine": engine, "message": "النص فارغ", "file": None, "url": None}
+            return {"success": False, "engine": engine, "message": "Text is empty", "file": None, "url": None}
+
+        if engine == "fallback":
+            return await self._synth_fallback(text, language, voice, speed)
 
         if engine == "gemini" and GEMINI_API_KEY:
             return await self._synth_gemini(text, language, voice, speed)
@@ -81,8 +82,7 @@ class TTSEngine:
         return await self._synth_fallback(text, language, voice, speed)
 
     async def _synth_fallback(self, text: str, language: str, voice: str, speed: float) -> Dict:
-        """توليد صوت تجريبي (نغمة بسيطة)"""
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
         duration = min(max(len(text) * 0.05, 0.5), 10.0)
         audio_data = generate_sine_wave(frequency=440.0, duration=duration)
         name_hash = hashlib.md5(text.encode()).hexdigest()[:8]
@@ -93,7 +93,7 @@ class TTSEngine:
             "engine": "fallback",
             "file": str(filepath),
             "url": f"/api/downloads/{filepath.name}",
-            "message": "تم التوليد بالمحرك الاحتياطي (نغمة تجريبية). ثبّت kokoro أو TTS للحصول على صوت حقيقي.",
+            "message": "Generated with fallback engine (test tone). Install kokoro or TTS for real speech.",
         }
 
     async def _synth_kokoro(self, text: str, language: str, voice: str, speed: float) -> Dict:
@@ -113,7 +113,7 @@ class TTSEngine:
                 "success": True, "engine": "kokoro",
                 "file": str(filepath),
                 "url": f"/api/downloads/{filepath.name}",
-                "message": "تم التوليد بنجاح باستخدام Kokoro TTS",
+                "message": "Generated with Kokoro TTS",
             }
         except Exception as e:
             logger.error(f"Kokoro TTS failed: {e}")
@@ -131,7 +131,7 @@ class TTSEngine:
                 "success": True, "engine": "xtts",
                 "file": str(filepath),
                 "url": f"/api/downloads/{filepath.name}",
-                "message": "تم التوليد بنجاح باستخدام XTTS-v2",
+                "message": "Generated with XTTS-v2",
             }
         except Exception as e:
             logger.error(f"XTTS failed: {e}")
@@ -150,14 +150,13 @@ class TTSEngine:
                 "success": True, "engine": "bark",
                 "file": str(filepath),
                 "url": f"/api/downloads/{filepath.name}",
-                "message": "تم التوليد بنجاح باستخدام Bark",
+                "message": "Generated with Bark",
             }
         except Exception as e:
             logger.error(f"Bark failed: {e}")
             return await self._synth_fallback(text, language, voice, speed)
 
     async def _synth_gemini(self, text: str, language: str, voice: str, speed: float) -> Dict:
-        """توليد صوت باستخدام Google Gemini TTS API"""
         try:
             from google import genai
             from google.genai.types import GenerateContentConfig
@@ -185,7 +184,7 @@ class TTSEngine:
                 "success": True, "engine": "gemini",
                 "file": str(filepath),
                 "url": f"/api/downloads/{filepath.name}",
-                "message": "تم التوليد بنجاح باستخدام Google Gemini TTS",
+                "message": "Generated with Google Gemini TTS",
             }
         except Exception as e:
             logger.error(f"Gemini TTS failed: {e}")
@@ -194,7 +193,6 @@ class TTSEngine:
     async def clone_voice(
         self, reference_audio_path: str, text: str, engine: str = "xtts"
     ) -> Dict[str, Any]:
-        """استنساخ صوت باستخدام عينة مرجعية"""
         logger.info(f"Voice clone: engine={engine}, ref={reference_audio_path}")
         try:
             if engine == "xtts" and self._check_lib("TTS"):
@@ -213,20 +211,20 @@ class TTSEngine:
                     "success": True, "engine": "xtts",
                     "file": str(filepath),
                     "url": f"/api/downloads/{filepath.name}",
-                    "message": "تم استنساخ الصوت بنجاح باستخدام XTTS-v2",
+                    "message": "Voice cloned with XTTS-v2",
                 }
             else:
                 return {
                     "success": False, "engine": engine,
                     "file": None, "url": None,
-                    "message": f"محرك {engine} غير متاح. ثبّت TTS (pip install TTS) للاستنساخ.",
+                    "message": f"Engine {engine} not available. Install TTS: pip install TTS",
                 }
         except Exception as e:
             logger.error(f"Voice clone failed: {e}")
             return {
                 "success": False, "engine": engine,
                 "file": None, "url": None,
-                "message": f"فشل استنساخ الصوت: {e}",
+                "message": f"Voice clone failed: {e}",
             }
 
 

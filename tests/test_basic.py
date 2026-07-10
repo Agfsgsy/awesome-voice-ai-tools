@@ -3,12 +3,10 @@ import sys
 import os
 import pytest
 
-# Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_config_import():
-    """اختبار استيراد الإعدادات"""
     from backend.core.config import APP_NAME, APP_VERSION, APP_PORT
     assert APP_NAME == "Voice AI Studio Arabic"
     assert APP_VERSION == "2.0.0"
@@ -16,14 +14,12 @@ def test_config_import():
 
 
 def test_logger_import():
-    """اختبار نظام التسجيل"""
     from backend.core.logger import get_logger
     logger = get_logger("test")
     assert logger is not None
 
 
 def test_audio_utils_import():
-    """اختبار أدوات الصوت"""
     from backend.core.audio_utils import generate_sine_wave
     data = generate_sine_wave(frequency=440, duration=0.1)
     assert len(data) > 0
@@ -31,7 +27,6 @@ def test_audio_utils_import():
 
 
 def test_plugin_manager_import():
-    """اختبار مدير الإضافات"""
     from backend.core.plugin_manager import PluginManager
     from pathlib import Path
     pm = PluginManager(Path("."))
@@ -39,7 +34,6 @@ def test_plugin_manager_import():
 
 
 def test_tts_engine_import():
-    """اختبار محرك TTS"""
     from backend.core.tts_engine import TTSEngine
     engine = TTSEngine()
     engines = engine.list_engines()
@@ -48,7 +42,6 @@ def test_tts_engine_import():
 
 
 def test_health_checks():
-    """اختبار فحوصات الصحة"""
     from backend.core.health import run_all_checks
     checks = run_all_checks(8001)
     assert len(checks) > 0
@@ -58,15 +51,13 @@ def test_health_checks():
 
 @pytest.mark.asyncio
 async def test_tts_fallback():
-    """اختبار المحرك الاحتياطي"""
     from backend.core.tts_engine import tts
-    result = await tts.synthesize(text="اختبار", engine="nonexistent")
+    result = await tts.synthesize(text="test", engine="fallback")
     assert result["success"] is True
     assert result["engine"] == "fallback"
 
 
 def test_fastapi_app():
-    """اختبار تطبيق FastAPI"""
     from main import app
     assert app is not None
     assert app.title == "Voice AI Studio Arabic"
