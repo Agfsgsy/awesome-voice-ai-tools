@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice AI Studio Arabic</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Cairo', sans-serif; }
+        body { background: #0f0f1a; color: #e0e0e0; }
+        .card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; }
+        .btn-primary { background: linear-gradient(135deg, #0f6b6b, #0d9488); transition: all 0.3s; }
+        .btn-primary:hover { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+        .nav-item.active { background: rgba(13, 148, 136, 0.15); border-right: 3px solid #0d9488; }
+        input, textarea, select { background: #16213e; border: 1px solid #2a2a4a; color: #e0e0e0; }
+        input:focus, textarea:focus, select:focus { border-color: #0d9488; outline: none; }
+        audio { width: 100%; }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #0d9488; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 card min-h-screen p-4 flex-shrink-0 hidden md:block">
+            <h1 class="text-xl font-bold text-teal-400 mb-6">🎙️ Voice AI Studio</h1>
+            <nav class="space-y-1">
+                <a href="#" class="nav-item active block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="dashboard">لوحة التحكم</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="tts">توليد الصوت</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="clone">استنساخ الصوت</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="effects">المؤثرات الصوتية</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="religious">المحتوى الإسلامي</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="library">المكتبة</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="settings">الإعدادات</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-6">
+            <!-- Dashboard -->
+            <div id="page-dashboard" class="page">
+                <h2 class="text-2xl font-bold mb-6">لوحة التحكم</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="card p-4">
+                        <p class="text-teal-400 text-sm">الملفات</p>
+                        <p class="text-2xl font-bold" id="stat-files">-</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-teal-400 text-sm">المحركات</p>
+                        <p class="text-2xl font-bold" id="stat-engines">-</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-teal-400 text-sm">الإضافات</p>
+                        <p class="text-2xl font-bold" id="stat-plugins">-</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-teal-400 text-sm">الحالة</p>
+                        <p class="text-2xl font-bold text-green-400" id="stat-status">-</p>
+                    </div>
+                </div>
+                <div class="card p-6">
+                    <h3 class="text-lg font-bold mb-4">أحدث الملفات</h3>
+                    <div id="recent-files" class="space-y-2">
+                        <p class="text-gray-500">جارٍ التحميل...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TTS -->
+            <div id="page-tts" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">توليد الصوت</h2>
+                <div class="card p-6">
+                    <label class="block text-sm mb-2 text-teal-400">النص</label>
+                    <textarea id="tts-text" rows="5" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص هنا..."></textarea>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm mb-2 text-teal-400">المحرك</label>
+                            <select id="tts-engine" class="w-full p-2 rounded-lg">
+                                <option value="kokoro">Kokoro TTS</option>
+                                <option value="piper">Piper TTS</option>
+                                <option value="gemini">Google Gemini TTS</option>
+                                <option value="xtts">XTTS-v2</option>
+                                <option value="bark">Bark</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-teal-400">اللغة</label>
+                            <select id="tts-language" class="w-full p-2 rounded-lg">
+                                <option value="ar">العربية</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm mb-2 text-teal-400">السرعة</label>
+                            <input type="range" id="tts-speed" min="0.5" max="2" step="0.1" value="1" class="w-full">
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-teal-400">الصوت</label>
+                            <input type="text" id="tts-voice" value="default" class="w-full p-2 rounded-lg">
+                        </div>
+                    </div>
+                    <button id="tts-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">توليد الصوت</button>
+                    <div id="tts-result" class="mt-4 hidden">
+                        <audio id="tts-audio" controls class="mb-2"></audio>
+                        <a id="tts-download" class="btn-primary px-4 py-2 rounded-lg inline-block text-sm">تحميل</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clone -->
+            <div id="page-clone" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">استنساخ الصوت</h2>
+                <div class="card p-6">
+                    <div class="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4 mb-4">
+                        <p class="text-yellow-400 text-sm">⚠️ يجب استخدام استنساخ الصوت بإذن صريح من صاحب الصوت.</p>
+                    </div>
+                    <label class="block text-sm mb-2 text-teal-400">رفع ملف صوتي مرجعي</label>
+                    <input type="file" id="clone-file" accept=".wav,.mp3" class="w-full p-2 mb-4">
+                    <label class="block text-sm mb-2 text-teal-400">النص</label>
+                    <textarea id="clone-text" rows="3" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص المراد استنساخه..."></textarea>
+                    <button id="clone-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">استنساخ الصوت</button>
+                    <div id="clone-result" class="mt-4 hidden">
+                        <audio id="clone-audio" controls class="mb-2"></audio>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Effects -->
+            <div id="page-effects" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">المؤثرات الصوتية</h2>
+                <div class="card p-6">
+                    <label class="block text-sm mb-2 text-teal-400">رفع ملف صوت</label>
+                    <input type="file" id="effects-file" accept=".wav,.mp3" class="w-full p-2 mb-4">
+                    <label class="block text-sm mb-2 text-teal-400">الإعداد المسبق</label>
+                    <select id="effects-preset" class="w-full p-2 rounded-lg mb-4">
+                        <option value="studio">صوت استوديو</option>
+                        <option value="lecture">محاضرة</option>
+                        <option value="mosque">صوت مسجد</option>
+                        <option value="deep_voice">صوت عميق</option>
+                        <option value="podcast">بودكاست</option>
+                        <option value="video_commentary">تعليق فيديو</option>
+                    </select>
+                    <button id="effects-apply" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">تطبيق المؤثرات</button>
+                </div>
+            </div>
+
+            <!-- Religious -->
+            <div id="page-religious" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">المحتوى الإسلامي</h2>
+                <div class="card p-6">
+                    <div class="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4 mb-4">
+                        <p class="text-yellow-400 text-sm">⚠️ يجب مراجعة النصوص القرآنية والدينية من مصدر موثوق قبل النشر، ولا تنسب صوتاً مولداً إلى قارئ أو شيخ حقيقي.</p>
+                    </div>
+                    <label class="block text-sm mb-2 text-teal-400">نوع المحتوى</label>
+                    <select id="religious-type" class="w-full p-2 rounded-lg mb-4">
+                        <option value="advice">موعظة</option>
+                        <option value="dua">دعاء</option>
+                        <option value="azkar">أذكار</option>
+                        <option value="lesson">درس</option>
+                    </select>
+                    <label class="block text-sm mb-2 text-teal-400">النص</label>
+                    <textarea id="religious-text" rows="5" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص هنا..."></textarea>
+                    <button id="religious-generate" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">توليد الصوت</button>
+                </div>
+            </div>
+
+            <!-- Library -->
+            <div id="page-library" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">المكتبة</h2>
+                <div class="card p-6">
+                    <div id="library-files" class="space-y-2">
+                        <p class="text-gray-500">جارٍ التحميل...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div id="page-settings" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">الإعدادات</h2>
+                <div class="card p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm mb-2 text-teal-400">Gemini API Key</label>
+                        <input type="password" id="settings-gemini-key" class="w-full p-2 rounded-lg" placeholder="••••••••">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-2 text-teal-400">Gemini TTS Model</label>
+                        <input type="text" id="settings-gemini-model" class="w-full p-2 rounded-lg" value="gemini-3.1-flash-tts-preview">
+                    </div>
+                    <div id="settings-status" class="text-sm text-gray-400"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API = window.location.origin;
+        let currentPage = "dashboard";
+
+        document.querySelectorAll(".nav-item").forEach(item => {
+            item.addEventListener("click", (e) => {
+                e.preventDefault();
+                document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+                item.classList.add("active");
+                document.querySelectorAll(".page").forEach(p => p.classList.add("hidden"));
+                const page = item.dataset.page;
+                document.getElementById("page-" + page).classList.remove("hidden");
+                currentPage = page;
+                if (page === "dashboard") loadDashboard();
+                if (page === "library") loadLibrary();
+                if (page === "settings") loadSettings();
+            });
+        });
+
+        async function apiGet(path) {
+            const res = await fetch(API + path);
+            return res.json();
+        }
+        async function apiPost(path, data) {
+            const res = await fetch(API + path, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(data)
+            });
+            return res.json();
+        }
+
+        async function loadDashboard() {
+            try {
+                const [status, downloads, info] = await Promise.all([
+                    apiGet("/status"), apiGet("/api/downloads"), apiGet("/api/info")
+                ]);
+                document.getElementById("stat-files").textContent = downloads.count;
+                document.getElementById("stat-engines").textContent = info.engines.length;
+                document.getElementById("stat-plugins").textContent = status.plugins_loaded;
+                document.getElementById("stat-status").textContent = "نشط";
+                const filesHtml = downloads.files.slice(0, 5).map(f =>
+                    `<div class="flex justify-between items-center p-2 hover:bg-teal-900/10 rounded">
+                        <span>${f.name}</span>
+                        <span class="text-xs text-gray-400">${(f.size/1024).toFixed(1)} KB</span>
+                    </div>`
+                ).join("") || "<p class=\'text-gray-500\'>لا توجد ملفات</p>";
+                document.getElementById("recent-files").innerHTML = filesHtml;
+            } catch (e) {
+                console.error("Dashboard load error:", e);
+            }
+        }
+
+        async function loadLibrary() {
+            try {
+                const downloads = await apiGet("/api/downloads");
+                const html = downloads.files.map(f =>
+                    `<div class="flex justify-between items-center p-3 hover:bg-teal-900/10 rounded-lg">
+                        <div>
+                            <p class="font-bold">${f.name}</p>
+                            <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <audio controls style="max-width:200px"><source src="/api/downloads/${f.name}"></audio>
+                            <a href="/api/downloads/${f.name}" download class="btn-primary px-3 py-1 rounded text-xs">تحميل</a>
+                            <button onclick="deleteFile(\'${f.name}\')" class="bg-red-900 px-3 py-1 rounded text-xs">حذف</button>
+                        </div>
+                    </div>`
+                ).join("") || "<p class=\'text-gray-500\'>لا توجد ملفات</p>";
+                document.getElementById("library-files").innerHTML = html;
+            } catch (e) {
+                console.error("Library load error:", e);
+            }
+        }
+
+        async function deleteFile(name) {
+            if (!confirm("حذف " + name + "?")) return;
+            await fetch(API + "/api/downloads/" + name, {method: "DELETE"});
+            loadLibrary();
+        }
+
+        async function loadSettings() {
+            try {
+                const s = await apiGet("/api/settings");
+                document.getElementById("settings-status").textContent =
+                    "Gemini: " + (s.gemini_api_key_set ? "مُفعّل ✓" : "غير مُفعّل ✗") +
+                    " | النموذج: " + s.gemini_tts_model;
+            } catch (e) {
+                console.error("Settings load error:", e);
+            }
+        }
+
+        document.getElementById("tts-generate")?.addEventListener("click", async () => {
+            const btn = document.getElementById("tts-generate");
+            const text = document.getElementById("tts-text").value.trim();
+            if (!text) return alert("اكتب نصاً أولاً");
+            btn.disabled = true;
+            btn.innerHTML = \'<span class="loading"></span> جارٍ التوليد...\';
+            try {
+                const result = await apiPost("/api/tts", {
+                    text: text,
+                    engine: document.getElementById("tts-engine").value,
+                    language: document.getElementById("tts-language").value,
+                    voice: document.getElementById("tts-voice").value,
+                    speed: parseFloat(document.getElementById("tts-speed").value),
+                });
+                if (result.url) {
+                    document.getElementById("tts-result").classList.remove("hidden");
+                    document.getElementById("tts-audio").src = result.url;
+                    document.getElementById("tts-download").href = result.url;
+                } else {
+                    alert(result.message || "فشل التوليد");
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+            btn.disabled = false;
+            btn.textContent = "توليد الصوت";
+        });
+
+        document.getElementById("clone-generate")?.addEventListener("click", async () => {
+            const btn = document.getElementById("clone-generate");
+            const fileInput = document.getElementById("clone-file");
+            const text = document.getElementById("clone-text").value.trim();
+            if (!fileInput.files[0] || !text) return alert("ارفع ملفاً واكتب نصاً");
+            btn.disabled = true;
+            btn.innerHTML = \'<span class="loading"></span> جارٍ الاستنساخ...\';
+            try {
+                const formData = new FormData();
+                formData.append("file", fileInput.files[0]);
+                const upRes = await fetch(API + "/api/uploads", {method: "POST", body: formData});
+                const upData = await upRes.json();
+                const result = await apiPost("/api/audio/clone", {
+                    reference_audio: upData.path, text: text, engine: "xtts"
+                });
+                if (result.url) {
+                    document.getElementById("clone-result").classList.remove("hidden");
+                    document.getElementById("clone-audio").src = result.url;
+                } else {
+                    alert(result.message || "فشل الاستنساخ");
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+            btn.disabled = false;
+            btn.textContent = "استنساخ الصوت";
+        });
+
+        document.getElementById("religious-generate")?.addEventListener("click", async () => {
+            const text = document.getElementById("religious-text").value.trim();
+            if (!text) return alert("اكتب نصاً أولاً");
+            document.getElementById("religious-text").value = text;
+            document.querySelector(\'[data-page="tts"]\').click();
+            document.getElementById("tts-text").value = text;
+        });
+
+        document.getElementById("effects-apply")?.addEventListener("click", async () => {
+            const fileInput = document.getElementById("effects-file");
+            if (!fileInput.files[0]) return alert("ارفع ملفاً أولاً");
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+            try {
+                const res = await fetch(API + "/api/uploads", {method: "POST", body: formData});
+                const data = await res.json();
+                alert("تم رفع الملف: " + data.filename + "\nالمؤثرات قيد التطوير - استخدم API للمعالجة المتقدمة");
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+        });
+
+        loadDashboard();
+    </script>
+</body>
+</html>

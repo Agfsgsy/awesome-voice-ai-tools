@@ -1,71 +1,55 @@
 #!/bin/bash
-# سكريبت تثبيت موحد لجميع أدوات الصوت
+# Voice AI Studio Arabic - Installation Script
+set -e
 
-echo "🎙️ تثبيت Voice AI Unified Launcher..."
+echo "=== Voice AI Studio Arabic - Installation ==="
 
-# التحقق من Python
+# Check Python
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 غير موجود. الرجاء تثبيته أولاً."
+    echo "[ERROR] Python 3 not found"
     exit 1
 fi
 
-# إنشاء بيئة افتراضية
-echo "📦 إنشاء بيئة افتراضية..."
-python3 -m venv venv
-source venv/bin/activate
+PYTHON=python3
+echo "[OK] Python: $($PYTHON --version)"
 
-# ترقية pip
-pip install --upgrade pip
+# Check if Termux
+IS_TERMUX=false
+if [ -d "/data/data/com.termux/files/usr" ]; then
+    IS_TERMUX=true
+    echo "[INFO] Termux detected"
+    REQ_FILE="requirements-termux.txt"
+else
+    REQ_FILE="requirements.txt"
+fi
 
-# تثبيت المتطلبات الأساسية
-echo "⬇️ تثبيت المتطلبات الأساسية..."
-pip install gradio soundfile numpy
+# Create venv
+if [ ! -d ".venv" ]; then
+    echo "[INFO] Creating virtual environment..."
+    $PYTHON -m venv .venv
+fi
 
-echo ""
-echo "اختر المحركات التي تريد تثبيتها:"
-echo "1) F5-TTS (موصى به - جودة عالية)"
-echo "2) Coqui XTTS-v2 (أفضل استنساخ)"
-echo "3) Bark (صوت إبداعي)"
-echo "4) Kokoro (سريع وخفيف)"
-echo "5) MeloTTS (خفيف جداً)"
-echo "6) جميع المحركات"
-echo ""
-read -p "أدخل أرقام اختيارك مفصولة بمسافة (مثال: 1 2): " choices
+# Activate venv
+if [ "$IS_TERMUX" = true ]; then
+    source .venv/bin/activate
+else
+    source .venv/bin/activate
+fi
 
-for choice in $choices; do
-    case $choice in
-        1)
-            echo "⬇️ تثبيت F5-TTS..."
-            pip install torch torchaudio
-            pip install f5-tts
-            ;;
-        2)
-            echo "⬇️ تثبيت Coqui XTTS-v2..."
-            pip install torch torchaudio
-            pip install TTS
-            ;;
-        3)
-            echo "⬇️ تثبيت Bark..."
-            pip install torch
-            pip install git+https://github.com/suno-ai/bark
-            ;;
-        4)
-            echo "⬇️ تثبيت Kokoro..."
-            pip install kokoro
-            ;;
-        5)
-            echo "⬇️ تثبيت MeloTTS..."
-            pip install git+https://github.com/myshell-ai/MeloTTS
-            ;;
-        6)
-            echo "⬇️ تثبيت جميع المحركات..."
-            pip install -r requirements/requirements-all.txt
-            pip install git+https://github.com/suno-ai/bark
-            pip install git+https://github.com/myshell-ai/MeloTTS
-            ;;
-    esac
+# Upgrade pip
+echo "[INFO] Upgrading pip..."
+pip install --upgrade pip wheel setuptools
+
+# Install requirements
+echo "[INFO] Installing requirements from $REQ_FILE..."
+pip install -r "$REQ_FILE"
+
+# Create directories
+for dir in uploads outputs cache logs models voices downloads config; do
+    mkdir -p "$dir"
 done
 
 echo ""
-echo "✅ التثبيت اكتمل!"
-echo "▶️ لتشغيل الواجهة: python app.py"
+echo "=== Installation Complete ==="
+echo "Run: ./scripts/run.sh"
+echo "URL: http://localhost:8000"

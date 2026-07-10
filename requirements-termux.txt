@@ -1,0 +1,16 @@
+# Voice AI Studio Arabic - Termux (Android) Requirements
+# Termux Python 3.11+ | No torch, no heavy models
+# Install: MATHLIB=m pip install -r requirements-termux.txt
+
+fastapi==0.115.6
+uvicorn==0.34.0
+pydantic==2.10.4
+python-multipart==0.0.20
+httpx==0.28.1
+numpy==1.26.4
+scipy==1.14.1
+aiofiles==24.1.0
+
+# Optional lightweight TTS (may need manual build)
+# kokoro>=0.8.4
+# piper-tts>=1.2.0

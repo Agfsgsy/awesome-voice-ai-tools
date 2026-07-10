@@ -1,5 +1,0 @@
-# MeloTTS Requirements
-git+https://github.com/myshell-ai/MeloTTS
-soundfile
-numpy
-gradio>=4.0

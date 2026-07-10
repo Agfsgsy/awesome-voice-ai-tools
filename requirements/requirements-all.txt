@@ -1,9 +1,0 @@
-# All Tools Combined
-gradio>=4.0
-soundfile
-numpy
-torch
-torchaudio
-TTS
-f5-tts
-kokoro

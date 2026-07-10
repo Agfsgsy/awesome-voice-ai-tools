@@ -1,7 +1,0 @@
-# Coqui XTTS-v2 Requirements
-TTS
-soundfile
-numpy
-torch
-torchaudio
-gradio>=4.0

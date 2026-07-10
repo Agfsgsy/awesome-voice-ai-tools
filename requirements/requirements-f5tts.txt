@@ -1,7 +1,0 @@
-# F5-TTS Requirements
-f5-tts
-soundfile
-numpy
-torch
-torchaudio
-gradio>=4.0

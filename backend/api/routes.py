@@ -1,0 +1,302 @@
+"""مسارات API الكاملة"""
+import os
+import json
+import shutil
+import platform
+import sys
+from pathlib import Path
+from typing import Optional, List
+from datetime import datetime
+
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from pydantic import BaseModel
+
+from backend.core.config import (
+    APP_NAME, APP_VERSION, APP_HOST, APP_PORT, APP_DEBUG,
+    IS_TERMUX, IS_ANDROID, IS_COLAB, GEMINI_API_KEY, GEMINI_TTS_MODEL,
+    MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, OUTPUTS_DIR,
+    CACHE_DIR, LOGS_DIR, CONFIG_DIR, ENGINE_PRIORITY, MAX_UPLOAD_MB,
+    SUPPORTED_AUDIO_FORMATS, PLUGINS_DIR
+)
+from backend.core.logger import get_logger
+from backend.core.health import run_all_checks
+from backend.core.tts_engine import tts
+from backend.core.plugin_manager import init_plugin_manager
+
+logger = get_logger("api")
+router = APIRouter()
+
+# === Models ===
+class TTSRequest(BaseModel):
+    text: str
+    engine: str = "kokoro"
+    language: str = "ar"
+    voice: str = "default"
+    speed: float = 1.0
+    pitch: float = 0.0
+
+class CloneRequest(BaseModel):
+    reference_audio: str
+    text: str
+    engine: str = "xtts"
+
+class SettingsUpdate(BaseModel):
+    gemini_api_key: Optional[str] = None
+    gemini_tts_model: Optional[str] = None
+    default_engine: Optional[str] = None
+    default_language: Optional[str] = None
+
+class RenameRequest(BaseModel):
+    new_name: str
+
+# === Init plugins ===
+try:
+    pm = init_plugin_manager(PLUGINS_DIR)
+    pm.load_all()
+except Exception as e:
+    logger.warning(f"Plugin init failed (non-critical): {e}")
+    pm = None
+
+# === Helper ===
+def _pm_info():
+    if pm:
+        return pm.get_info()
+    return []
+
+# === Routes ===
+
+@router.get("/")
+async def root():
+    return {"app": APP_NAME, "version": APP_VERSION, "status": "running", "docs": "/docs"}
+
+@router.get("/health")
+async def health():
+    checks = run_all_checks(APP_PORT)
+    all_ok = all(c.get("ok", False) for c in checks)
+    return {"status": "healthy" if all_ok else "warning", "checks": checks}
+
+@router.get("/status")
+async def status():
+    return {
+        "app": APP_NAME,
+        "version": APP_VERSION,
+        "host": APP_HOST,
+        "port": APP_PORT,
+        "debug": APP_DEBUG,
+        "is_termux": IS_TERMUX,
+        "is_colab": IS_COLAB,
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "timestamp": datetime.now().isoformat(),
+        "engines": tts.list_engines(),
+        "plugins_loaded": len([k for k, v in (pm.loaded if pm else {}).items() if v is not None]),
+        "plugins_total": len(pm.registry) if pm else 0,
+    }
+
+@router.get("/version")
+async def version():
+    return {"version": APP_VERSION, "name": APP_NAME}
+
+@router.get("/api/info")
+async def api_info():
+    return {
+        "app_name": APP_NAME,
+        "version": APP_VERSION,
+        "description": "منصة صوتيات عربية لتوليد واستنساخ الصوت",
+        "engines": tts.list_engines(),
+        "max_upload_mb": MAX_UPLOAD_MB,
+        "supported_formats": SUPPORTED_AUDIO_FORMATS,
+        "gemini_configured": bool(GEMINI_API_KEY),
+        "gemini_model": GEMINI_TTS_MODEL,
+        "is_termux": IS_TERMUX,
+        "is_colab": IS_COLAB,
+    }
+
+@router.get("/api/plugins")
+async def api_plugins():
+    return {"plugins": _pm_info()}
+
+@router.get("/api/models")
+async def api_models():
+    models = []
+    for f in sorted(MODELS_DIR.iterdir()):
+        if f.is_file() and not f.name.startswith("."):
+            models.append({"name": f.name, "size": f.stat().st_size, "path": str(f)})
+    return {"models": models, "count": len(models), "dir": str(MODELS_DIR)}
+
+@router.get("/api/voices")
+async def api_voices():
+    voices = []
+    for f in sorted(VOICES_DIR.iterdir()):
+        if f.is_file() and not f.name.startswith("."):
+            voices.append({"name": f.name, "size": f.stat().st_size, "path": str(f)})
+    return {"voices": voices, "count": len(voices), "dir": str(VOICES_DIR)}
+
+@router.get("/api/settings")
+async def api_settings():
+    return {
+        "gemini_api_key_set": bool(GEMINI_API_KEY),
+        "gemini_tts_model": GEMINI_TTS_MODEL,
+        "default_engine": ENGINE_PRIORITY[0] if ENGINE_PRIORITY else "kokoro",
+        "is_termux": IS_TERMUX,
+        "is_colab": IS_COLAB,
+        "app_host": APP_HOST,
+        "app_port": APP_PORT,
+    }
+
+@router.post("/api/settings")
+async def api_update_settings(data: SettingsUpdate):
+    return {"message": "Settings are managed via environment variables. Set GEMINI_API_KEY in .env or env."}
+
+@router.get("/api/system")
+async def api_system():
+    import shutil as sh
+    disk = sh.disk_usage(os.getcwd())
+    return {
+        "platform": platform.platform(),
+        "python": sys.version.split()[0],
+        "disk_total_gb": round(disk.total / (1024**3), 2),
+        "disk_free_gb": round(disk.free / (1024**3), 2),
+        "is_termux": IS_TERMUX,
+        "is_colab": IS_COLAB,
+        "cpu_count": os.cpu_count(),
+    }
+
+@router.get("/api/logs")
+async def api_logs():
+    log_file = LOGS_DIR / "app.log"
+    if log_file.exists():
+        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]
+        return {"logs": lines, "count": len(lines)}
+    return {"logs": [], "message": "No log file found"}
+
+@router.get("/api/downloads")
+async def api_list_downloads():
+    files = []
+    for f in sorted(OUTPUTS_DIR.iterdir()):
+        if f.is_file() and not f.name.startswith("."):
+            files.append({
+                "name": f.name, "size": f.stat().st_size,
+                "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+            })
+    return {"files": files, "count": len(files), "dir": str(OUTPUTS_DIR)}
+
+@router.get("/api/downloads/{filename}")
+async def api_download_file(filename: str):
+    filepath = OUTPUTS_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(str(filepath), filename=filename)
+
+@router.delete("/api/downloads/{filename}")
+async def api_delete_download(filename: str):
+    filepath = OUTPUTS_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    filepath.unlink()
+    return {"message": f"Deleted {filename}"}
+
+@router.post("/api/uploads")
+async def api_upload_file(file: UploadFile = File(...)):
+    ext = Path(file.filename).suffix.lower()
+    if ext not in SUPPORTED_AUDIO_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+    filepath = UPLOADS_DIR / file.filename
+    with open(filepath, "wb") as f:
+        f.write(content)
+    logger.info(f"Uploaded: {filepath}")
+    return {"message": "File uploaded", "filename": file.filename, "path": str(filepath), "size": len(content)}
+
+@router.get("/api/uploads")
+async def api_list_uploads():
+    files = []
+    for f in sorted(UPLOADS_DIR.iterdir()):
+        if f.is_file() and not f.name.startswith("."):
+            files.append({
+                "name": f.name, "size": f.stat().st_size,
+                "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+            })
+    return {"files": files, "count": len(files), "dir": str(UPLOADS_DIR)}
+
+@router.post("/api/tts")
+async def api_tts(req: TTSRequest):
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="Text is required")
+    result = await tts.synthesize(
+        text=req.text, engine=req.engine, language=req.language,
+        voice=req.voice, speed=req.speed, pitch=req.pitch,
+    )
+    return result
+
+@router.post("/api/speech")
+async def api_speech(req: TTSRequest):
+    return await api_tts(req)
+
+@router.post("/api/audio/clone")
+async def api_clone(req: CloneRequest):
+    result = await tts.clone_voice(
+        reference_audio_path=req.reference_audio,
+        text=req.text, engine=req.engine,
+    )
+    return result
+
+@router.post("/api/audio/upload")
+async def api_audio_upload(file: UploadFile = File(...)):
+    return await api_upload_file(file)
+
+@router.get("/api/audio/list")
+async def api_audio_list():
+    all_files = []
+    for d in [OUTPUTS_DIR, UPLOADS_DIR]:
+        for f in sorted(d.iterdir()):
+            if f.is_file() and not f.name.startswith("."):
+                all_files.append({
+                    "name": f.name, "size": f.stat().st_size,
+                    "dir": str(d), "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                })
+    return {"files": all_files, "count": len(all_files)}
+
+@router.get("/api/cache")
+async def api_cache_info():
+    files = []
+    total_size = 0
+    for f in CACHE_DIR.iterdir():
+        if f.is_file() and not f.name.startswith("."):
+            s = f.stat().st_size
+            total_size += s
+            files.append({"name": f.name, "size": s})
+    return {"files": files, "count": len(files), "total_size": total_size, "dir": str(CACHE_DIR)}
+
+@router.delete("/api/cache")
+async def api_cache_clear():
+    cleared = 0
+    for f in CACHE_DIR.iterdir():
+        if f.is_file() and not f.name.startswith("."):
+            f.unlink()
+            cleared += 1
+    return {"message": f"Cleared {cleared} files from cache"}
+
+@router.post("/api/files/{filename}/rename")
+async def api_rename_file(filename: str, req: RenameRequest):
+    found = None
+    for d in [OUTPUTS_DIR, UPLOADS_DIR]:
+        f = d / filename
+        if f.exists():
+            found = f
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail="File not found")
+    new_path = found.parent / req.new_name
+    found.rename(new_path)
+    return {"message": f"Renamed {filename} to {req.new_name}", "path": str(new_path)}
+
+@router.get("/api/logs/download")
+async def api_download_logs():
+    log_file = LOGS_DIR / "app.log"
+    if not log_file.exists():
+        return {"message": "No logs"}
+    return FileResponse(str(log_file), filename="app.log", media_type="text/plain")
