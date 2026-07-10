@@ -1,0 +1,11 @@
+# Audio Effects & Processing
+pedalboard
+librosa
+noisereduce
+pydub
+soundfile
+numpy
+scipy
+pyworld
+arabic-reshaper
+python-bidi
