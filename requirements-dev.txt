@@ -1,8 +1,20 @@
-# Voice AI Studio Arabic - Development
+# Voice AI Studio Arabic - Development Requirements
 -r requirements.txt
+
+# Testing
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+httpx>=0.28.0
+
+# Code Quality
 black>=24.0.0
 ruff>=0.8.0
 isort>=5.13.0
 autopep8>=2.3.0
+
+# Type Checking
+mypy>=1.8.0
+
+# Security Scanning
+bandit>=1.7.0
+safety>=3.0.0

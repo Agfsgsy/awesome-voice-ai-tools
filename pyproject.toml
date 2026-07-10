@@ -18,6 +18,12 @@ dependencies = [
     "python-multipart>=0.0.20",
     "httpx>=0.28.0",
     "aiofiles>=24.0.0",
+    "numpy>=1.26.0",
+    "scipy>=1.14.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-magic>=0.4.27",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -43,10 +49,14 @@ linux = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "httpx>=0.28.0",
     "black>=24.0.0",
     "ruff>=0.8.0",
     "isort>=5.13.0",
     "autopep8>=2.3.0",
+    "mypy>=1.8.0",
+    "bandit>=1.7.0",
+    "safety>=3.0.0",
 ]
 
 [tool.ruff]
@@ -62,3 +72,14 @@ line_length = 120
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]

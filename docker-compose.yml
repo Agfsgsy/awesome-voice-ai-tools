@@ -3,8 +3,9 @@ version: "3.8"
 services:
   voice-ai:
     build: .
+    container_name: voice-ai-studio
     ports:
-      - "7860:8000"
+      - "8000:8000"
     volumes:
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
@@ -12,9 +13,27 @@ services:
       - ./logs:/app/logs
       - ./models:/app/models
       - ./voices:/app/voices
+      - ./config:/app/config
     environment:
       - APP_HOST=0.0.0.0
       - APP_PORT=8000
+      - APP_DEBUG=false
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_TTS_MODEL=${GEMINI_TTS_MODEL:-gemini-3.1-flash-tts-preview}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - RATE_LIMIT_ENABLED=true
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m

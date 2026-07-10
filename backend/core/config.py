@@ -1,7 +1,8 @@
 """إعدادات المشروع المركزية"""
+
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = BASE_DIR / "backend"
@@ -37,3 +38,46 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
 
 ENGINE_PRIORITY = ["kokoro", "piper", "gemini", "xtts", "f5", "bark", "melotts", "fish"]
+
+# ---------------------------------------------------------------------------
+# Security Settings
+# ---------------------------------------------------------------------------
+
+# CORS settings ( tighten in production )
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "")
+if CORS_ORIGINS:
+    # Comma-separated list of allowed origins
+    ALLOWED_ORIGINS = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
+else:
+    # Default: allow localhost origins only in production
+    ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost:7860",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:7860",
+    ]
+
+CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+CORS_ALLOW_HEADERS = ["*"]
+
+# JWT settings
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+# Admin credentials (set in production!)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
+# Rate limiting
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+
+# API documentation access
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", "true").lower() == "true"
+
+# Security: API Key header name
+API_KEY_HEADER = "X-API-Key"

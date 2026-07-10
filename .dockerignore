@@ -1,0 +1,81 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables (security critical)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+uploads/
+outputs/
+cache/
+models/
+voices/
+downloads/
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Notebooks
+*.ipynb
+
+# Scripts (not needed in container)
+scripts/*.sh
+
+# Colab
+run_colab.ipynb
+requirements-colab.txt
+requirements-termux.txt
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Security sensitive
+*.pem
+*.key
+*.crt
+secrets/
