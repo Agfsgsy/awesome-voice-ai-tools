@@ -27,6 +27,17 @@ python main.py
 
 افتح المتصفح: http://localhost:8000
 
+## Run on Google Colab
+يمكنك تشغيل المشروع بسهولة على Google Colab باستخدام النص البرمجي المخصص:
+1. قم بإنشاء حساب في ngrok للحصول على Authtoken الخاص بك.
+2. عيّن المتغير البيئي `NGROK_AUTHTOKEN` برمزك الخاص.
+3. قم بتشغيل الأمر التالي:
+```bash
+export NGROK_AUTHTOKEN="your_ngrok_authtoken_here"
+python colab_launcher.py
+```
+سيقوم النص بتثبيت الاعتماديات وتجهيز الخادم وإعطائك رابط ngrok العام لفتح الواجهة وواجهات API.
+
 ## API
 - `/docs` - وثائق API التفاعلية
 - `/api/tts` - توليد صوت
