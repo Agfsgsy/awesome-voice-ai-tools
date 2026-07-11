@@ -24,6 +24,7 @@ from backend.core.health import run_all_checks
 from backend.core.tts_engine import tts
 from backend.core.plugin_manager import init_plugin_manager
 from backend.core.tts_registry import tts_registry
+from backend.core.stt_registry import stt_registry
 
 logger = get_logger("api")
 router = APIRouter()
@@ -36,6 +37,11 @@ class TTSRequest(BaseModel):
     voice: str = "default"
     speed: float = 1.0
     pitch: float = 0.0
+
+class STTRequest(BaseModel):
+    filename: str
+    language: str = "ar"
+    engine: str = "whisper"
 
 class CloneRequest(BaseModel):
     reference_audio: str
@@ -325,6 +331,25 @@ async def api_tts(req: TTSRequest):
 @router.post("/api/speech")
 async def api_speech(req: TTSRequest):
     return await api_tts(req)
+
+@router.post("/api/stt")
+async def api_stt(req: STTRequest):
+    plugin = stt_registry.get_plugin(req.engine)
+    if not plugin:
+        return {"success": False, "message": f"STT engine '{req.engine}' not found."}
+
+    # Try finding file in common directories
+    file_path = None
+    for d in [UPLOADS_DIR, OUTPUTS_DIR]:
+        p = d / req.filename
+        if p.exists():
+            file_path = str(p)
+            break
+
+    if not file_path:
+        return {"success": False, "message": f"File '{req.filename}' not found."}
+
+    return await plugin.transcribe(file_path, language=req.language)
 
 # === Audio ===
 
