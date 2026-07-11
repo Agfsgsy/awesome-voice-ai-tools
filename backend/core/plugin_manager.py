@@ -65,6 +65,13 @@ class PluginManager:
         for name in plugins:
             self.load_plugin(name)
 
+    def reload_all(self) -> None:
+        """إعادة اكتشاف وتحميل جميع الإضافات لتحديث السجل"""
+        logger.info("Reloading all plugins...")
+        self.registry.clear()
+        self.loaded.clear()
+        self.load_all()
+
     def get_info(self) -> List[Dict]:
         """معلومات عن جميع الإضافات"""
         result = []

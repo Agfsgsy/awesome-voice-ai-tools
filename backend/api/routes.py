@@ -197,7 +197,22 @@ async def api_settings():
 
 @router.post("/api/settings")
 async def api_update_settings(data: SettingsUpdate):
-    return {"message": "Settings are managed via environment variables. Set GEMINI_API_KEY in .env or env."}
+    import backend.core.config as config
+    env_file = Path(".env")
+    env_lines = env_file.read_text().splitlines() if env_file.exists() else []
+    env_dict = {line.split("=", 1)[0]: line.split("=", 1)[1] for line in env_lines if "=" in line}
+
+    if data.gemini_api_key is not None:
+        env_dict["GEMINI_API_KEY"] = data.gemini_api_key
+        config.GEMINI_API_KEY = data.gemini_api_key
+    if data.gemini_tts_model is not None:
+        env_dict["GEMINI_TTS_MODEL"] = data.gemini_tts_model
+        config.GEMINI_TTS_MODEL = data.gemini_tts_model
+
+    # Save back to .env
+    env_file.write_text("\n".join(f"{k}={v}" for k, v in env_dict.items()))
+
+    return {"message": "Settings updated successfully"}
 
 # === System ===
 
@@ -392,3 +407,64 @@ async def api_rename_file(filename: str, req: RenameRequest):
     new_path = found.parent / req.new_name
     found.rename(new_path)
     return {"message": f"Renamed {filename} to {req.new_name}", "path": str(new_path)}
+
+# === Effects ===
+@router.post("/api/effects/apply")
+async def api_effects_apply(file: UploadFile = File(...), preset: str = Form(...)):
+    filename = Path(file.filename).name
+    ext = Path(filename).suffix.lower()
+    if ext not in SUPPORTED_AUDIO_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+
+    filepath = UPLOADS_DIR / filename
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    try:
+        from backend.plugins.builtin.audio_effects import process_audio
+        import hashlib
+        name_hash = hashlib.md5(content).hexdigest()[:8]
+        out_filename = f"effect_{preset}_{name_hash}.wav"
+        out_filepath = OUTPUTS_DIR / out_filename
+
+        success = process_audio(str(filepath), str(out_filepath), preset)
+        if success:
+            return {
+                "message": "Effects applied",
+                "filename": out_filename,
+                "path": str(out_filepath),
+                "url": f"/api/downloads/{out_filename}"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to apply effects")
+    except Exception as e:
+        logger.error(f"Effect processing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# === STT ===
+@router.post("/api/stt")
+async def api_stt(file: UploadFile = File(...), language: str = Form("ar-SA")):
+    filename = Path(file.filename).name
+    ext = Path(filename).suffix.lower()
+    if ext not in SUPPORTED_AUDIO_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+
+    filepath = UPLOADS_DIR / filename
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    try:
+        from backend.plugins.builtin.stt_plugin import transcribe_audio
+        text = transcribe_audio(str(filepath), language=language)
+        return {"text": text, "message": "تم تحويل الصوت إلى نص"}
+    except Exception as e:
+        logger.error(f"STT processing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -282,10 +282,22 @@
                 document.getElementById("settings-status").textContent =
                     "Gemini: " + (s.gemini_api_key_set ? "مُفعّل ✓" : "غير مُفعّل ✗") +
                     " | النموذج: " + s.gemini_tts_model;
+                if(s.gemini_tts_model) {
+                    document.getElementById("settings-gemini-model").value = s.gemini_tts_model;
+                }
             } catch (e) {
                 console.error("Settings load error:", e);
             }
         }
+
+        document.getElementById("settings-gemini-key")?.addEventListener("change", async (e) => {
+            await apiPost("/api/settings", {gemini_api_key: e.target.value});
+            loadSettings();
+        });
+        document.getElementById("settings-gemini-model")?.addEventListener("change", async (e) => {
+            await apiPost("/api/settings", {gemini_tts_model: e.target.value});
+            loadSettings();
+        });
 
         document.getElementById("tts-generate")?.addEventListener("click", async () => {
             const btn = document.getElementById("tts-generate");
@@ -353,16 +365,33 @@
 
         document.getElementById("effects-apply")?.addEventListener("click", async () => {
             const fileInput = document.getElementById("effects-file");
+            const presetSelect = document.getElementById("effects-preset");
+            const btn = document.getElementById("effects-apply");
+
             if (!fileInput.files[0]) return alert("ارفع ملفاً أولاً");
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> جارٍ التطبيق...';
+
             const formData = new FormData();
             formData.append("file", fileInput.files[0]);
+            formData.append("preset", presetSelect.value);
+
             try {
-                const res = await fetch(API + "/api/uploads", {method: "POST", body: formData});
+                const res = await fetch(API + "/api/effects/apply", {method: "POST", body: formData});
                 const data = await res.json();
-                alert("تم رفع الملف: " + data.filename + "\nالمؤثرات قيد التطوير - استخدم API للمعالجة المتقدمة");
+                if (data.url) {
+                    alert("تم تطبيق المؤثرات بنجاح!");
+                    // Refresh library to show the new file
+                    document.querySelector('[data-page="library"]').click();
+                } else {
+                    alert("فشل تطبيق المؤثرات: " + (data.detail || data.message));
+                }
             } catch (e) {
                 alert("خطأ: " + e.message);
             }
+            btn.disabled = false;
+            btn.textContent = "تطبيق المؤثرات";
         });
 
         loadDashboard();
