@@ -17,7 +17,7 @@ from backend.core.config import (
     IS_TERMUX, IS_ANDROID, IS_COLAB, GEMINI_API_KEY, GEMINI_TTS_MODEL,
     MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, OUTPUTS_DIR,
     CACHE_DIR, LOGS_DIR, CONFIG_DIR, ENGINE_PRIORITY, MAX_UPLOAD_MB,
-    SUPPORTED_AUDIO_FORMATS, PLUGINS_DIR
+    SUPPORTED_AUDIO_FORMATS, PLUGINS_DIR, FRONTEND_DIR
 )
 from backend.core.logger import get_logger
 from backend.core.health import run_all_checks
@@ -79,6 +79,9 @@ def _pm_info():
 
 @router.get("/")
 async def root():
+    index_path = FRONTEND_DIR / "templates" / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
     return {"app": APP_NAME, "version": APP_VERSION, "status": "running", "docs": "/docs"}
 
 @router.get("/health")
@@ -162,6 +165,22 @@ async def api_plugin_check(req: PluginInstallRequest):
     installed = plugin.check()
     return {"engine": req.engine, "installed": installed}
 
+@router.post("/api/plugins/enable")
+async def api_plugin_enable(req: PluginInstallRequest):
+    if not pm:
+        raise HTTPException(status_code=500, detail="Plugin manager not initialized")
+    if pm.enable_plugin(req.engine):
+        return {"success": True, "message": f"Plugin {req.engine} enabled"}
+    raise HTTPException(status_code=400, detail=f"Failed to enable plugin {req.engine}")
+
+@router.post("/api/plugins/disable")
+async def api_plugin_disable(req: PluginInstallRequest):
+    if not pm:
+        raise HTTPException(status_code=500, detail="Plugin manager not initialized")
+    if pm.disable_plugin(req.engine):
+        return {"success": True, "message": f"Plugin {req.engine} disabled"}
+    raise HTTPException(status_code=400, detail=f"Failed to disable plugin {req.engine}")
+
 # === Model endpoints ===
 
 @router.get("/api/models")
@@ -174,6 +193,11 @@ async def api_models():
 async def api_model_download(req: ModelDownloadRequest):
     from backend.core.model_manager import model_manager
     return model_manager.download_model(req.engine, req.model_name)
+
+@router.delete("/api/models/{engine}/{model_name}")
+async def api_model_delete(engine: str, model_name: str):
+    from backend.core.model_manager import model_manager
+    return model_manager.delete_model(engine, model_name)
 
 @router.get("/api/voices")
 async def api_voices():
@@ -261,6 +285,8 @@ async def api_list_downloads():
 
 @router.get("/api/downloads/{filename}")
 async def api_download_file(filename: str):
+    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = OUTPUTS_DIR / filename
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -268,6 +294,8 @@ async def api_download_file(filename: str):
 
 @router.delete("/api/downloads/{filename}")
 async def api_delete_download(filename: str):
+    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = OUTPUTS_DIR / filename
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -278,6 +306,8 @@ async def api_delete_download(filename: str):
 
 @router.post("/api/uploads")
 async def api_upload_file(file: UploadFile = File(...)):
+    if ".." in file.filename or file.filename.startswith("/") or file.filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
     ext = Path(file.filename).suffix.lower()
     if ext not in SUPPORTED_AUDIO_FORMATS:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
@@ -289,6 +319,25 @@ async def api_upload_file(file: UploadFile = File(...)):
         f.write(content)
     logger.info(f"Uploaded: {filepath}")
     return {"message": "File uploaded", "filename": file.filename, "path": str(filepath), "size": len(content)}
+
+@router.delete("/api/uploads/{filename}")
+async def api_delete_upload(filename: str):
+    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    filepath = UPLOADS_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    filepath.unlink()
+    return {"message": f"Deleted {filename}"}
+
+@router.get("/api/uploads/{filename}")
+async def api_download_upload(filename: str):
+    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    filepath = UPLOADS_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(str(filepath), filename=filename)
 
 @router.get("/api/uploads")
 async def api_list_uploads():
@@ -357,6 +406,44 @@ async def api_clone(req: CloneRequest):
 @router.post("/api/audio/upload")
 async def api_audio_upload(file: UploadFile = File(...)):
     return await api_upload_file(file)
+
+@router.post("/api/audio/edit")
+async def api_audio_edit(file: UploadFile = File(...), trim_start_ms: int = Form(0), trim_end_ms: int = Form(0)):
+    if ".." in file.filename or file.filename.startswith("/") or file.filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in SUPPORTED_AUDIO_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+
+    filepath = UPLOADS_DIR / file.filename
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    try:
+        from backend.plugins.builtin.audio_effects import edit_audio
+        import hashlib
+        name_hash = hashlib.md5(content).hexdigest()[:8]
+        out_filename = f"edited_{name_hash}.wav"
+        out_filepath = OUTPUTS_DIR / out_filename
+
+        success = edit_audio(str(filepath), str(out_filepath), trim_start_ms=trim_start_ms, trim_end_ms=trim_end_ms)
+        if success:
+            return {
+                "message": "Audio edited successfully",
+                "filename": out_filename,
+                "path": str(out_filepath),
+                "url": f"/api/downloads/{out_filename}"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to edit audio")
+    except Exception as e:
+        logger.error(f"Audio editing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/audio/list")
 async def api_audio_list():

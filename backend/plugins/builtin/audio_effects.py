@@ -21,6 +21,28 @@ def get_presets():
     return PRESETS
 
 
+def edit_audio(input_path: str, output_path: str, trim_start_ms: int = None, trim_end_ms: int = None) -> bool:
+    """Trim and edit audio files using pydub"""
+    try:
+        from pydub import AudioSegment
+    except ImportError:
+        print("pydub not installed, falling back to basic processing")
+        return False
+
+    try:
+        audio = AudioSegment.from_file(input_path)
+
+        if trim_start_ms is not None:
+            audio = audio[trim_start_ms:]
+        if trim_end_ms is not None and trim_end_ms > 0:
+            audio = audio[:-trim_end_ms]
+
+        audio.export(output_path, format="wav")
+        return True
+    except Exception as e:
+        print(f"Error editing audio: {e}")
+        return False
+
 def process_audio(input_path: str, output_path: str, preset_name: str) -> bool:
     """تطبيق التأثيرات على ملف الصوت"""
     import numpy as np
