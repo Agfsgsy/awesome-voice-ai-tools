@@ -8,23 +8,44 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Cairo', sans-serif; }
-        body { background: #0f0f1a; color: #e0e0e0; }
-        .card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; }
-        .btn-primary { background: linear-gradient(135deg, #0f6b6b, #0d9488); transition: all 0.3s; }
+        body.dark { background: #0f0f1a; color: #e0e0e0; }
+        body.light { background: #f0f0f5; color: #1a1a2e; }
+
+        .dark .card { background: #1a1a2e; border: 1px solid #2a2a4a; }
+        .light .card { background: #ffffff; border: 1px solid #e2e8f0; }
+        .card { border-radius: 12px; }
+
+        .btn-primary { background: linear-gradient(135deg, #0f6b6b, #0d9488); transition: all 0.3s; color: white; }
         .btn-primary:hover { background: linear-gradient(135deg, #0d9488, #14b8a6); }
-        .nav-item.active { background: rgba(13, 148, 136, 0.15); border-right: 3px solid #0d9488; }
-        input, textarea, select { background: #16213e; border: 1px solid #2a2a4a; color: #e0e0e0; }
+
+        .dark .nav-item.active { background: rgba(13, 148, 136, 0.15); border-right: 3px solid #0d9488; }
+        .light .nav-item.active { background: rgba(13, 148, 136, 0.15); border-right: 3px solid #0d9488; font-weight: bold; }
+
+        .dark input, .dark textarea, .dark select { background: #16213e; border: 1px solid #2a2a4a; color: #e0e0e0; }
+        .light input, .light textarea, .light select { background: #ffffff; border: 1px solid #cbd5e1; color: #1e293b; }
         input:focus, textarea:focus, select:focus { border-color: #0d9488; outline: none; }
+
         audio { width: 100%; }
         .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #0d9488; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="min-h-screen">
-    <div class="flex min-h-screen">
+<body class="dark min-h-screen transition-colors duration-300">
+    <div class="flex flex-col md:flex-row min-h-screen">
+        <!-- Mobile Header -->
+        <div class="md:hidden flex justify-between items-center p-4 card m-2">
+            <h1 class="text-xl font-bold text-teal-400">🎙️ Voice AI</h1>
+            <button id="mobile-menu-btn" class="p-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+        </div>
+
         <!-- Sidebar -->
-        <aside class="w-64 card min-h-screen p-4 flex-shrink-0 hidden md:block">
-            <h1 class="text-xl font-bold text-teal-400 mb-6">🎙️ Voice AI Studio</h1>
+        <aside id="sidebar" class="w-full md:w-64 card min-h-screen p-4 flex-shrink-0 hidden md:block transition-all duration-300">
+            <div class="flex justify-between items-center mb-6 hidden md:flex">
+                <h1 class="text-xl font-bold text-teal-400">🎙️ Voice AI Studio</h1>
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-700/50">🌓</button>
+            </div>
             <nav class="space-y-1">
                 <a href="#" class="nav-item active block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="dashboard">لوحة التحكم</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="tts">توليد الصوت</a>
@@ -32,6 +53,8 @@
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="effects">المؤثرات الصوتية</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="religious">المحتوى الإسلامي</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="library">المكتبة</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="models">النماذج والإضافات</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="logs">السجلات (Logs)</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="settings">الإعدادات</a>
             </nav>
         </aside>
@@ -69,10 +92,24 @@
 
             <!-- TTS -->
             <div id="page-tts" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">توليد الصوت</h2>
+                <h2 class="text-2xl font-bold mb-6">توليد الصوت (Voice Studio)</h2>
                 <div class="card p-6">
-                    <label class="block text-sm mb-2 text-teal-400">النص</label>
-                    <textarea id="tts-text" rows="5" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب النص هنا..."></textarea>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm text-teal-400">النص</label>
+                        <div class="flex gap-2 text-xs text-gray-400">
+                            <span id="tts-char-count">حروف: 0</span> |
+                            <span id="tts-word-count">كلمات: 0</span> |
+                            <span id="tts-est-duration">المدة: 0s</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-2 flex gap-2">
+                        <input type="file" id="tts-import-file" class="hidden" accept=".txt">
+                        <button onclick="document.getElementById('tts-import-file').click()" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-white">استيراد نص (TXT)</button>
+                        <button onclick="document.getElementById('tts-text').value = ''; updateTtsCounters();" class="text-xs bg-red-900/50 hover:bg-red-900 px-3 py-1 rounded text-white">مسح</button>
+                    </div>
+
+                    <textarea id="tts-text" rows="8" class="w-full p-3 rounded-lg mb-4" placeholder="اكتب أو الصق النص هنا..."></textarea>
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-sm mb-2 text-teal-400">المحرك</label>
@@ -128,22 +165,42 @@
                 </div>
             </div>
 
-            <!-- Effects -->
+            <!-- Effects & Editor -->
             <div id="page-effects" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">المؤثرات الصوتية</h2>
-                <div class="card p-6">
-                    <label class="block text-sm mb-2 text-teal-400">رفع ملف صوت</label>
-                    <input type="file" id="effects-file" accept=".wav,.mp3" class="w-full p-2 mb-4">
-                    <label class="block text-sm mb-2 text-teal-400">الإعداد المسبق</label>
-                    <select id="effects-preset" class="w-full p-2 rounded-lg mb-4">
-                        <option value="studio">صوت استوديو</option>
-                        <option value="lecture">محاضرة</option>
-                        <option value="mosque">صوت مسجد</option>
-                        <option value="deep_voice">صوت عميق</option>
-                        <option value="podcast">بودكاست</option>
-                        <option value="video_commentary">تعليق فيديو</option>
-                    </select>
-                    <button id="effects-apply" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">تطبيق المؤثرات</button>
+                <h2 class="text-2xl font-bold mb-6">المؤثرات الصوتية والمحرر (Audio Editor)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold mb-4">تطبيق مؤثرات</h3>
+                        <label class="block text-sm mb-2 text-teal-400">رفع ملف صوت</label>
+                        <input type="file" id="effects-file" accept=".wav,.mp3" class="w-full p-2 mb-4">
+                        <label class="block text-sm mb-2 text-teal-400">الإعداد المسبق</label>
+                        <select id="effects-preset" class="w-full p-2 rounded-lg mb-4">
+                            <option value="studio">صوت استوديو</option>
+                            <option value="lecture">محاضرة</option>
+                            <option value="mosque">صوت مسجد</option>
+                            <option value="deep_voice">صوت عميق</option>
+                            <option value="podcast">بودكاست</option>
+                            <option value="video_commentary">تعليق فيديو</option>
+                        </select>
+                        <button id="effects-apply" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">تطبيق المؤثرات</button>
+                    </div>
+
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold mb-4">قص الملف الصوتي (Trim)</h3>
+                        <label class="block text-sm mb-2 text-teal-400">رفع ملف صوت</label>
+                        <input type="file" id="edit-file" accept=".wav,.mp3" class="w-full p-2 mb-4">
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm mb-2 text-teal-400">حذف من البداية (ms)</label>
+                                <input type="number" id="edit-start" class="w-full p-2 rounded-lg" value="0">
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-2 text-teal-400">حذف من النهاية (ms)</label>
+                                <input type="number" id="edit-end" class="w-full p-2 rounded-lg" value="0">
+                            </div>
+                        </div>
+                        <button id="edit-apply" class="btn-primary px-6 py-3 rounded-lg font-bold w-full">قص الصوت</button>
+                    </div>
                 </div>
             </div>
 
@@ -177,19 +234,74 @@
                 </div>
             </div>
 
+            <!-- Models and Plugins -->
+            <div id="page-models" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">إدارة النماذج والإضافات</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold mb-4">الإضافات (Plugins)</h3>
+                        <div id="plugins-list" class="space-y-4">
+                            <p class="text-gray-500">جارٍ التحميل...</p>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold mb-4">النماذج (Models)</h3>
+                        <div id="models-list" class="space-y-4">
+                            <p class="text-gray-500">جارٍ التحميل...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs -->
+            <div id="page-logs" class="page hidden flex-col h-[calc(100vh-100px)]">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">سجلات النظام (Logs)</h2>
+                    <div class="flex gap-2">
+                        <button onclick="loadLogs()" class="bg-gray-700 px-3 py-1 rounded text-sm text-white">تحديث</button>
+                        <a href="/api/logs/download" class="bg-blue-600 px-3 py-1 rounded text-sm text-white" download>تحميل السجل</a>
+                    </div>
+                </div>
+                <div class="card p-4 flex-1 h-full overflow-hidden flex flex-col">
+                    <pre id="logs-container" class="font-mono text-xs overflow-auto flex-1 bg-gray-900 p-4 rounded text-green-400 text-left" dir="ltr" style="max-height: 500px;">
+جارٍ التحميل...
+                    </pre>
+                </div>
+            </div>
+
             <!-- Settings -->
             <div id="page-settings" class="page hidden">
                 <h2 class="text-2xl font-bold mb-6">الإعدادات</h2>
-                <div class="card p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm mb-2 text-teal-400">Gemini API Key</label>
-                        <input type="password" id="settings-gemini-key" class="w-full p-2 rounded-lg" placeholder="••••••••">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="card p-6 space-y-4">
+                        <h3 class="text-lg font-bold mb-4">API Keys & Models</h3>
+                        <div>
+                            <label class="block text-sm mb-2 text-teal-400">Gemini API Key</label>
+                            <input type="password" id="settings-gemini-key" class="w-full p-2 rounded-lg" placeholder="••••••••">
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-teal-400">Gemini TTS Model</label>
+                            <input type="text" id="settings-gemini-model" class="w-full p-2 rounded-lg" value="gemini-3.1-flash-tts-preview">
+                        </div>
+                        <div id="settings-status" class="text-sm text-gray-400"></div>
                     </div>
-                    <div>
-                        <label class="block text-sm mb-2 text-teal-400">Gemini TTS Model</label>
-                        <input type="text" id="settings-gemini-model" class="w-full p-2 rounded-lg" value="gemini-3.1-flash-tts-preview">
+                    <div class="card p-6 space-y-4">
+                        <h3 class="text-lg font-bold mb-4">التخزين المؤقت (Cache)</h3>
+                        <div class="flex justify-between items-center bg-gray-800 p-3 rounded-lg">
+                            <div>
+                                <p class="text-sm">حجم الكاش</p>
+                                <p id="cache-size" class="font-bold text-teal-400">جارٍ التحميل...</p>
+                            </div>
+                            <button onclick="clearCache()" class="bg-red-900 px-4 py-2 rounded text-sm text-white">مسح الكاش</button>
+                        </div>
                     </div>
-                    <div id="settings-status" class="text-sm text-gray-400"></div>
+
+                    <div class="card p-6 space-y-4 md:col-span-2">
+                        <h3 class="text-lg font-bold mb-4">معلومات النظام</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="system-info-container">
+                            <p class="text-gray-500">جارٍ التحميل...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -198,6 +310,47 @@
     <script>
         const API = window.location.origin;
         let currentPage = "dashboard";
+
+        // Theme Toggle Logic
+        document.getElementById("theme-toggle")?.addEventListener("click", () => {
+            if (document.body.classList.contains("dark")) {
+                document.body.classList.replace("dark", "light");
+            } else {
+                document.body.classList.replace("light", "dark");
+            }
+        });
+
+        // Mobile Menu Logic
+        document.getElementById("mobile-menu-btn")?.addEventListener("click", () => {
+            document.getElementById("sidebar").classList.toggle("hidden");
+        });
+
+        // TTS Counters Logic
+        function updateTtsCounters() {
+            const text = document.getElementById("tts-text").value;
+            const chars = text.length;
+            const words = text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
+            const estSeconds = Math.round(words / 2.5); // roughly 2.5 words per second
+
+            document.getElementById("tts-char-count").textContent = "حروف: " + chars;
+            document.getElementById("tts-word-count").textContent = "كلمات: " + words;
+            document.getElementById("tts-est-duration").textContent = "المدة: ~" + estSeconds + "s";
+        }
+
+        document.getElementById("tts-text")?.addEventListener("input", updateTtsCounters);
+
+        // TTS File Import Logic
+        document.getElementById("tts-import-file")?.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const textArea = document.getElementById("tts-text");
+                textArea.value = textArea.value ? textArea.value + "\n\n" + evt.target.result : evt.target.result;
+                updateTtsCounters();
+            };
+            reader.readAsText(file);
+        });
 
         document.querySelectorAll(".nav-item").forEach(item => {
             item.addEventListener("click", (e) => {
@@ -210,9 +363,27 @@
                 currentPage = page;
                 if (page === "dashboard") loadDashboard();
                 if (page === "library") loadLibrary();
+                if (page === "models") loadModelsAndPlugins();
+                if (page === "logs") loadLogs();
                 if (page === "settings") loadSettings();
             });
         });
+
+        async function loadLogs() {
+            try {
+                const logs = await apiGet("/api/logs");
+                const container = document.getElementById("logs-container");
+                if (logs.logs && logs.logs.length > 0) {
+                    container.textContent = logs.logs.join("\n");
+                } else {
+                    container.textContent = logs.message || "لا توجد سجلات.";
+                }
+                container.scrollTop = container.scrollHeight;
+            } catch (e) {
+                console.error("Logs load error:", e);
+                document.getElementById("logs-container").textContent = "حدث خطأ أثناء تحميل السجلات.";
+            }
+        }
 
         async function apiGet(path) {
             const res = await fetch(API + path);
@@ -250,43 +421,141 @@
 
         async function loadLibrary() {
             try {
-                const downloads = await apiGet("/api/downloads");
-                const html = downloads.files.map(f =>
-                    `<div class="flex justify-between items-center p-3 hover:bg-teal-900/10 rounded-lg">
+                const audioList = await apiGet("/api/audio/list");
+                const html = audioList.files.map(f => {
+                    const isUpload = f.dir.includes("uploads");
+                    const badge = isUpload ? '<span class="bg-blue-900 text-xs px-2 py-1 rounded">مرفوع</span>' : '<span class="bg-green-900 text-xs px-2 py-1 rounded">مُخرج</span>';
+                    const downloadPath = isUpload ? `/api/uploads/${f.name}` : `/api/downloads/${f.name}`; // Note: uploads download route doesn't exist, we fallback to audio control for now
+                    return `<div class="flex justify-between items-center p-3 hover:bg-teal-900/10 rounded-lg border-b border-gray-800">
                         <div>
-                            <p class="font-bold">${f.name}</p>
-                            <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")}</p>
+                            <p class="font-bold flex items-center gap-2">${f.name} ${badge}</p>
+                            <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")} - ${(f.size/1024).toFixed(1)} KB</p>
                         </div>
-                        <div class="flex gap-2">
-                            <audio controls style="max-width:200px"><source src="/api/downloads/${f.name}"></audio>
-                            <a href="/api/downloads/${f.name}" download class="btn-primary px-3 py-1 rounded text-xs">تحميل</a>
-                            <button onclick="deleteFile(\'${f.name}\')" class="bg-red-900 px-3 py-1 rounded text-xs">حذف</button>
+                        <div class="flex gap-2 items-center">
+                            <audio controls style="max-width:200px"><source src="${!isUpload ? downloadPath : ''}"></audio>
+                            <button onclick="renameFile('${f.name}')" class="bg-yellow-700 px-3 py-1 rounded text-xs text-white">إعادة تسمية</button>
+                            ${!isUpload ? `<a href="${downloadPath}" download class="btn-primary px-3 py-1 rounded text-xs">تحميل</a>` : ''}
+                            <button onclick="deleteFile('${f.name}', ${isUpload})" class="bg-red-900 px-3 py-1 rounded text-xs text-white">حذف</button>
                         </div>
-                    </div>`
-                ).join("") || "<p class=\'text-gray-500\'>لا توجد ملفات</p>";
+                    </div>`;
+                }).join("") || "<p class='text-gray-500'>لا توجد ملفات</p>";
                 document.getElementById("library-files").innerHTML = html;
             } catch (e) {
                 console.error("Library load error:", e);
             }
         }
 
-        async function deleteFile(name) {
+        async function renameFile(oldName) {
+            const newName = prompt("أدخل الاسم الجديد:", oldName);
+            if (newName && newName !== oldName) {
+                try {
+                    await apiPost(`/api/files/${oldName}/rename`, {new_name: newName});
+                    loadLibrary();
+                } catch (e) {
+                    alert("فشل تغيير الاسم: " + e.message);
+                }
+            }
+        }
+
+        async function deleteFile(name, isUpload) {
             if (!confirm("حذف " + name + "?")) return;
-            await fetch(API + "/api/downloads/" + name, {method: "DELETE"});
+            const endpoint = isUpload ? `/api/uploads/${name}` : `/api/downloads/${name}`;
+            await fetch(API + endpoint, {method: "DELETE"});
             loadLibrary();
+        }
+
+        async function loadModelsAndPlugins() {
+            try {
+                const [models, plugins] = await Promise.all([
+                    apiGet("/api/models"),
+                    apiGet("/api/plugins")
+                ]);
+
+                // Render Models
+                const modelsHtml = models.models.map(m =>
+                    `<div class="p-3 bg-gray-800 rounded-lg flex justify-between items-center mb-2">
+                        <div>
+                            <p class="font-bold">${m.name}</p>
+                            <p class="text-xs text-gray-400">المحرك: ${m.engine}</p>
+                        </div>
+                        <button onclick="deleteModel('${m.engine}', '${m.name}')" class="bg-red-900 px-3 py-1 rounded text-xs text-white">حذف</button>
+                    </div>`
+                ).join("") || "<p class='text-gray-500'>لا توجد نماذج محملة</p>";
+                document.getElementById("models-list").innerHTML = modelsHtml;
+
+                // Render Plugins
+                const pluginsHtml = plugins.map(p =>
+                    `<div class="p-3 bg-gray-800 rounded-lg flex justify-between items-center mb-2">
+                        <div>
+                            <p class="font-bold">${p.name}</p>
+                            <p class="text-xs text-gray-400">مثبت: ${p.installed ? 'نعم' : 'لا'} | مفعل: ${p.enabled !== false ? 'نعم' : 'لا'}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            ${!p.installed ? `<button onclick="installPlugin('${p.name}')" class="bg-blue-600 px-3 py-1 rounded text-xs text-white">تثبيت</button>` : ''}
+                            ${p.installed && p.enabled !== false ? `<button onclick="togglePlugin('${p.name}', 'disable')" class="bg-yellow-600 px-3 py-1 rounded text-xs text-white">تعطيل</button>` : ''}
+                            ${p.installed && p.enabled === false ? `<button onclick="togglePlugin('${p.name}', 'enable')" class="bg-green-600 px-3 py-1 rounded text-xs text-white">تفعيل</button>` : ''}
+                        </div>
+                    </div>`
+                ).join("") || "<p class='text-gray-500'>لا توجد إضافات</p>";
+                document.getElementById("plugins-list").innerHTML = pluginsHtml;
+            } catch (e) {
+                console.error("Models/Plugins load error:", e);
+            }
+        }
+
+        async function deleteModel(engine, modelName) {
+            if (!confirm(`حذف النموذج ${modelName}؟`)) return;
+            await fetch(`${API}/api/models/${engine}/${modelName}`, {method: "DELETE"});
+            loadModelsAndPlugins();
+        }
+
+        async function installPlugin(engine) {
+            if (!confirm(`تثبيت الإضافة ${engine}؟`)) return;
+            await apiPost("/api/plugins/install", {engine: engine});
+            loadModelsAndPlugins();
+        }
+
+        async function togglePlugin(engine, action) {
+            await apiPost(`/api/plugins/${action}`, {engine: engine});
+            loadModelsAndPlugins();
         }
 
         async function loadSettings() {
             try {
-                const s = await apiGet("/api/settings");
+                const [s, cacheInfo, sysInfo] = await Promise.all([
+                    apiGet("/api/settings"),
+                    apiGet("/api/cache"),
+                    apiGet("/api/system")
+                ]);
                 document.getElementById("settings-status").textContent =
                     "Gemini: " + (s.gemini_api_key_set ? "مُفعّل ✓" : "غير مُفعّل ✗") +
                     " | النموذج: " + s.gemini_tts_model;
                 if(s.gemini_tts_model) {
                     document.getElementById("settings-gemini-model").value = s.gemini_tts_model;
                 }
+                document.getElementById("cache-size").textContent = (cacheInfo.total_size / (1024 * 1024)).toFixed(2) + " MB";
+
+                const sysHtml = `
+                    <div class="bg-gray-800 p-3 rounded-lg"><p class="text-xs text-gray-400">النظام</p><p class="font-bold truncate text-sm">${sysInfo.platform}</p></div>
+                    <div class="bg-gray-800 p-3 rounded-lg"><p class="text-xs text-gray-400">Python</p><p class="font-bold">${sysInfo.python}</p></div>
+                    <div class="bg-gray-800 p-3 rounded-lg"><p class="text-xs text-gray-400">المساحة المتوفرة</p><p class="font-bold text-green-400">${sysInfo.disk_free_gb} GB</p></div>
+                    <div class="bg-gray-800 p-3 rounded-lg"><p class="text-xs text-gray-400">عدد الأنوية</p><p class="font-bold">${sysInfo.cpu_count || '-'}</p></div>
+                `;
+                document.getElementById("system-info-container").innerHTML = sysHtml;
             } catch (e) {
                 console.error("Settings load error:", e);
+            }
+        }
+
+        async function clearCache() {
+            if (!confirm("هل أنت متأكد من مسح الكاش؟")) return;
+            try {
+                const res = await fetch(API + "/api/cache", {method: "DELETE"});
+                const data = await res.json();
+                alert(data.message);
+                loadSettings();
+            } catch (e) {
+                alert("فشل مسح الكاش");
             }
         }
 
@@ -392,6 +661,38 @@
             }
             btn.disabled = false;
             btn.textContent = "تطبيق المؤثرات";
+        });
+
+        document.getElementById("edit-apply")?.addEventListener("click", async () => {
+            const fileInput = document.getElementById("edit-file");
+            const startMs = document.getElementById("edit-start").value;
+            const endMs = document.getElementById("edit-end").value;
+            const btn = document.getElementById("edit-apply");
+
+            if (!fileInput.files[0]) return alert("ارفع ملفاً أولاً");
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> جارٍ القص...';
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+            formData.append("trim_start_ms", startMs);
+            formData.append("trim_end_ms", endMs);
+
+            try {
+                const res = await fetch(API + "/api/audio/edit", {method: "POST", body: formData});
+                const data = await res.json();
+                if (data.url) {
+                    alert("تم قص الصوت بنجاح!");
+                    document.querySelector('[data-page="library"]').click();
+                } else {
+                    alert("فشل القص: " + (data.detail || data.message));
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+            btn.disabled = false;
+            btn.textContent = "قص الصوت";
         });
 
         loadDashboard();

@@ -59,6 +59,18 @@ class PluginManager:
             self.loaded[name] = None
             return False
 
+    def enable_plugin(self, name: str) -> bool:
+        """تفعيل إضافة (تحميلها إذا لم تكن محملة)"""
+        if name in self.loaded and self.loaded[name] is not None:
+            return True
+        return self.load_plugin(name)
+
+    def disable_plugin(self, name: str) -> bool:
+        """تعطيل إضافة"""
+        if name in self.loaded:
+            del self.loaded[name]
+        return True
+
     def load_all(self) -> None:
         """تحميل جميع الإضافات المكتشفة"""
         plugins = self.discover()
