@@ -39,9 +39,6 @@ def run_get_tests():
     else:
         print("\nAll GET endpoints passed!")
 
-if __name__ == "__main__":
-    run_get_tests()
-
 def run_post_tests():
     print("\nRunning POST endpoint tests...")
     failed = []
@@ -153,5 +150,46 @@ def run_post_tests():
     else:
         print("\nAll POST endpoints passed!")
 
+def run_additional_tests():
+    print("\nRunning additional endpoint tests...")
+    failed = []
+
+    # Rename File
+    try:
+        rename_ep = "/api/files/dummy.wav/rename"
+        res = requests.post(BASE_URL + rename_ep, json={"new_name": "dummy_renamed.wav"})
+        if res.status_code == 200:
+            print(f"[OK] {rename_ep}")
+        else:
+            print(f"[FAIL] {rename_ep} - Status: {res.status_code} - Response: {res.text}")
+            failed.append(rename_ep)
+
+        # Rename it back
+        res = requests.post(BASE_URL + "/api/files/dummy_renamed.wav/rename", json={"new_name": "dummy.wav"})
+    except Exception as e:
+        print(f"[ERROR] {rename_ep} - {e}")
+        failed.append(rename_ep)
+
+    # Delete File
+    try:
+        delete_ep = "/api/uploads/dummy.wav"
+        res = requests.delete(BASE_URL + delete_ep)
+        if res.status_code == 200:
+            print(f"[OK] {delete_ep}")
+        else:
+            print(f"[FAIL] {delete_ep} - Status: {res.status_code} - Response: {res.text}")
+            failed.append(delete_ep)
+    except Exception as e:
+        print(f"[ERROR] {delete_ep} - {e}")
+        failed.append(delete_ep)
+
+    if failed:
+        print(f"\nFailed {len(failed)} additional endpoints.")
+        exit(1)
+    else:
+        print("\nAll additional endpoints passed!")
+
 if __name__ == "__main__":
+    run_get_tests()
     run_post_tests()
+    run_additional_tests()

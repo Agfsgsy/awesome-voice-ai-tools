@@ -412,7 +412,7 @@
                         <span>${f.name}</span>
                         <span class="text-xs text-gray-400">${(f.size/1024).toFixed(1)} KB</span>
                     </div>`
-                ).join("") || "<p class=\'text-gray-500\'>لا توجد ملفات</p>";
+                ).join("") || "<p class='text-gray-500'>لا توجد ملفات</p>";
                 document.getElementById("recent-files").innerHTML = filesHtml;
             } catch (e) {
                 console.error("Dashboard load error:", e);
@@ -425,16 +425,16 @@
                 const html = audioList.files.map(f => {
                     const isUpload = f.dir.includes("uploads");
                     const badge = isUpload ? '<span class="bg-blue-900 text-xs px-2 py-1 rounded">مرفوع</span>' : '<span class="bg-green-900 text-xs px-2 py-1 rounded">مُخرج</span>';
-                    const downloadPath = isUpload ? `/api/uploads/${f.name}` : `/api/downloads/${f.name}`; // Note: uploads download route doesn't exist, we fallback to audio control for now
+                    const downloadPath = isUpload ? `/api/uploads/${f.name}` : `/api/downloads/${f.name}`;
                     return `<div class="flex justify-between items-center p-3 hover:bg-teal-900/10 rounded-lg border-b border-gray-800">
                         <div>
                             <p class="font-bold flex items-center gap-2">${f.name} ${badge}</p>
                             <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")} - ${(f.size/1024).toFixed(1)} KB</p>
                         </div>
                         <div class="flex gap-2 items-center">
-                            <audio controls style="max-width:200px"><source src="${!isUpload ? downloadPath : ''}"></audio>
+                            <audio controls style="max-width:200px"><source src="${downloadPath}"></audio>
                             <button onclick="renameFile('${f.name}')" class="bg-yellow-700 px-3 py-1 rounded text-xs text-white">إعادة تسمية</button>
-                            ${!isUpload ? `<a href="${downloadPath}" download class="btn-primary px-3 py-1 rounded text-xs">تحميل</a>` : ''}
+                            <a href="${downloadPath}" download class="btn-primary px-3 py-1 rounded text-xs">تحميل</a>
                             <button onclick="deleteFile('${f.name}', ${isUpload})" class="bg-red-900 px-3 py-1 rounded text-xs text-white">حذف</button>
                         </div>
                     </div>`;
@@ -484,7 +484,8 @@
                 document.getElementById("models-list").innerHTML = modelsHtml;
 
                 // Render Plugins
-                const pluginsHtml = plugins.map(p =>
+                const allPlugins = [...(plugins.tts_plugins || []), ...(plugins.builtin_plugins || [])];
+                const pluginsHtml = allPlugins.map(p =>
                     `<div class="p-3 bg-gray-800 rounded-lg flex justify-between items-center mb-2">
                         <div>
                             <p class="font-bold">${p.name}</p>
@@ -573,7 +574,7 @@
             const text = document.getElementById("tts-text").value.trim();
             if (!text) return alert("اكتب نصاً أولاً");
             btn.disabled = true;
-            btn.innerHTML = \'<span class="loading"></span> جارٍ التوليد...\';
+            btn.innerHTML = '<span class="loading"></span> جارٍ التوليد...';
             try {
                 const result = await apiPost("/api/tts", {
                     text: text,
@@ -602,7 +603,7 @@
             const text = document.getElementById("clone-text").value.trim();
             if (!fileInput.files[0] || !text) return alert("ارفع ملفاً واكتب نصاً");
             btn.disabled = true;
-            btn.innerHTML = \'<span class="loading"></span> جارٍ الاستنساخ...\';
+            btn.innerHTML = '<span class="loading"></span> جارٍ الاستنساخ...';
             try {
                 const formData = new FormData();
                 formData.append("file", fileInput.files[0]);
@@ -628,8 +629,11 @@
             const text = document.getElementById("religious-text").value.trim();
             if (!text) return alert("اكتب نصاً أولاً");
             document.getElementById("religious-text").value = text;
-            document.querySelector(\'[data-page="tts"]\').click();
+            document.querySelector('[data-page="tts"]').click();
             document.getElementById("tts-text").value = text;
+            setTimeout(() => {
+                document.getElementById("tts-generate").click();
+            }, 100);
         });
 
         document.getElementById("effects-apply")?.addEventListener("click", async () => {
