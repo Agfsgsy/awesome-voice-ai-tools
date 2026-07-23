@@ -1,6 +1,7 @@
 """مسارات API الكاملة"""
-import os
 import json
+import aiofiles
+import os
 import shutil
 import platform
 import sys
@@ -315,8 +316,8 @@ async def api_upload_file(file: UploadFile = File(...)):
     if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
     filepath = UPLOADS_DIR / file.filename
-    with open(filepath, "wb") as f:
-        f.write(content)
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(content)
     logger.info(f"Uploaded: {filepath}")
     return {"message": "File uploaded", "filename": file.filename, "path": str(filepath), "size": len(content)}
 
@@ -508,8 +509,8 @@ async def api_effects_apply(file: UploadFile = File(...), preset: str = Form(...
         raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
 
     filepath = UPLOADS_DIR / filename
-    with open(filepath, "wb") as f:
-        f.write(content)
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(content)
 
     try:
         from backend.plugins.builtin.audio_effects import process_audio
@@ -545,8 +546,8 @@ async def api_stt(file: UploadFile = File(...), language: str = Form("ar-SA")):
         raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
 
     filepath = UPLOADS_DIR / filename
-    with open(filepath, "wb") as f:
-        f.write(content)
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(content)
 
     try:
         from backend.plugins.builtin.stt_plugin import transcribe_audio
