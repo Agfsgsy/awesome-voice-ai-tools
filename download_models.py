@@ -21,8 +21,13 @@ def main():
         for plugin in plugins:
             print(f"\n--- {plugin.label} ---")
             if not plugin.check():
-                print(f"  [SKIP] Not installed")
-                continue
+                print(f"  [INFO] Not installed. Attempting auto-installation for {plugin.name}...")
+                install_result = plugin.install()
+                if install_result.get("success"):
+                    print(f"  [SUCCESS] Auto-installed {plugin.name}.")
+                else:
+                    print(f"  [SKIP] Auto-install failed: {install_result.get('message', 'Unknown error')}")
+                    continue
             result = plugin.download_models(args.model)
             status = "OK" if result.get("success") else "FAIL"
             print(f"  [{status}] {result.get('message', '')}")
@@ -31,6 +36,14 @@ def main():
         if not plugin:
             print(f"Engine '{args.engine}' not found. Available: {list(tts_registry.plugins.keys())}")
             sys.exit(1)
+        if not plugin.check():
+            print(f"[INFO] Engine '{args.engine}' not installed. Attempting auto-installation...")
+            install_result = plugin.install()
+            if install_result.get("success"):
+                print(f"[SUCCESS] Auto-installed {plugin.name}.")
+            else:
+                print(f"[FAIL] Auto-install failed: {install_result.get('message', 'Unknown error')}")
+                sys.exit(1)
         result = plugin.download_models(args.model)
         status = "OK" if result.get("success") else "FAIL"
         print(f"[{status}] {result}")
