@@ -15,8 +15,14 @@ def main():
     for plugin in plugins:
         print(f"--- {plugin.label} ({plugin.name}) ---")
         if not plugin.check():
-            print(f"  [SKIP] Not installed. Run install_ai.sh first.")
-            continue
+            print(f"  [INFO] Not installed. Attempting auto-installation for {plugin.name}...")
+            install_result = plugin.install()
+            if install_result.get("success"):
+                print(f"  [SUCCESS] Auto-installed {plugin.name}.")
+            else:
+                print(f"  [SKIP] Auto-install failed: {install_result.get('message', 'Unknown error')}. Please run install_ai.sh or install_ai.bat first.")
+                continue
+
         models = plugin.list_models()
         for model in models:
             if not model.get("downloaded"):
