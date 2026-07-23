@@ -49,6 +49,20 @@ def test_health_checks():
     assert all("ok" in c for c in checks)
 
 
+def test_check_pip_missing():
+    from backend.core.health import check_pip
+    from unittest.mock import patch
+    import sys
+
+    with patch.dict(sys.modules, {"pip": None}):
+        result = check_pip()
+
+    assert result["name"] == "pip"
+    assert result["ok"] is False
+    assert result["detail"] == "not found"
+    assert result["message"] == "pip not installed"
+
+
 @pytest.mark.asyncio
 async def test_tts_fallback():
     from backend.core.tts_engine import tts
