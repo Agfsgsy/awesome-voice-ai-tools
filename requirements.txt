@@ -10,3 +10,6 @@ httpx==0.28.1
 numpy==1.26.4
 scipy==1.14.1
 aiofiles==24.1.0
+requests>=2.31.0
+speechrecognition>=3.10.0
+pydub>=0.25.1

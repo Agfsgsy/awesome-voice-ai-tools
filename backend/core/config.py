@@ -36,4 +36,4 @@ GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
 
-ENGINE_PRIORITY = ["kokoro", "piper", "gemini", "xtts", "f5", "bark", "melotts", "fish"]
+ENGINE_PRIORITY = ["piper", "coqui", "melotts", "styletts2", "kokoro", "gemini"]
