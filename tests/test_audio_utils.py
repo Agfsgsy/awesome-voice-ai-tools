@@ -1,11 +1,9 @@
 """Tests for audio_utils module"""
-import sys
 import os
 import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.audio_utils import generate_sine_wave, save_audio
 

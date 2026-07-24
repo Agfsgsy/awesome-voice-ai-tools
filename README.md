@@ -19,9 +19,31 @@ pinned: false
 - محتوى إسلامي
 - واجهة عربية RTL 100%
 
-## التشغيل
+## التشغيل والتثبيت
+### المتطلبات الأساسية
+- Python 3.9 أو أحدث.
+- `ffmpeg` (مطلوب لمعالجة الصوت).
+
+### خطوات التثبيت (Linux / macOS)
 ```bash
+# تثبيت ffmpeg (Ubuntu/Debian كمثال)
+sudo apt update && sudo apt install ffmpeg -y
+
+# تثبيت متطلبات المشروع
 pip install -r requirements.txt
+pip install -r requirements-ai.txt # (اختياري - لمحركات الذكاء الاصطناعي المتقدمة)
+
+# تشغيل الخادم
+python main.py
+```
+
+### خطوات التثبيت (Windows)
+يمكنك استخدام سكربت التثبيت التلقائي الموجود:
+```bat
+install_ai.bat
+```
+ثم قم بتشغيل:
+```bat
 python main.py
 ```
 

@@ -56,6 +56,7 @@
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="library">المكتبة</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="models">النماذج والإضافات</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="logs">السجلات (Logs)</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="api-tester">مختبر API</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="settings">الإعدادات</a>
             </nav>
         </aside>
@@ -253,26 +254,69 @@
             <!-- Library -->
             <div id="page-library" class="page hidden">
                 <h2 class="text-2xl font-bold mb-6">المكتبة</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold mb-4">المخرجات (Outputs / Downloads)</h3>
+                        <div id="outputs-manager" class="space-y-2 overflow-y-auto max-h-[500px]">
+                            <p class="text-gray-500">جارٍ التحميل...</p>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold mb-4">المرفوعات (Uploads)</h3>
+                        <div id="uploads-manager" class="space-y-2 overflow-y-auto max-h-[500px]">
+                            <p class="text-gray-500">جارٍ التحميل...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Tester -->
+            <div id="page-api-tester" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">مختبر واجهة برمجة التطبيقات (API Tester)</h2>
                 <div class="card p-6">
-                    <div id="library-files" class="space-y-2">
-                        <p class="text-gray-500">جارٍ التحميل...</p>
+                    <div class="flex gap-4 mb-4">
+                        <select id="api-method" class="input-field w-32">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                        <input type="text" id="api-url" class="input-field flex-1" placeholder="/api/endpoint" value="/api/status">
+                        <button onclick="runApiTest()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">إرسال</button>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm text-gray-400 mb-2">جسم الطلب (JSON - للـ POST)</label>
+                        <textarea id="api-body" class="input-field w-full h-32" placeholder='{"key": "value"}'></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">الاستجابة:</label>
+                        <pre id="api-response" class="bg-gray-900 p-4 rounded-lg overflow-auto max-h-96 text-left" dir="ltr">الاستجابة ستظهر هنا...</pre>
                     </div>
                 </div>
             </div>
 
             <!-- Models and Plugins -->
             <div id="page-models" class="page hidden">
-                <h2 class="text-2xl font-bold mb-6">إدارة النماذج والإضافات</h2>
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">إدارة النماذج والإضافات</h2>
+                    <button onclick="verifyModels()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                        فحص النماذج (Verify)
+                    </button>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="card p-6">
                         <h3 class="text-lg font-bold mb-4">الإضافات (Plugins)</h3>
-                        <div id="plugins-list" class="space-y-4">
+                        <div id="plugins-list" class="space-y-4 overflow-y-auto max-h-[500px]">
                             <p class="text-gray-500">جارٍ التحميل...</p>
                         </div>
                     </div>
                     <div class="card p-6">
                         <h3 class="text-lg font-bold mb-4">النماذج (Models)</h3>
-                        <div id="models-list" class="space-y-4">
+                        <div class="mb-4 flex gap-2">
+                            <input type="text" id="model-download-engine" placeholder="المحرك (مثل xtts)" class="input-field flex-1">
+                            <input type="text" id="model-download-name" placeholder="اسم النموذج (اختياري)" class="input-field flex-1">
+                            <button onclick="downloadModel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">تحميل</button>
+                        </div>
+                        <div id="models-list" class="space-y-4 overflow-y-auto max-h-[400px]">
                             <p class="text-gray-500">جارٍ التحميل...</p>
                         </div>
                     </div>
@@ -385,15 +429,55 @@
                 item.classList.add("active");
                 document.querySelectorAll(".page").forEach(p => p.classList.add("hidden"));
                 const page = item.dataset.page;
-                document.getElementById("page-" + page).classList.remove("hidden");
+                const targetPage = document.getElementById("page-" + page);
+                if (targetPage) targetPage.classList.remove("hidden");
                 currentPage = page;
                 if (page === "dashboard") loadDashboard();
                 if (page === "library") loadLibrary();
                 if (page === "models") loadModelsAndPlugins();
                 if (page === "logs") loadLogs();
                 if (page === "settings") loadSettings();
+                if (page === "api-tester") { /* no init needed */ }
             });
         });
+
+        async function runApiTest() {
+            const method = document.getElementById("api-method").value;
+            const url = document.getElementById("api-url").value.trim();
+            let bodyText = document.getElementById("api-body").value.trim();
+            const resContainer = document.getElementById("api-response");
+
+            resContainer.textContent = "جارٍ التحميل...";
+
+            try {
+                let options = {
+                    method: method,
+                    headers: {}
+                };
+
+                if (method !== "GET" && method !== "HEAD" && bodyText) {
+                    options.headers["Content-Type"] = "application/json";
+                    options.body = bodyText;
+                }
+
+                const res = await fetch(API + url, options);
+                let data;
+                const contentType = res.headers.get("content-type");
+                if(contentType && contentType.includes("application/json")) {
+                    data = await res.json();
+                } else {
+                    data = await res.text();
+                }
+
+                resContainer.textContent = JSON.stringify({
+                    status: res.status,
+                    ok: res.ok,
+                    data: data
+                }, null, 2);
+            } catch(e) {
+                resContainer.textContent = "Error: " + e.message;
+            }
+        }
 
         async function loadLogs() {
             try {
@@ -447,25 +531,54 @@
 
         async function loadLibrary() {
             try {
-                const audioList = await apiGet("/api/audio/list");
-                const html = audioList.files.map(f => {
-                    const isUpload = f.dir.includes("uploads");
-                    const badge = isUpload ? '<span class="bg-blue-900 text-xs px-2 py-1 rounded">مرفوع</span>' : '<span class="bg-green-900 text-xs px-2 py-1 rounded">مُخرج</span>';
-                    const downloadPath = isUpload ? `/api/uploads/${f.name}` : `/api/downloads/${f.name}`; // Note: uploads download route doesn't exist, we fallback to audio control for now
-                    return `<div class="flex justify-between items-center p-3 hover:bg-teal-900/10 rounded-lg border-b border-gray-800">
-                        <div>
-                            <p class="font-bold flex items-center gap-2">${f.name} ${badge}</p>
-                            <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")} - ${(f.size/1024).toFixed(1)} KB</p>
+                const [audioList, uploadsList, downloadsList] = await Promise.all([
+                    apiGet("/api/audio/list"),
+                    apiGet("/api/uploads"),
+                    apiGet("/api/downloads")
+                ]);
+
+                // Render Outputs (Downloads)
+                const outputsHtml = downloadsList.map(f => {
+                    const downloadPath = `/api/downloads/${f.name}`;
+                    return `<div class="p-3 hover:bg-teal-900/10 rounded-lg border-b border-gray-800 mb-2">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="font-bold break-all">${f.name}</p>
+                                <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")} - ${(f.size/1024).toFixed(1)} KB</p>
+                            </div>
                         </div>
-                        <div class="flex gap-2 items-center">
-                            <audio controls style="max-width:200px"><source src="${!isUpload ? downloadPath : ''}"></audio>
-                            <button onclick="renameFile('${f.name}')" class="bg-yellow-700 px-3 py-1 rounded text-xs text-white">إعادة تسمية</button>
-                            ${!isUpload ? `<a href="${downloadPath}" download class="btn-primary px-3 py-1 rounded text-xs">تحميل</a>` : ''}
-                            <button onclick="deleteFile('${f.name}', ${isUpload})" class="bg-red-900 px-3 py-1 rounded text-xs text-white">حذف</button>
+                        <div class="flex flex-col gap-2">
+                            <audio controls class="w-full"><source src="${downloadPath}"></audio>
+                            <div class="flex gap-2">
+                                <a href="${downloadPath}" download class="btn-primary px-3 py-1 rounded text-xs text-center flex-1">تحميل</a>
+                                <button onclick="deleteFile('${f.name}', false)" class="bg-red-900 px-3 py-1 rounded text-xs text-white flex-1">حذف</button>
+                            </div>
                         </div>
                     </div>`;
-                }).join("") || "<p class='text-gray-500'>لا توجد ملفات</p>";
-                document.getElementById("library-files").innerHTML = html;
+                }).join("") || "<p class='text-gray-500'>لا توجد مخرجات</p>";
+                document.getElementById("outputs-manager").innerHTML = outputsHtml;
+
+                // Render Uploads
+                const uploadsHtml = uploadsList.map(f => {
+                    const downloadPath = `/api/uploads/${f.name}`;
+                    return `<div class="p-3 hover:bg-teal-900/10 rounded-lg border-b border-gray-800 mb-2">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="font-bold break-all">${f.name}</p>
+                                <p class="text-xs text-gray-400">${new Date(f.modified).toLocaleString("ar")} - ${(f.size/1024).toFixed(1)} KB</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <audio controls class="w-full"><source src="${downloadPath}"></audio>
+                            <div class="flex gap-2">
+                                <a href="${downloadPath}" download class="btn-primary px-3 py-1 rounded text-xs text-center flex-1">تحميل</a>
+                                <button onclick="deleteFile('${f.name}', true)" class="bg-red-900 px-3 py-1 rounded text-xs text-white flex-1">حذف</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join("") || "<p class='text-gray-500'>لا توجد مرفوعات</p>";
+                document.getElementById("uploads-manager").innerHTML = uploadsHtml;
+
             } catch (e) {
                 console.error("Library load error:", e);
             }
@@ -544,6 +657,37 @@
         async function togglePlugin(engine, action) {
             await apiPost(`/api/plugins/${action}`, {engine: engine});
             loadModelsAndPlugins();
+        }
+
+        async function verifyModels() {
+            try {
+                const res = await apiPost("/api/models/verify", {});
+                if(res.success) {
+                    alert("تم فحص النماذج بنجاح.");
+                    loadModelsAndPlugins();
+                } else {
+                    alert("فشل الفحص.");
+                }
+            } catch (e) {
+                alert("خطأ أثناء الفحص: " + e.message);
+            }
+        }
+
+        async function downloadModel() {
+            const engine = document.getElementById("model-download-engine").value.trim();
+            const modelName = document.getElementById("model-download-name").value.trim() || "default";
+            if (!engine) return alert("يرجى إدخال اسم المحرك");
+            try {
+                const res = await apiPost("/api/models/download", {engine: engine, model_name: modelName});
+                if(res.success !== false) {
+                    alert("تم طلب تحميل النموذج بنجاح");
+                    loadModelsAndPlugins();
+                } else {
+                    alert("فشل التحميل: " + (res.message || ""));
+                }
+            } catch(e) {
+                alert("خطأ أثناء التحميل: " + e.message);
+            }
         }
 
         async function loadSettings() {

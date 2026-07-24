@@ -1,9 +1,7 @@
-import sys
 import os
 import pytest
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def test_stt_plugin_loading():
     from backend.core.plugin_manager import init_plugin_manager
