@@ -49,6 +49,7 @@
             <nav class="space-y-1">
                 <a href="#" class="nav-item active block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="dashboard">لوحة التحكم</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="tts">توليد الصوت</a>
+                <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="stt">تحويل الصوت لنص</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="clone">استنساخ الصوت</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="effects">المؤثرات الصوتية</a>
                 <a href="#" class="nav-item block px-4 py-3 rounded-lg text-sm hover:bg-teal-900/20" data-page="religious">المحتوى الإسلامي</a>
@@ -143,6 +144,31 @@
                     <div id="tts-result" class="mt-4 hidden">
                         <audio id="tts-audio" controls class="mb-2"></audio>
                         <a id="tts-download" class="btn-primary px-4 py-2 rounded-lg inline-block text-sm">تحميل</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STT Page -->
+            <div id="page-stt" class="page hidden">
+                <h2 class="text-2xl font-bold mb-6">🎙️ تحويل الصوت إلى نص (STT)</h2>
+                <div class="grid grid-cols-1 gap-6">
+                    <div class="card p-6">
+                        <div class="mb-4">
+                            <label class="block text-sm mb-2">اختر ملف الصوت</label>
+                            <input type="file" id="stt-file" accept="audio/*" class="w-full p-2 rounded">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm mb-2">لغة الصوت</label>
+                            <select id="stt-language" class="w-full p-3 rounded-lg">
+                                <option value="ar-SA">العربية</option>
+                                <option value="en-US">الإنجليزية</option>
+                            </select>
+                        </div>
+                        <button id="stt-generate" class="btn-primary w-full py-3 rounded-lg font-bold text-lg">تحويل إلى نص</button>
+                    </div>
+                    <div id="stt-result" class="card p-6 hidden">
+                        <h3 class="text-lg font-bold mb-4">النص المستخرج:</h3>
+                        <textarea id="stt-output" class="w-full h-32 p-4 rounded-lg" readonly></textarea>
                     </div>
                 </div>
             </div>
@@ -412,7 +438,7 @@
                         <span>${f.name}</span>
                         <span class="text-xs text-gray-400">${(f.size/1024).toFixed(1)} KB</span>
                     </div>`
-                ).join("") || "<p class=\'text-gray-500\'>لا توجد ملفات</p>";
+                ).join("") || "<p class='text-gray-500'>لا توجد ملفات</p>";
                 document.getElementById("recent-files").innerHTML = filesHtml;
             } catch (e) {
                 console.error("Dashboard load error:", e);
@@ -573,7 +599,7 @@
             const text = document.getElementById("tts-text").value.trim();
             if (!text) return alert("اكتب نصاً أولاً");
             btn.disabled = true;
-            btn.innerHTML = \'<span class="loading"></span> جارٍ التوليد...\';
+            btn.innerHTML = '<span class="loading"></span> جارٍ التوليد...';
             try {
                 const result = await apiPost("/api/tts", {
                     text: text,
@@ -596,13 +622,40 @@
             btn.textContent = "توليد الصوت";
         });
 
+        document.getElementById("stt-generate")?.addEventListener("click", async () => {
+            const btn = document.getElementById("stt-generate");
+            const fileInput = document.getElementById("stt-file");
+            if (!fileInput.files[0]) return alert("ارفع ملفاً أولاً");
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> جارٍ التحويل...';
+            try {
+                const formData = new FormData();
+                formData.append("file", fileInput.files[0]);
+                formData.append("language", document.getElementById("stt-language").value);
+
+                const res = await fetch(API + "/api/stt", {method: "POST", body: formData});
+                const data = await res.json();
+
+                if (data.text) {
+                    document.getElementById("stt-result").classList.remove("hidden");
+                    document.getElementById("stt-output").value = data.text;
+                } else {
+                    alert(data.message || data.detail || "فشل التحويل");
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+            btn.disabled = false;
+            btn.textContent = "تحويل إلى نص";
+        });
+
         document.getElementById("clone-generate")?.addEventListener("click", async () => {
             const btn = document.getElementById("clone-generate");
             const fileInput = document.getElementById("clone-file");
             const text = document.getElementById("clone-text").value.trim();
             if (!fileInput.files[0] || !text) return alert("ارفع ملفاً واكتب نصاً");
             btn.disabled = true;
-            btn.innerHTML = \'<span class="loading"></span> جارٍ الاستنساخ...\';
+            btn.innerHTML = '<span class="loading"></span> جارٍ الاستنساخ...';
             try {
                 const formData = new FormData();
                 formData.append("file", fileInput.files[0]);
@@ -628,7 +681,7 @@
             const text = document.getElementById("religious-text").value.trim();
             if (!text) return alert("اكتب نصاً أولاً");
             document.getElementById("religious-text").value = text;
-            document.querySelector(\'[data-page="tts"]\').click();
+            document.querySelector('[data-page="tts"]').click();
             document.getElementById("tts-text").value = text;
         });
 
