@@ -52,7 +52,7 @@ class TTSEngine:
     async def synthesize(
         self,
         text: str,
-        engine: str = "kokoro",
+        engine: str = "fallback",
         language: str = "ar",
         voice: str = "default",
         speed: float = 1.0,
