@@ -116,11 +116,6 @@
                         <div>
                             <label class="block text-sm mb-2 text-teal-400">المحرك</label>
                             <select id="tts-engine" class="w-full p-2 rounded-lg">
-                                <option value="kokoro">Kokoro TTS</option>
-                                <option value="piper">Piper TTS</option>
-                                <option value="gemini">Google Gemini TTS</option>
-                                <option value="xtts">XTTS-v2</option>
-                                <option value="bark">Bark</option>
                             </select>
                         </div>
                         <div>
@@ -524,6 +519,29 @@
                     </div>`
                 ).join("") || "<p class='text-gray-500'>لا توجد ملفات</p>";
                 document.getElementById("recent-files").innerHTML = filesHtml;
+
+                // Populate TTS engines dynamically
+                const ttsEngineSelect = document.getElementById("tts-engine");
+                ttsEngineSelect.innerHTML = "";
+                let hasAvailableEngines = false;
+
+                info.engines.forEach(e => {
+                    if (e.available) {
+                        const option = document.createElement("option");
+                        option.value = e.name;
+                        option.textContent = e.label;
+                        ttsEngineSelect.appendChild(option);
+                        hasAvailableEngines = true;
+                    }
+                });
+
+                if (!hasAvailableEngines) {
+                    const option = document.createElement("option");
+                    option.value = "auto";
+                    option.textContent = "الوضع الاحتياطي (Fallback)";
+                    ttsEngineSelect.appendChild(option);
+                }
+
             } catch (e) {
                 console.error("Dashboard load error:", e);
             }
@@ -745,9 +763,10 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span> جارٍ التوليد...';
             try {
+                const selectedEngine = document.getElementById("tts-engine").value;
                 const result = await apiPost("/api/tts", {
                     text: text,
-                    engine: document.getElementById("tts-engine").value,
+                    engine: selectedEngine || "auto",
                     language: document.getElementById("tts-language").value,
                     voice: document.getElementById("tts-voice").value,
                     speed: parseFloat(document.getElementById("tts-speed").value),

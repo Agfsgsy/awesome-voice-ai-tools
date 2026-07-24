@@ -213,7 +213,7 @@ async def api_settings():
     return {
         "gemini_api_key_set": bool(GEMINI_API_KEY),
         "gemini_tts_model": GEMINI_TTS_MODEL,
-        "default_engine": ENGINE_PRIORITY[0] if ENGINE_PRIORITY else "kokoro",
+        "default_engine": tts_registry.auto_select_engine() or "fallback",
         "is_termux": IS_TERMUX,
         "is_colab": IS_COLAB,
         "app_host": APP_HOST,
@@ -364,12 +364,7 @@ async def api_tts(req: TTSRequest):
         if selected:
             req.engine = selected
         else:
-            return {
-                "success": False,
-                "engine": "auto",
-                "message": "No TTS engine available with downloaded models. Install one: piper, kokoro, coqui, melotts, styletts2. See /api/plugins for status.",
-                "available_engines": [e["name"] for e in tts_registry.get_available_engines()],
-            }
+            req.engine = "fallback"
 
     # Try TTS plugin system first
     plugin = tts_registry.get_plugin(req.engine)

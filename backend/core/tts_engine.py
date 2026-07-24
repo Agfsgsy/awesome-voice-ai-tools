@@ -52,12 +52,16 @@ class TTSEngine:
     async def synthesize(
         self,
         text: str,
-        engine: str = "kokoro",
+        engine: str = "auto",
         language: str = "ar",
         voice: str = "default",
         speed: float = 1.0,
         pitch: float = 0.0,
     ) -> Dict[str, Any]:
+        from backend.core.tts_registry import tts_registry
+        if engine == "auto":
+            engine = tts_registry.auto_select_engine() or "fallback"
+
         logger.info(f"TTS request: engine={engine}, lang={language}, text_len={len(text)}")
 
         if not text.strip():
@@ -93,7 +97,7 @@ class TTSEngine:
             "engine": "fallback",
             "file": str(filepath),
             "url": f"/api/downloads/{filepath.name}",
-            "message": "Generated with fallback engine (test tone). Install kokoro or TTS for real speech.",
+            "message": "Generated with fallback engine (test tone). Install a TTS engine for real speech.",
         }
 
     async def _synth_kokoro(self, text: str, language: str, voice: str, speed: float) -> Dict:
