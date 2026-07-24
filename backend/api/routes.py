@@ -110,6 +110,7 @@ async def status():
         "tts_plugins": [p.name for p in tts_registry.get_all_plugins()],
         "available_engines": [e["name"] for e in available],
         "auto_selected_engine": auto_engine,
+        "engine_available": len(available) > 0,
         "plugins_loaded": len([k for k, v in (pm.loaded if pm else {}).items() if v is not None]),
         "plugins_total": len(pm.registry) if pm else 0,
     }
@@ -210,10 +211,26 @@ async def api_voices():
 
 @router.get("/api/settings")
 async def api_settings():
+    import backend.core.config as config
+    available = tts_registry.get_available_engines()
+    available_names = [e["name"] for e in available]
+
+    default_engine = None
+    if config.DEFAULT_ENGINE and config.DEFAULT_ENGINE in available_names:
+        default_engine = config.DEFAULT_ENGINE
+    if not default_engine:
+        default_engine = tts_registry.auto_select_engine()
+    if not default_engine:
+        if available:
+            default_engine = available_names[0]
+        else:
+            default_engine = "fallback"
+
     return {
         "gemini_api_key_set": bool(GEMINI_API_KEY),
         "gemini_tts_model": GEMINI_TTS_MODEL,
-        "default_engine": ENGINE_PRIORITY[0] if ENGINE_PRIORITY else "kokoro",
+        "default_engine": default_engine,
+        "engine_available": len(available) > 0,
         "is_termux": IS_TERMUX,
         "is_colab": IS_COLAB,
         "app_host": APP_HOST,
@@ -233,6 +250,9 @@ async def api_update_settings(data: SettingsUpdate):
     if data.gemini_tts_model is not None:
         env_dict["GEMINI_TTS_MODEL"] = data.gemini_tts_model
         config.GEMINI_TTS_MODEL = data.gemini_tts_model
+    if data.default_engine is not None:
+        env_dict["DEFAULT_ENGINE"] = data.default_engine
+        config.DEFAULT_ENGINE = data.default_engine
 
     # Save back to .env
     env_file.write_text("\n".join(f"{k}={v}" for k, v in env_dict.items()))

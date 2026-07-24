@@ -120,6 +120,7 @@
                                 <option value="gemini">Google Gemini TTS</option>
                                 <option value="xtts">XTTS-v2</option>
                                 <option value="bark">Bark</option>
+                                <option value="fallback" class="hidden">Fallback</option>
                             </select>
                         </div>
                         <div>
@@ -440,6 +441,44 @@
                     </div>`
                 ).join("") || "<p class='text-gray-500'>لا توجد ملفات</p>";
                 document.getElementById("recent-files").innerHTML = filesHtml;
+
+                // Update TTS Engine Select based on availability
+                const engineSelect = document.getElementById("tts-engine");
+                if (engineSelect && status.tts_plugins && status.available_engines) {
+                    for (let i = 0; i < engineSelect.options.length; i++) {
+                        const option = engineSelect.options[i];
+                        if (status.tts_plugins.includes(option.value) && !status.available_engines.includes(option.value)) {
+                            option.disabled = true;
+                            option.text = option.text.replace(' (غير متاح)', '') + ' (غير متاح)';
+                        } else {
+                            option.disabled = false;
+                            option.text = option.text.replace(' (غير متاح)', '');
+                        }
+                    }
+
+                    const btn = document.getElementById("tts-generate");
+                    const oldWarning = document.getElementById("no-engine-warning");
+                    if (oldWarning) oldWarning.remove();
+
+                    if (status.engine_available) {
+                         if (btn) btn.disabled = false;
+                         if (status.auto_selected_engine) {
+                              engineSelect.value = status.auto_selected_engine;
+                         } else if (status.available_engines.length > 0) {
+                              engineSelect.value = status.available_engines[0];
+                         }
+                    } else {
+                         engineSelect.value = "fallback";
+                         if (btn) {
+                             btn.disabled = true;
+                             const warning = document.createElement("div");
+                             warning.id = "no-engine-warning";
+                             warning.className = "text-yellow-500 text-sm mt-2 font-bold text-center";
+                             warning.textContent = "No TTS engines are installed. (لا توجد محركات مثبتة)";
+                             btn.parentNode.insertBefore(warning, btn.nextSibling);
+                         }
+                    }
+                }
             } catch (e) {
                 console.error("Dashboard load error:", e);
             }

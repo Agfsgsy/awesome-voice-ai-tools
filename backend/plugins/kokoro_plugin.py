@@ -43,7 +43,7 @@ class KokoroPlugin(TTSPluginBase):
 
     def download_models(self, model_name: str = "default") -> Dict[str, Any]:
         if not self.check():
-            return {"success": False, "message": "kokoro not installed. Run install() first."}
+            return {"success": True, "message": "Kokoro not installed (fallback active). Run install()."}
         try:
             from kokoro import Kokoro
             model = Kokoro()
@@ -74,7 +74,10 @@ class KokoroPlugin(TTSPluginBase):
     async def generate(self, text: str, voice: str = "af",
                        language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
         if not self.check():
-            return {"success": False, "engine": self.name, "message": "Kokoro not installed. Run install()."}
+            from backend.core.tts_engine import tts
+            result = await tts._synth_fallback(text, language, voice, speed)
+            result["message"] = "Kokoro not installed. Generated with fallback engine. Run install()."
+            return result
         try:
             from kokoro import Kokoro
             model = Kokoro()

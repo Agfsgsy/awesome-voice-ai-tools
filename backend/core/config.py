@@ -32,6 +32,7 @@ IS_COLAB = os.path.exists("/content")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+DEFAULT_ENGINE = os.getenv("DEFAULT_ENGINE")
 
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
