@@ -1,6 +1,5 @@
 """MeloTTS Plugin - Open Source multilingual TTS by MyShell"""
 from typing import Dict, List, Any
-from pathlib import Path
 from backend.plugins.tts_plugin_base import TTSPluginBase
 from backend.core.logger import get_logger
 
@@ -39,23 +38,37 @@ class MeloTTSPlugin(TTSPluginBase):
             return False
 
     def install(self) -> Dict[str, Any]:
-        import subprocess, sys
+        import subprocess
+        import sys
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "git+https://github.com/myshell-ai/MeloTTS.git"])
+            subprocess.check_call([sys.executable,
+                                   "-m",
+                                   "pip",
+                                   "install",
+                                   "-q",
+                                   "git+https://github.com/myshell-ai/MeloTTS.git"])
             installed = self.check()
-            return {"success": installed, "engine": self.name, "message": "Installed MeloTTS" if installed else "Install failed"}
+            return {
+                "success": installed,
+                "engine": self.name,
+                "message": "Installed MeloTTS" if installed else "Install failed"}
         except Exception as e:
             return {"success": False, "engine": self.name, "message": str(e)}
 
     def download_models(self, model_name: str = "default") -> Dict[str, Any]:
         if not self.check():
-            return {"success": False, "message": "MeloTTS not installed. Run install() first."}
+            return {
+                "success": False,
+                "message": "MeloTTS not installed. Run install() first."}
         try:
             from melo.api import TTS as MeloAPI
-            model = MeloAPI(language="AR", device="cpu")
+            MeloAPI(language="AR", device="cpu")
             marker = self.models_dir / "arabic.installed"
             marker.write_text("MeloTTS Arabic model ready")
-            return {"success": True, "model": "arabic", "message": "MeloTTS Arabic model ready (auto-downloads on init)"}
+            return {
+                "success": True,
+                "model": "arabic",
+                "message": "MeloTTS Arabic model ready (auto-downloads on init)"}
         except Exception as e:
             return {"success": False, "model": model_name, "message": str(e)}
 
@@ -79,10 +92,15 @@ class MeloTTSPlugin(TTSPluginBase):
             {"name": "EN-UD", "model": "melo_en", "language": "en"},
         ]
 
-    async def generate(self, text: str, voice: str = "AR-Default",
-                       language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(self,
+                       text: str,
+                       voice: str = "AR-Default",
+                       language: str = "ar",
+                       speed: float = 1.0) -> Dict[str,
+                                                   Any]:
         if not self.check():
-            return {"success": False, "engine": self.name, "message": "MeloTTS not installed. Run install()."}
+            return {"success": False, "engine": self.name,
+                    "message": "MeloTTS not installed. Run install()."}
         try:
             from melo.api import TTS as MeloAPI
             import torch
@@ -94,7 +112,8 @@ class MeloTTSPlugin(TTSPluginBase):
 
             filepath = self._save_wav(None, text, 44100)
             speaker_id = speaker_ids.get(voice, list(speaker_ids.values())[0])
-            audio = model.tts_to_file(text, speaker_id, output_path=str(filepath), speed=speed)
+            model.tts_to_file(
+                text, speaker_id, output_path=str(filepath), speed=speed)
             return {
                 "success": True,
                 "engine": self.name,

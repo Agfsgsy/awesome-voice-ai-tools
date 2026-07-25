@@ -7,8 +7,10 @@ PLUGIN_DESCRIPTION = "إضافة تجريبية لاختبار نظام الإض
 
 def register():
     """تسجيل الإضافة"""
-    pass
 
 
 def get_info():
-    return {"name": PLUGIN_NAME, "version": __version__, "description": PLUGIN_DESCRIPTION}
+    return {
+        "name": PLUGIN_NAME,
+        "version": __version__,
+        "description": PLUGIN_DESCRIPTION}

@@ -1,6 +1,5 @@
 """مدير الأصوات - إدارة الأصوات المتاحة من جميع المحركات"""
-from typing import Dict, List, Any
-from pathlib import Path
+from typing import Dict, List
 from backend.core.logger import get_logger
 from backend.core.config import VOICES_DIR
 
@@ -29,7 +28,8 @@ class VoiceManager:
 
     def list_voices_by_language(self, language: str) -> List[Dict]:
         """عرض الأصوات بلغة معينة"""
-        return [v for v in self.list_all_voices() if v.get("language") == language]
+        return [v for v in self.list_all_voices() if v.get("language")
+                == language]
 
     def list_arabic_voices(self) -> List[Dict]:
         """عرض الأصوات العربية"""

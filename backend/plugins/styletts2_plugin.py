@@ -1,6 +1,5 @@
 """StyleTTS2 Plugin - Open Source high-quality TTS by yl4579"""
 from typing import Dict, List, Any
-from pathlib import Path
 from backend.plugins.tts_plugin_base import TTSPluginBase
 from backend.core.logger import get_logger
 
@@ -41,27 +40,40 @@ class StyleTTS2Plugin(TTSPluginBase):
             return False
 
     def install(self) -> Dict[str, Any]:
-        import subprocess, sys
+        import subprocess
+        import sys
         try:
             # Clone the repo
             repo_path = self.models_dir / "StyleTTS2_repo"
             if not repo_path.exists():
-                subprocess.check_call(["git", "clone", "https://github.com/yl4579/StyleTTS2.git", str(repo_path)])
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "-r", str(repo_path / "requirements.txt")])
+                subprocess.check_call(
+                    ["git", "clone", "https://github.com/yl4579/StyleTTS2.git", str(repo_path)])
+            subprocess.check_call([sys.executable,
+                                   "-m",
+                                   "pip",
+                                   "install",
+                                   "-q",
+                                   "-r",
+                                   str(repo_path / "requirements.txt")])
             import sys as sys_module
             if str(repo_path) not in sys_module.path:
                 sys_module.path.insert(0, str(repo_path))
             installed = self.check()
-            return {"success": installed, "engine": self.name, "message": "Installed StyleTTS2" if installed else "Install partial"}
+            return {
+                "success": installed,
+                "engine": self.name,
+                "message": "Installed StyleTTS2" if installed else "Install partial"}
         except Exception as e:
             return {"success": False, "engine": self.name, "message": str(e)}
 
     def download_models(self, model_name: str = "LibriTTS") -> Dict[str, Any]:
         import urllib.request
         if model_name not in self.STYLETTS2_MODELS:
-            return {"success": False, "message": f"Unknown model: {model_name}"}
+            return {
+                "success": False,
+                "message": f"Unknown model: {model_name}"}
 
-        meta = self.STYLETTS2_MODELS[model_name]
+        # meta = self.STYLETTS2_MODELS[model_name]
         repo_path = self.models_dir / "StyleTTS2_repo"
 
         try:
@@ -80,11 +92,15 @@ class StyleTTS2Plugin(TTSPluginBase):
                 for fname in ["config.yml", "epoch_2nd_00100.pth"]:
                     filepath = model_dir / fname
                     if not filepath.exists():
-                        urllib.request.urlretrieve(f"{base_url}/{fname}", str(filepath))
+                        urllib.request.urlretrieve(
+                            f"{base_url}/{fname}", str(filepath))
 
             marker = self.models_dir / f"{model_name}.installed"
             marker.write_text(f"StyleTTS2 {model_name} model ready")
-            return {"success": True, "model": model_name, "path": str(model_dir)}
+            return {
+                "success": True,
+                "model": model_name,
+                "path": str(model_dir)}
         except Exception as e:
             return {"success": False, "model": model_name, "message": str(e)}
 
@@ -105,10 +121,15 @@ class StyleTTS2Plugin(TTSPluginBase):
             {"name": "default", "model": "LJSpeech", "language": "en"},
         ]
 
-    async def generate(self, text: str, voice: str = "default",
-                       language: str = "en", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(self,
+                       text: str,
+                       voice: str = "default",
+                       language: str = "en",
+                       speed: float = 1.0) -> Dict[str,
+                                                   Any]:
         if not self.check():
-            return {"success": False, "engine": self.name, "message": "StyleTTS2 not installed. Run install()."}
+            return {"success": False, "engine": self.name,
+                    "message": "StyleTTS2 not installed. Run install()."}
         try:
             import sys as sys_module
             repo_path = self.models_dir / "StyleTTS2_repo"
@@ -118,7 +139,6 @@ class StyleTTS2Plugin(TTSPluginBase):
             import torch
             import styles
             import yaml
-            from pathlib import Path as P
 
             config_path = repo_path / "Models" / "Config" / "config.yml"
             model_path = repo_path / "Models" / "LibriTTS" / "epoch_2nd_00100.pth"
@@ -139,7 +159,8 @@ class StyleTTS2Plugin(TTSPluginBase):
         except Exception as e:
             logger.error(f"StyleTTS2 generate failed: {e}")
             auto_install_msg = "StyleTTS2 requires manual setup. Clone the repo, download models from HuggingFace, and install requirements."
-            return {"success": False, "engine": self.name, "message": f"{auto_install_msg} Error: {e}"}
+            return {"success": False, "engine": self.name,
+                    "message": f"{auto_install_msg} Error: {e}"}
 
 
 PLUGIN_CLASS = StyleTTS2Plugin

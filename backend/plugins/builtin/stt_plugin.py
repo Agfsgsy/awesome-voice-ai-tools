@@ -3,8 +3,10 @@ __version__ = "1.0.0"
 PLUGIN_NAME = "Speech-To-Text"
 PLUGIN_DESCRIPTION = "تحويل الصوت إلى نص باستخدام SpeechRecognition (Google API أو نماذج محلية)"
 
+
 def register():
     pass
+
 
 def transcribe_audio(filepath: str, language: str = "ar-SA") -> str:
     """تحويل ملف الصوت إلى نص"""

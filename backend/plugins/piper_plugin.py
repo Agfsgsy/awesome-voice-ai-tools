@@ -53,18 +53,28 @@ class PiperPlugin(TTSPluginBase):
             return False
 
     def install(self) -> Dict[str, Any]:
-        import subprocess, sys
+        import subprocess
+        import sys
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "piper-tts"])
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "-q", "piper-tts"])
             installed = self.check()
-            return {"success": installed, "engine": self.name, "message": "Installed piper-tts" if installed else "Install failed"}
+            return {
+                "success": installed,
+                "engine": self.name,
+                "message": "Installed piper-tts" if installed else "Install failed"}
         except Exception as e:
             return {"success": False, "engine": self.name, "message": str(e)}
 
-    def download_models(self, model_name: str = "ar_JO-kareem-medium") -> Dict[str, Any]:
+    def download_models(
+            self, model_name: str = "ar_JO-kareem-medium") -> Dict[str, Any]:
         import urllib.request
         if model_name not in self.PIPER_MODELS:
-            return {"success": False, "message": f"Unknown model: {model_name}. Available: {list(self.PIPER_MODELS.keys())}"}
+            return {
+                "success": False,
+                "message": f"Unknown model: {model_name}. Available: {
+                    list(
+                        self.PIPER_MODELS.keys())}"}
         meta = self.PIPER_MODELS[model_name]
         model_path = self.models_dir / f"{model_name}.onnx"
         config_path = self.models_dir / f"{model_name}.onnx.json"
@@ -73,7 +83,11 @@ class PiperPlugin(TTSPluginBase):
             logger.info(f"Downloading Piper model: {model_name}")
             urllib.request.urlretrieve(meta["url"], str(model_path))
             urllib.request.urlretrieve(meta["config_url"], str(config_path))
-            return {"success": True, "model": model_name, "path": str(model_path), "config": str(config_path)}
+            return {
+                "success": True,
+                "model": model_name,
+                "path": str(model_path),
+                "config": str(config_path)}
         except Exception as e:
             return {"success": False, "model": model_name, "message": str(e)}
 
@@ -102,16 +116,25 @@ class PiperPlugin(TTSPluginBase):
                 })
         return voices
 
-    async def generate(self, text: str, voice: str = "kareem",
-                       language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(self,
+                       text: str,
+                       voice: str = "kareem",
+                       language: str = "ar",
+                       speed: float = 1.0) -> Dict[str,
+                                                   Any]:
         if not self.check():
-            return {"success": False, "engine": self.name, "message": "Piper not installed. Run install()."}
+            return {"success": False, "engine": self.name,
+                    "message": "Piper not installed. Run install()."}
 
         # Find downloaded model
         models = self.list_models()
-        downloaded = [m for m in models if m["downloaded"] and m["language"] == language]
+        downloaded = [m for m in models if m["downloaded"]
+                      and m["language"] == language]
         if not downloaded:
-            return {"success": False, "engine": self.name, "message": f"No downloaded model for language '{language}'. Run download_models()."}
+            return {
+                "success": False,
+                "engine": self.name,
+                "message": f"No downloaded model for language '{language}'. Run download_models()."}
         model = downloaded[0]
 
         try:
@@ -119,11 +142,13 @@ class PiperPlugin(TTSPluginBase):
             from piper import PiperVoice
             model_path = Path(model["path"])
             config_path = model_path.with_suffix(".onnx.json")
-            voice_obj = PiperVoice.load(str(model_path), config_path=str(config_path))
+            voice_obj = PiperVoice.load(
+                str(model_path), config_path=str(config_path))
             filepath = self._save_wav(b"", text, 22050)
 
             with wave.open(str(filepath), "wb") as wav_file:
-                voice_obj.synthesize_wav(text, wav_file, length_scale=1.0/speed)
+                voice_obj.synthesize_wav(
+                    text, wav_file, length_scale=1.0 / speed)
 
             return {
                 "success": True,
