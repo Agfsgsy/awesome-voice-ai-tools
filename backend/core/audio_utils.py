@@ -1,10 +1,7 @@
 """أدوات الصوت المساعدة"""
-import os
 import wave
 import struct
-import hashlib
 from pathlib import Path
-from typing import Optional
 
 from backend.core.config import OUTPUTS_DIR
 from backend.core.logger import get_logger
@@ -12,18 +9,25 @@ from backend.core.logger import get_logger
 logger = get_logger("audio_utils")
 
 
-def generate_sine_wave(frequency: float = 440.0, duration: float = 1.0, sample_rate: int = 22050) -> bytes:
+def generate_sine_wave(
+        frequency: float = 440.0,
+        duration: float = 1.0,
+        sample_rate: int = 22050) -> bytes:
     """توليد موجة جيبية بسيطة (محرك احتياطي)"""
     import math
     num_samples = int(duration * sample_rate)
     frames = []
     for i in range(num_samples):
-        value = int(32767 * 0.5 * math.sin(2 * math.pi * frequency * i / sample_rate))
+        value = int(32767 * 0.5 * math.sin(2 * math.pi *
+                    frequency * i / sample_rate))
         frames.append(struct.pack('<h', value))
     return b''.join(frames)
 
 
-def save_audio(audio_data: bytes, filename: str, sample_rate: int = 22050) -> Path:
+def save_audio(
+        audio_data: bytes,
+        filename: str,
+        sample_rate: int = 22050) -> Path:
     """حفظ بيانات الصوت في ملف WAV"""
     if isinstance(audio_data, bytes):
         filepath = OUTPUTS_DIR / filename

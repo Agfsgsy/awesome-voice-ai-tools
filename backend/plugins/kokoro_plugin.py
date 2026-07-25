@@ -1,6 +1,5 @@
 """Kokoro TTS Plugin - Open Source lightweight TTS"""
 from typing import Dict, List, Any
-from pathlib import Path
 from backend.plugins.tts_plugin_base import TTSPluginBase
 from backend.core.logger import get_logger
 
@@ -33,23 +32,33 @@ class KokoroPlugin(TTSPluginBase):
             return False
 
     def install(self) -> Dict[str, Any]:
-        import subprocess, sys
+        import subprocess
+        import sys
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "kokoro"])
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "-q", "kokoro"])
             installed = self.check()
-            return {"success": installed, "engine": self.name, "message": "Installed kokoro" if installed else "Install failed"}
+            return {
+                "success": installed,
+                "engine": self.name,
+                "message": "Installed kokoro" if installed else "Install failed"}
         except Exception as e:
             return {"success": False, "engine": self.name, "message": str(e)}
 
     def download_models(self, model_name: str = "default") -> Dict[str, Any]:
         if not self.check():
-            return {"success": False, "message": "Engine not installed. Run install() first."}
+            return {
+                "success": False,
+                "message": "Engine not installed. Run install() first."}
         try:
             from kokoro import Kokoro
-            model = Kokoro()
+            Kokoro()
             marker = self.models_dir / "default.installed"
             marker.write_text("kokoro model auto-downloaded on first use")
-            return {"success": True, "model": "default", "message": "Kokoro model ready (auto-downloads on first generate())"}
+            return {
+                "success": True,
+                "model": "default",
+                "message": "Kokoro model ready (auto-downloads on first generate())"}
         except Exception as e:
             return {"success": False, "model": model_name, "message": str(e)}
 
@@ -71,10 +80,15 @@ class KokoroPlugin(TTSPluginBase):
             })
         return voices
 
-    async def generate(self, text: str, voice: str = "af",
-                       language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(self,
+                       text: str,
+                       voice: str = "af",
+                       language: str = "ar",
+                       speed: float = 1.0) -> Dict[str,
+                                                   Any]:
         if not self.check():
-            return {"success": False, "engine": self.name, "message": "Engine not installed. Run install()."}
+            return {"success": False, "engine": self.name,
+                    "message": "Engine not installed. Run install()."}
         try:
             from kokoro import Kokoro
             model = Kokoro()

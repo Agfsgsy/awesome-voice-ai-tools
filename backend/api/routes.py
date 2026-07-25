@@ -1,12 +1,11 @@
 """مسارات API الكاملة"""
-import json
 import aiofiles
 import os
 import shutil
 import platform
 import sys
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
@@ -30,6 +29,8 @@ logger = get_logger("api")
 router = APIRouter()
 
 # === Models ===
+
+
 class TTSRequest(BaseModel):
     text: str
     engine: str = "auto"
@@ -38,10 +39,12 @@ class TTSRequest(BaseModel):
     speed: float = 1.0
     pitch: float = 0.0
 
+
 class CloneRequest(BaseModel):
     reference_audio: str
     text: str
     engine: str = "coqui"
+
 
 class SettingsUpdate(BaseModel):
     gemini_api_key: Optional[str] = None
@@ -49,15 +52,19 @@ class SettingsUpdate(BaseModel):
     default_engine: Optional[str] = None
     default_language: Optional[str] = None
 
+
 class RenameRequest(BaseModel):
     new_name: str
+
 
 class PluginInstallRequest(BaseModel):
     engine: str
 
+
 class ModelDownloadRequest(BaseModel):
     engine: str
     model_name: str = "default"
+
 
 # === Init builtin plugins ===
 try:
@@ -71,6 +78,8 @@ except Exception as e:
 tts_registry.initialize()
 
 # === Helper ===
+
+
 def _pm_info():
     if pm:
         return pm.get_info()
@@ -78,18 +87,25 @@ def _pm_info():
 
 # === Routes ===
 
+
 @router.get("/")
 async def root():
     index_path = FRONTEND_DIR / "templates" / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
-    return {"app": APP_NAME, "version": APP_VERSION, "status": "running", "docs": "/docs"}
+    return {
+        "app": APP_NAME,
+        "version": APP_VERSION,
+        "status": "running",
+        "docs": "/docs"}
+
 
 @router.get("/health")
 async def health():
     checks = run_all_checks(APP_PORT)
     all_ok = all(c.get("ok", False) for c in checks)
     return {"status": "healthy" if all_ok else "warning", "checks": checks}
+
 
 @router.get("/status")
 async def status():
@@ -114,9 +130,11 @@ async def status():
         "plugins_total": len(pm.registry) if pm else 0,
     }
 
+
 @router.get("/version")
 async def version():
     return {"version": APP_VERSION, "name": APP_NAME}
+
 
 @router.get("/api/info")
 async def api_info():
@@ -135,6 +153,7 @@ async def api_info():
 
 # === Plugin endpoints ===
 
+
 @router.get("/api/plugins")
 async def api_plugins():
     all_plugins = []
@@ -144,45 +163,58 @@ async def api_plugins():
     builtin = _pm_info()
     return {"tts_plugins": all_plugins, "builtin_plugins": builtin}
 
+
 @router.get("/api/plugins/{name}")
 async def api_plugin_detail(name: str):
     plugin = tts_registry.get_plugin(name)
     if not plugin:
-        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Plugin '{name}' not found")
     return plugin.health()
+
 
 @router.post("/api/plugins/install")
 async def api_plugin_install(req: PluginInstallRequest):
     plugin = tts_registry.get_plugin(req.engine)
     if not plugin:
-        raise HTTPException(status_code=404, detail=f"Engine '{req.engine}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Engine '{req.engine}' not found")
     return plugin.install()
+
 
 @router.post("/api/plugins/check")
 async def api_plugin_check(req: PluginInstallRequest):
     plugin = tts_registry.get_plugin(req.engine)
     if not plugin:
-        raise HTTPException(status_code=404, detail=f"Engine '{req.engine}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Engine '{req.engine}' not found")
     installed = plugin.check()
     return {"engine": req.engine, "installed": installed}
+
 
 @router.post("/api/plugins/enable")
 async def api_plugin_enable(req: PluginInstallRequest):
     if not pm:
-        raise HTTPException(status_code=500, detail="Plugin manager not initialized")
+        raise HTTPException(
+            status_code=500, detail="Plugin manager not initialized")
     if pm.enable_plugin(req.engine):
         return {"success": True, "message": f"Plugin {req.engine} enabled"}
-    raise HTTPException(status_code=400, detail=f"Failed to enable plugin {req.engine}")
+    raise HTTPException(
+        status_code=400, detail=f"Failed to enable plugin {req.engine}")
+
 
 @router.post("/api/plugins/disable")
 async def api_plugin_disable(req: PluginInstallRequest):
     if not pm:
-        raise HTTPException(status_code=500, detail="Plugin manager not initialized")
+        raise HTTPException(
+            status_code=500, detail="Plugin manager not initialized")
     if pm.disable_plugin(req.engine):
         return {"success": True, "message": f"Plugin {req.engine} disabled"}
-    raise HTTPException(status_code=400, detail=f"Failed to disable plugin {req.engine}")
+    raise HTTPException(
+        status_code=400, detail=f"Failed to disable plugin {req.engine}")
 
 # === Model endpoints ===
+
 
 @router.get("/api/models")
 async def api_models():
@@ -190,15 +222,25 @@ async def api_models():
     models = model_manager.list_all_models()
     return {"models": models, "count": len(models)}
 
+
 @router.post("/api/models/download")
 async def api_model_download(req: ModelDownloadRequest):
     from backend.core.model_manager import model_manager
     return model_manager.download_model(req.engine, req.model_name)
 
+
 @router.delete("/api/models/{engine}/{model_name}")
 async def api_model_delete(engine: str, model_name: str):
     from backend.core.model_manager import model_manager
     return model_manager.delete_model(engine, model_name)
+
+
+@router.post("/api/models/verify")
+async def api_model_verify():
+    from backend.core.model_manager import model_manager
+    model_manager.verify_all_models()
+    return {"success": True, "message": "تم فحص النماذج بنجاح"}
+
 
 @router.get("/api/voices")
 async def api_voices():
@@ -207,6 +249,7 @@ async def api_voices():
     return {"voices": voices, "count": len(voices)}
 
 # === Settings ===
+
 
 @router.get("/api/settings")
 async def api_settings():
@@ -220,12 +263,14 @@ async def api_settings():
         "app_port": APP_PORT,
     }
 
+
 @router.post("/api/settings")
 async def api_update_settings(data: SettingsUpdate):
     import backend.core.config as config
     env_file = Path(".env")
     env_lines = env_file.read_text().splitlines() if env_file.exists() else []
-    env_dict = {line.split("=", 1)[0]: line.split("=", 1)[1] for line in env_lines if "=" in line}
+    env_dict = {line.split("=", 1)[0]: line.split("=", 1)[1]
+                for line in env_lines if "=" in line}
 
     if data.gemini_api_key is not None:
         env_dict["GEMINI_API_KEY"] = data.gemini_api_key
@@ -240,6 +285,7 @@ async def api_update_settings(data: SettingsUpdate):
     return {"message": "Settings updated successfully"}
 
 # === System ===
+
 
 @router.get("/api/system")
 async def api_system():
@@ -256,22 +302,29 @@ async def api_system():
 
 # === Logs ===
 
+
 @router.get("/api/logs")
 async def api_logs():
     log_file = LOGS_DIR / "app.log"
     if log_file.exists():
-        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]
+        lines = log_file.read_text(
+            encoding="utf-8", errors="replace").splitlines()[-200:]
         return {"logs": lines, "count": len(lines)}
     return {"logs": [], "message": "No log file found"}
+
 
 @router.get("/api/logs/download")
 async def api_download_logs():
     log_file = LOGS_DIR / "app.log"
     if not log_file.exists():
         return {"message": "No logs"}
-    return FileResponse(str(log_file), filename="app.log", media_type="text/plain")
+    return FileResponse(
+        str(log_file),
+        filename="app.log",
+        media_type="text/plain")
 
 # === Downloads ===
+
 
 @router.get("/api/downloads")
 async def api_list_downloads():
@@ -284,18 +337,22 @@ async def api_list_downloads():
             })
     return {"files": files, "count": len(files), "dir": str(OUTPUTS_DIR)}
 
+
 @router.get("/api/downloads/{filename}")
 async def api_download_file(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if ".." in filename or filename.startswith(
+            "/") or filename.startswith("\\"):
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = OUTPUTS_DIR / filename
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(filepath), filename=filename)
 
+
 @router.delete("/api/downloads/{filename}")
 async def api_delete_download(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if ".." in filename or filename.startswith(
+            "/") or filename.startswith("\\"):
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = OUTPUTS_DIR / filename
     if not filepath.exists():
@@ -305,25 +362,35 @@ async def api_delete_download(filename: str):
 
 # === Uploads ===
 
+
 @router.post("/api/uploads")
 async def api_upload_file(file: UploadFile = File(...)):
-    if ".." in file.filename or file.filename.startswith("/") or file.filename.startswith("\\"):
+    if ".." in file.filename or file.filename.startswith(
+            "/") or file.filename.startswith("\\"):
         raise HTTPException(status_code=400, detail="Invalid filename")
     ext = Path(file.filename).suffix.lower()
     if ext not in SUPPORTED_AUDIO_FORMATS:
-        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported format: {ext}")
     content = await file.read()
     if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+        raise HTTPException(
+            status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
     filepath = UPLOADS_DIR / file.filename
     async with aiofiles.open(filepath, "wb") as f:
         await f.write(content)
     logger.info(f"Uploaded: {filepath}")
-    return {"message": "File uploaded", "filename": file.filename, "path": str(filepath), "size": len(content)}
+    return {
+        "message": "File uploaded",
+        "filename": file.filename,
+        "path": str(filepath),
+        "size": len(content)}
+
 
 @router.delete("/api/uploads/{filename}")
 async def api_delete_upload(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if ".." in filename or filename.startswith(
+            "/") or filename.startswith("\\"):
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = UPLOADS_DIR / filename
     if not filepath.exists():
@@ -331,14 +398,17 @@ async def api_delete_upload(filename: str):
     filepath.unlink()
     return {"message": f"Deleted {filename}"}
 
+
 @router.get("/api/uploads/{filename}")
 async def api_download_upload(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if ".." in filename or filename.startswith(
+            "/") or filename.startswith("\\"):
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = UPLOADS_DIR / filename
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(filepath), filename=filename)
+
 
 @router.get("/api/uploads")
 async def api_list_uploads():
@@ -352,6 +422,7 @@ async def api_list_uploads():
     return {"files": files, "count": len(files), "dir": str(UPLOADS_DIR)}
 
 # === TTS ===
+
 
 @router.post("/api/tts")
 async def api_tts(req: TTSRequest):
@@ -382,11 +453,13 @@ async def api_tts(req: TTSRequest):
     )
     return result
 
+
 @router.post("/api/speech")
 async def api_speech(req: TTSRequest):
     return await api_tts(req)
 
 # === Audio ===
+
 
 @router.post("/api/audio/clone")
 async def api_clone(req: CloneRequest):
@@ -399,22 +472,30 @@ async def api_clone(req: CloneRequest):
     )
     return result
 
+
 @router.post("/api/audio/upload")
 async def api_audio_upload(file: UploadFile = File(...)):
     return await api_upload_file(file)
 
+
 @router.post("/api/audio/edit")
-async def api_audio_edit(file: UploadFile = File(...), trim_start_ms: int = Form(0), trim_end_ms: int = Form(0)):
-    if ".." in file.filename or file.filename.startswith("/") or file.filename.startswith("\\"):
+async def api_audio_edit(
+        file: UploadFile = File(...),
+        trim_start_ms: int = Form(0),
+        trim_end_ms: int = Form(0)):
+    if ".." in file.filename or file.filename.startswith(
+            "/") or file.filename.startswith("\\"):
         raise HTTPException(status_code=400, detail="Invalid filename")
 
     ext = Path(file.filename).suffix.lower()
     if ext not in SUPPORTED_AUDIO_FORMATS:
-        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported format: {ext}")
 
     content = await file.read()
     if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+        raise HTTPException(
+            status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
 
     filepath = UPLOADS_DIR / file.filename
     with open(filepath, "wb") as f:
@@ -427,7 +508,11 @@ async def api_audio_edit(file: UploadFile = File(...), trim_start_ms: int = Form
         out_filename = f"edited_{name_hash}.wav"
         out_filepath = OUTPUTS_DIR / out_filename
 
-        success = edit_audio(str(filepath), str(out_filepath), trim_start_ms=trim_start_ms, trim_end_ms=trim_end_ms)
+        success = edit_audio(
+            str(filepath),
+            str(out_filepath),
+            trim_start_ms=trim_start_ms,
+            trim_end_ms=trim_end_ms)
         if success:
             return {
                 "message": "Audio edited successfully",
@@ -441,19 +526,19 @@ async def api_audio_edit(file: UploadFile = File(...), trim_start_ms: int = Form
         logger.error(f"Audio editing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/api/audio/list")
 async def api_audio_list():
     all_files = []
     for d in [OUTPUTS_DIR, UPLOADS_DIR]:
         for f in sorted(d.iterdir()):
             if f.is_file() and not f.name.startswith("."):
-                all_files.append({
-                    "name": f.name, "size": f.stat().st_size,
-                    "dir": str(d), "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
-                })
+                all_files.append({"name": f.name, "size": f.stat().st_size, "dir": str(
+                    d), "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat(), })
     return {"files": all_files, "count": len(all_files)}
 
 # === Cache ===
+
 
 @router.get("/api/cache")
 async def api_cache_info():
@@ -464,7 +549,12 @@ async def api_cache_info():
             s = f.stat().st_size
             total_size += s
             files.append({"name": f.name, "size": s})
-    return {"files": files, "count": len(files), "total_size": total_size, "dir": str(CACHE_DIR)}
+    return {
+        "files": files,
+        "count": len(files),
+        "total_size": total_size,
+        "dir": str(CACHE_DIR)}
+
 
 @router.delete("/api/cache")
 async def api_cache_clear():
@@ -476,6 +566,7 @@ async def api_cache_clear():
     return {"message": f"Cleared {cleared} files from cache"}
 
 # === Files ===
+
 
 @router.post("/api/files/{filename}/rename")
 async def api_rename_file(filename: str, req: RenameRequest):
@@ -489,19 +580,28 @@ async def api_rename_file(filename: str, req: RenameRequest):
         raise HTTPException(status_code=404, detail="File not found")
     new_path = found.parent / req.new_name
     found.rename(new_path)
-    return {"message": f"Renamed {filename} to {req.new_name}", "path": str(new_path)}
+    return {
+        "message": f"Renamed {filename} to {
+            req.new_name}",
+        "path": str(new_path)}
 
 # === Effects ===
+
+
 @router.post("/api/effects/apply")
-async def api_effects_apply(file: UploadFile = File(...), preset: str = Form(...)):
+async def api_effects_apply(
+        file: UploadFile = File(...),
+        preset: str = Form(...)):
     filename = Path(file.filename).name
     ext = Path(filename).suffix.lower()
     if ext not in SUPPORTED_AUDIO_FORMATS:
-        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported format: {ext}")
 
     content = await file.read()
     if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+        raise HTTPException(
+            status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
 
     filepath = UPLOADS_DIR / filename
     async with aiofiles.open(filepath, "wb") as f:
@@ -523,22 +623,27 @@ async def api_effects_apply(file: UploadFile = File(...), preset: str = Form(...
                 "url": f"/api/downloads/{out_filename}"
             }
         else:
-            raise HTTPException(status_code=500, detail="Failed to apply effects")
+            raise HTTPException(
+                status_code=500, detail="Failed to apply effects")
     except Exception as e:
         logger.error(f"Effect processing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # === STT ===
+
+
 @router.post("/api/stt")
 async def api_stt(file: UploadFile = File(...), language: str = Form("ar-SA")):
     filename = Path(file.filename).name
     ext = Path(filename).suffix.lower()
     if ext not in SUPPORTED_AUDIO_FORMATS:
-        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported format: {ext}")
 
     content = await file.read()
     if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
+        raise HTTPException(
+            status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB}MB)")
 
     filepath = UPLOADS_DIR / filename
     async with aiofiles.open(filepath, "wb") as f:

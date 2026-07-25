@@ -35,7 +35,8 @@ class PluginManager:
             logger.error(f"Plugin file not found: {filepath}")
             return False
         try:
-            spec = importlib.util.spec_from_file_location(f"plugin_{name}", filepath)
+            spec = importlib.util.spec_from_file_location(
+                f"plugin_{name}", filepath)
             if spec is None or spec.loader is None:
                 logger.error(f"Cannot load spec for {name}")
                 return False

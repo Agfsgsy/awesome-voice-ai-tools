@@ -1,6 +1,5 @@
 """Coqui TTS Plugin - Open Source multilingual TTS"""
 from typing import Dict, List, Any
-from pathlib import Path
 from backend.plugins.tts_plugin_base import TTSPluginBase
 from backend.core.logger import get_logger
 
@@ -18,7 +17,25 @@ class CoquiPlugin(TTSPluginBase):
     COQUI_MODELS = {
         "xtts_v2": {
             "model_name": "tts_models/multilingual/multi-dataset/xtts_v2",
-            "languages": ["ar", "en", "fr", "de", "es", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh-cn", "hu", "ko", "ja", "hi"],
+            "languages": [
+                "ar",
+                "en",
+                "fr",
+                "de",
+                "es",
+                "it",
+                "pt",
+                "pl",
+                "tr",
+                "ru",
+                "nl",
+                "cs",
+                "ar",
+                "zh-cn",
+                "hu",
+                "ko",
+                "ja",
+                "hi"],
             "supports_cloning": True,
         },
         "glow_tts": {
@@ -38,27 +55,40 @@ class CoquiPlugin(TTSPluginBase):
             return False
 
     def install(self) -> Dict[str, Any]:
-        import subprocess, sys
+        import subprocess
+        import sys
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "TTS"])
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "-q", "TTS"])
             installed = self.check()
-            return {"success": installed, "engine": self.name, "message": "Installed TTS" if installed else "Install failed"}
+            return {
+                "success": installed,
+                "engine": self.name,
+                "message": "Installed TTS" if installed else "Install failed"}
         except Exception as e:
             return {"success": False, "engine": self.name, "message": str(e)}
 
     def download_models(self, model_name: str = "xtts_v2") -> Dict[str, Any]:
         if model_name not in self.COQUI_MODELS:
-            return {"success": False, "message": f"Unknown model: {model_name}"}
+            return {
+                "success": False,
+                "message": f"Unknown model: {model_name}"}
         if not self.check():
-            return {"success": False, "message": "TTS not installed. Run install() first."}
+            return {
+                "success": False,
+                "message": "TTS not installed. Run install() first."}
         try:
             from TTS.api import TTS as CoquiTTS
             meta = self.COQUI_MODELS[model_name]
-            model = CoquiTTS(model_name=meta["model_name"])
+            CoquiTTS(model_name=meta["model_name"])
             # Model auto-downloaded on first use
             marker = self.models_dir / f"{model_name}.installed"
             marker.write_text("installed")
-            return {"success": True, "model": model_name, "message": f"Model {meta['model_name']} downloaded"}
+            return {
+                "success": True,
+                "model": model_name,
+                "message": f"Model {
+                    meta['model_name']} downloaded"}
         except Exception as e:
             return {"success": False, "model": model_name, "message": str(e)}
 
@@ -81,17 +111,25 @@ class CoquiPlugin(TTSPluginBase):
             {"name": "default", "model": "glow_tts", "language": "en"},
         ]
 
-    async def generate(self, text: str, voice: str = "default",
-                       language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(self,
+                       text: str,
+                       voice: str = "default",
+                       language: str = "ar",
+                       speed: float = 1.0) -> Dict[str,
+                                                   Any]:
         if not self.check():
-            return {"success": False, "engine": self.name, "message": "Coqui TTS not installed. Run install()."}
+            return {"success": False, "engine": self.name,
+                    "message": "Coqui TTS not installed. Run install()."}
         try:
             from TTS.api import TTS as CoquiTTS
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            model = CoquiTTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", device=device)
+            model = CoquiTTS(
+                model_name="tts_models/multilingual/multi-dataset/xtts_v2",
+                device=device)
             filepath = self._save_wav(None, text, 24000)
-            model.tts_to_file(text=text, language=language, file_path=str(filepath))
+            model.tts_to_file(text=text, language=language,
+                              file_path=str(filepath))
             return {
                 "success": True,
                 "engine": self.name,

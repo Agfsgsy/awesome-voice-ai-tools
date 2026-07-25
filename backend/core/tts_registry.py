@@ -1,6 +1,5 @@
 """سجل محركات TTS - نظام كشف وتحديد تلقائي للمحركات المتاحة"""
 from typing import Dict, List, Any, Optional
-from pathlib import Path
 from backend.core.logger import get_logger
 from backend.core.config import ENGINE_PRIORITY
 
@@ -102,7 +101,12 @@ class TTSRegistry:
             logger.warning(f"Failed to register StyleTTS2: {e}")
 
         self._initialized = True
-        logger.info(f"TTS Registry initialized with {len(self.plugins)} plugins: {list(self.plugins.keys())}")
+        logger.info(
+            f"TTS Registry initialized with {
+                len(
+                    self.plugins)} plugins: {
+                list(
+                    self.plugins.keys())}")
 
 
 tts_registry = TTSRegistry()

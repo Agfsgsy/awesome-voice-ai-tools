@@ -1,6 +1,6 @@
 """Base class لجميع إضافات TTS"""
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from pathlib import Path
 from backend.core.logger import get_logger
 from backend.core.config import MODELS_DIR, VOICES_DIR, OUTPUTS_DIR
@@ -27,33 +27,31 @@ class TTSPluginBase(ABC):
     @abstractmethod
     def check(self) -> bool:
         """هل المحرك مثبت ومتاح؟"""
-        pass
 
     @abstractmethod
     def install(self) -> Dict[str, Any]:
         """تثبيت المحرك (pip install أو تحميل)"""
-        pass
 
     @abstractmethod
     def download_models(self, model_name: str = "default") -> Dict[str, Any]:
         """تحميل النماذج المطلوبة"""
-        pass
 
     @abstractmethod
     def list_models(self) -> List[Dict]:
         """قائمة النماذج المتاحة أو المحملة"""
-        pass
 
     @abstractmethod
     def list_voices(self) -> List[Dict]:
         """قائمة الأصوات المتاحة"""
-        pass
 
     @abstractmethod
-    async def generate(self, text: str, voice: str = "default",
-                       language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(self,
+                       text: str,
+                       voice: str = "default",
+                       language: str = "ar",
+                       speed: float = 1.0) -> Dict[str,
+                                                   Any]:
         """توليد صوت من نص"""
-        pass
 
     def health(self) -> Dict[str, Any]:
         """فحص صحة المحرك"""
@@ -71,7 +69,8 @@ class TTSPluginBase(ABC):
             "is_open_source": self.is_open_source,
         }
 
-    def _save_wav(self, audio_data, filename: str, sample_rate: int = 22050) -> Path:
+    def _save_wav(self, audio_data, filename: str,
+                  sample_rate: int = 22050) -> Path:
         """حفظ بيانات الصوت"""
         import hashlib
         name_hash = hashlib.md5(filename.encode()).hexdigest()[:8]
@@ -79,7 +78,7 @@ class TTSPluginBase(ABC):
         filepath = OUTPUTS_DIR / out_name
 
         if isinstance(audio_data, bytes):
-            import wave, struct
+            import wave
             with wave.open(str(filepath), 'w') as wf:
                 wf.setnchannels(1)
                 wf.setsampwidth(2)

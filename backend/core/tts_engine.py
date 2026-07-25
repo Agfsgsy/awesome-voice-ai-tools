@@ -1,5 +1,4 @@
 """محرك TTS - واجهة موحدة لجميع محركات الصوت"""
-import os
 import asyncio
 import hashlib
 from typing import Optional, Dict, List, Any
@@ -22,13 +21,20 @@ class TTSEngine:
 
     def _init_engines(self):
         engine_defs = [
-            {"name": "kokoro", "label": "Kokoro TTS", "available": self._check_lib("kokoro")},
-            {"name": "piper", "label": "Piper TTS", "available": self._check_lib("piper_tts")},
-            {"name": "xtts", "label": "XTTS-v2", "available": self._check_lib("TTS")},
-            {"name": "bark", "label": "Bark", "available": self._check_lib("bark")},
-            {"name": "melotts", "label": "MeloTTS", "available": self._check_lib("melotts")},
-            {"name": "gemini", "label": "Google Gemini TTS", "available": bool(GEMINI_API_KEY)},
-            {"name": "fallback", "label": "Fallback (tone)", "available": True},
+            {"name": "kokoro", "label": "Kokoro TTS",
+                "available": self._check_lib("kokoro")},
+            {"name": "piper", "label": "Piper TTS",
+                "available": self._check_lib("piper_tts")},
+            {"name": "xtts", "label": "XTTS-v2",
+                "available": self._check_lib("TTS")},
+            {"name": "bark", "label": "Bark",
+                "available": self._check_lib("bark")},
+            {"name": "melotts", "label": "MeloTTS",
+                "available": self._check_lib("melotts")},
+            {"name": "gemini", "label": "Google Gemini TTS",
+                "available": bool(GEMINI_API_KEY)},
+            {"name": "fallback",
+                "label": "Fallback (tone)", "available": True},
         ]
         for e in engine_defs:
             self.engines[e["name"]] = e
@@ -62,10 +68,17 @@ class TTSEngine:
         if engine == "auto":
             engine = tts_registry.auto_select_engine() or "fallback"
 
-        logger.info(f"TTS request: engine={engine}, lang={language}, text_len={len(text)}")
+        logger.info(
+            f"TTS request: engine={engine}, lang={language}, text_len={
+                len(text)}")
 
         if not text.strip():
-            return {"success": False, "engine": engine, "message": "Text is empty", "file": None, "url": None}
+            return {
+                "success": False,
+                "engine": engine,
+                "message": "Text is empty",
+                "file": None,
+                "url": None}
 
         if engine == "fallback":
             return await self._synth_fallback(text, language, voice, speed)
@@ -85,7 +98,12 @@ class TTSEngine:
         logger.warning(f"Engine '{engine}' not available, using fallback")
         return await self._synth_fallback(text, language, voice, speed)
 
-    async def _synth_fallback(self, text: str, language: str, voice: str, speed: float) -> Dict:
+    async def _synth_fallback(
+            self,
+            text: str,
+            language: str,
+            voice: str,
+            speed: float) -> Dict:
         await asyncio.sleep(0.01)
         duration = min(max(len(text) * 0.05, 0.5), 10.0)
         audio_data = generate_sine_wave(frequency=440.0, duration=duration)
@@ -100,7 +118,12 @@ class TTSEngine:
             "message": "Generated with fallback engine (test tone). Install a TTS engine for real speech.",
         }
 
-    async def _synth_kokoro(self, text: str, language: str, voice: str, speed: float) -> Dict:
+    async def _synth_kokoro(
+            self,
+            text: str,
+            language: str,
+            voice: str,
+            speed: float) -> Dict:
         try:
             from kokoro import Kokoro
             model = Kokoro()
@@ -123,14 +146,21 @@ class TTSEngine:
             logger.error(f"Kokoro TTS failed: {e}")
             return await self._synth_fallback(text, language, voice, speed)
 
-    async def _synth_xtts(self, text: str, language: str, voice: str, speed: float) -> Dict:
+    async def _synth_xtts(
+            self,
+            text: str,
+            language: str,
+            voice: str,
+            speed: float) -> Dict:
         try:
             from TTS.api import TTS as CoquiTTS
-            model = CoquiTTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
+            model = CoquiTTS(
+                model_name="tts_models/multilingual/multi-dataset/xtts_v2")
             name_hash = hashlib.md5(text.encode()).hexdigest()[:8]
             filename = f"tts_xtts_{name_hash}.wav"
             filepath = OUTPUTS_DIR / filename
-            model.tts_to_file(text=text, language=language, file_path=str(filepath))
+            model.tts_to_file(text=text, language=language,
+                              file_path=str(filepath))
             return {
                 "success": True, "engine": "xtts",
                 "file": str(filepath),
@@ -141,7 +171,12 @@ class TTSEngine:
             logger.error(f"XTTS failed: {e}")
             return await self._synth_fallback(text, language, voice, speed)
 
-    async def _synth_bark(self, text: str, language: str, voice: str, speed: float) -> Dict:
+    async def _synth_bark(
+            self,
+            text: str,
+            language: str,
+            voice: str,
+            speed: float) -> Dict:
         try:
             from bark import generate_audio
             from scipy.io.wavfile import write as write_wav
@@ -160,7 +195,12 @@ class TTSEngine:
             logger.error(f"Bark failed: {e}")
             return await self._synth_fallback(text, language, voice, speed)
 
-    async def _synth_gemini(self, text: str, language: str, voice: str, speed: float) -> Dict:
+    async def _synth_gemini(
+            self,
+            text: str,
+            language: str,
+            voice: str,
+            speed: float) -> Dict:
         try:
             from google import genai
             from google.genai.types import GenerateContentConfig
@@ -197,11 +237,13 @@ class TTSEngine:
     async def clone_voice(
         self, reference_audio_path: str, text: str, engine: str = "xtts"
     ) -> Dict[str, Any]:
-        logger.info(f"Voice clone: engine={engine}, ref={reference_audio_path}")
+        logger.info(
+            f"Voice clone: engine={engine}, ref={reference_audio_path}")
         try:
             if engine == "xtts" and self._check_lib("TTS"):
                 from TTS.api import TTS as CoquiTTS
-                model = CoquiTTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
+                model = CoquiTTS(
+                    model_name="tts_models/multilingual/multi-dataset/xtts_v2")
                 name_hash = hashlib.md5(text.encode()).hexdigest()[:8]
                 filename = f"clone_xtts_{name_hash}.wav"
                 filepath = OUTPUTS_DIR / filename
@@ -219,8 +261,10 @@ class TTSEngine:
                 }
             else:
                 return {
-                    "success": False, "engine": engine,
-                    "file": None, "url": None,
+                    "success": False,
+                    "engine": engine,
+                    "file": None,
+                    "url": None,
                     "message": f"Engine {engine} not available. Install TTS: pip install TTS",
                 }
         except Exception as e:

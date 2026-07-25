@@ -4,12 +4,30 @@ PLUGIN_NAME = "Audio Effects"
 PLUGIN_DESCRIPTION = "معالجة الصوت: إزالة ضجيج، تغيير سرعة، طبقة، ضغط، ريفرب"
 
 PRESETS = {
-    "studio": {"noise_reduction": True, "compressor": True, "eq": True},
-    "lecture": {"noise_reduction": True, "compressor": False, "reverb": "light"},
-    "mosque": {"noise_reduction": True, "reverb": "heavy", "eq": "bass_boost"},
-    "deep_voice": {"pitch": -3, "compressor": True},
-    "podcast": {"noise_reduction": True, "compressor": True, "eq": True, "reverb": "none"},
-    "video_commentary": {"noise_reduction": True, "compressor": True, "speed": 1.05},
+    "studio": {
+        "noise_reduction": True,
+        "compressor": True,
+        "eq": True},
+    "lecture": {
+        "noise_reduction": True,
+        "compressor": False,
+        "reverb": "light"},
+    "mosque": {
+        "noise_reduction": True,
+        "reverb": "heavy",
+        "eq": "bass_boost"},
+    "deep_voice": {
+        "pitch": -3,
+        "compressor": True},
+    "podcast": {
+        "noise_reduction": True,
+        "compressor": True,
+        "eq": True,
+        "reverb": "none"},
+    "video_commentary": {
+        "noise_reduction": True,
+        "compressor": True,
+        "speed": 1.05},
 }
 
 
@@ -21,7 +39,11 @@ def get_presets():
     return PRESETS
 
 
-def edit_audio(input_path: str, output_path: str, trim_start_ms: int = None, trim_end_ms: int = None) -> bool:
+def edit_audio(
+        input_path: str,
+        output_path: str,
+        trim_start_ms: int = None,
+        trim_end_ms: int = None) -> bool:
     """Trim and edit audio files using pydub"""
     try:
         from pydub import AudioSegment
@@ -43,6 +65,7 @@ def edit_audio(input_path: str, output_path: str, trim_start_ms: int = None, tri
         print(f"Error editing audio: {e}")
         return False
 
+
 def process_audio(input_path: str, output_path: str, preset_name: str) -> bool:
     """تطبيق التأثيرات على ملف الصوت"""
     import numpy as np
@@ -58,7 +81,8 @@ def process_audio(input_path: str, output_path: str, preset_name: str) -> bool:
 
     # تحويل إلى float32 للمعالجة
     if data.dtype != np.float32:
-        max_val = np.iinfo(data.dtype).max if np.issubdtype(data.dtype, np.integer) else 1.0
+        max_val = np.iinfo(data.dtype).max if np.issubdtype(
+            data.dtype, np.integer) else 1.0
         data = data.astype(np.float32) / max_val
 
     # Pitch shift / speed change (simple resampling for speed, crude pitch)
@@ -73,7 +97,8 @@ def process_audio(input_path: str, output_path: str, preset_name: str) -> bool:
     if speed != 1.0:
         new_sample_rate = int(sample_rate * speed)
 
-    # For pitch, we'll do a simple speed change to simulate pitch without time stretching
+    # For pitch, we'll do a simple speed change to simulate pitch without time
+    # stretching
     if pitch != 0:
         # pitch < 0 means lower pitch (slower)
         # pitch > 0 means higher pitch (faster)
@@ -95,9 +120,9 @@ def process_audio(input_path: str, output_path: str, preset_name: str) -> bool:
 
         # Create zero array for delayed signal
         delayed = np.zeros_like(data)
-        if len(data.shape) > 1: # Stereo
+        if len(data.shape) > 1:  # Stereo
             delayed[delay_samples:, :] = data[:-delay_samples, :] * decay
-        else: # Mono
+        else:  # Mono
             delayed[delay_samples:] = data[:-delay_samples] * decay
 
         data = data + delayed
