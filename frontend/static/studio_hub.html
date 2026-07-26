@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voice AI Studio Arabic Pro</title>
+<style>
+:root{--bg:#050b14;--panel:#0d1b2d;--text:#f3f8ff;--muted:#9fb2c8;--brand:#21c9aa;--blue:#178dff;--gold:#d6a941}*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;overflow:hidden}.app{height:100%;display:flex;flex-direction:column}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#07111f;border-bottom:1px solid #ffffff1f}.title{font-weight:900;white-space:nowrap}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tab{border:1px solid #315374;background:#19314d;color:#fff;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer}.tab.active{background:linear-gradient(135deg,var(--brand),var(--blue));border-color:transparent}.hint{font-size:12px;color:var(--muted)}iframe{width:100%;height:100%;border:0;background:#07111f;flex:1}@media(max-width:700px){.top{align-items:flex-start;flex-direction:column}.title{white-space:normal}.tabs{width:100%}.tab{flex:1}.hint{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div><div class="title">🎙️ استوديو الصوت العربي الاحترافي</div><div class="hint">كل الأدوات القديمة محفوظة، وأدوات المنتج الجديدة مضافة في تبويب مستقل.</div></div>
+    <div class="tabs">
+      <button class="tab active" data-page="pro.html">الاستوديو الكامل</button>
+      <button class="tab" data-page="producer.html">المنتج والمقابلات</button>
+    </div>
+  </div>
+  <iframe id="view" src="pro.html" title="Voice AI Studio"></iframe>
+</div>
+<script>
+const view=document.getElementById('view');
+document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
+ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+ btn.classList.add('active');
+ view.src=btn.dataset.page;
+}));
+</script>
+</body>
+</html>
