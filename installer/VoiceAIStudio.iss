@@ -1,5 +1,5 @@
 #define MyAppName "Voice AI Studio Arabic Pro"
-#define MyAppVersion "2.4.0"
+#define MyAppVersion "2.5.0"
 #define MyAppPublisher "Agfsgsy"
 #define MyAppExeName "VoiceAIStudioArabic.exe"
 
