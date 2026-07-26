@@ -42,10 +42,10 @@ def test_tts_engine_import():
 
 
 @pytest.mark.asyncio
-async def test_tts_rejects_fake_fallback_success():
+async def test_tts_rejects_invalid_engine():
     from backend.core.tts_engine import TTSEngine
 
-    result = await TTSEngine().synthesize(text="اختبار", engine="fallback")
+    result = await TTSEngine().synthesize(text="اختبار", engine="invalid_engine_name")
     assert result["success"] is False
     assert result["file"] is None
     assert result["url"] is None

@@ -100,6 +100,11 @@ class TTSRegistry:
             self.register("styletts2", StyleTTS2Plugin())
         except Exception as e:
             logger.warning(f"Failed to register StyleTTS2: {e}")
+        try:
+            from backend.plugins.builtin.fallback_plugin import FallbackPlugin
+            self.register("fallback", FallbackPlugin())
+        except Exception as e:
+            logger.warning(f"Failed to register Fallback: {e}")
 
         self._initialized = True
         logger.info(f"TTS Registry initialized with {len(self.plugins)} plugins: {list(self.plugins.keys())}")
