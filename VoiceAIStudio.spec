@@ -1,9 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from pathlib import Path
 
-datas = [("frontend", "frontend")]
+from PyInstaller.utils.hooks import (
+    collect_all,
+    collect_submodules,
+)
+
+project_root = Path(SPEC).resolve().parent
+
+datas = [(str(project_root / "frontend"), "frontend")]
 binaries = []
-hiddenimports = collect_submodules("backend.plugins")
+hiddenimports = collect_submodules("backend.plugins") + collect_submodules("uvicorn")
 
 for package in ("edge_tts", "imageio_ffmpeg", "webview"):
     package_datas, package_binaries, package_hidden = collect_all(package)
@@ -12,25 +19,21 @@ for package in ("edge_tts", "imageio_ffmpeg", "webview"):
     hiddenimports += package_hidden
 
 hiddenimports += [
-    "uvicorn.logging",
-    "uvicorn.loops.auto",
-    "uvicorn.protocols.http.auto",
-    "uvicorn.protocols.websockets.auto",
-    "uvicorn.lifespan.on",
     "multipart",
     "pydub",
+    "webview.platforms.winforms",
 ]
 
 a = Analysis(
-    ["desktop_app.py"],
-    pathex=[],
+    [str(project_root / "desktop_app.py")],
+    pathex=[str(project_root)],
     binaries=binaries,
     datas=datas,
-    hiddenimports=hiddenimports,
+    hiddenimports=sorted(set(hiddenimports)),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter.test", "unittest.test"],
+    excludes=["pytest", "notebook", "jupyter", "matplotlib"],
     noarchive=False,
     optimize=1,
 )
@@ -41,7 +44,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="VoiceAIStudio",
+    name="VoiceAIStudioArabic",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -52,6 +55,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    uac_admin=False,
 )
 
 coll = COLLECT(
@@ -61,5 +65,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="VoiceAIStudio",
+    name="VoiceAIStudioArabic",
 )
