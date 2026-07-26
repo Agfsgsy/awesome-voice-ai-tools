@@ -1,9 +1,6 @@
-"""Studio 2.7: AI rewriting, sermon generation, desktop exports, music mixing and consent-based cloning."""
+"""Studio Pro: AI rewriting, sermons, exports, music mixing and consent-based cloning."""
 from __future__ import annotations
 
-import json
-import os
-import re
 import shutil
 import subprocess
 import uuid
@@ -13,40 +10,18 @@ import httpx
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from backend.core.config import CONFIG_DIR, OUTPUTS_DIR, UPLOADS_DIR
+from backend.core.config import OUTPUTS_DIR, UPLOADS_DIR
+from backend.core.gemini_key_pool import ordered_keys, record_result
 from backend.core.tts_registry import tts_registry
 from backend.plugins.builtin.audio_effects import _ffmpeg_executable
 
 router = APIRouter(prefix="/api/studio-pro", tags=["Studio Pro"])
 
 
-def _keys() -> list[str]:
-    cfg = CONFIG_DIR / "gemini.json"
-    values: list[str] = []
-    if cfg.exists():
-        try:
-            data = json.loads(cfg.read_text(encoding="utf-8"))
-            values.extend(data.get("api_keys") or [])
-            if data.get("api_key"):
-                values.append(data["api_key"])
-        except Exception:
-            pass
-    values.extend(re.split(r"[\n,;|]+", os.getenv("GEMINI_API_KEYS", "") or os.getenv("GEMINI_API_KEY", "")))
-    return list(dict.fromkeys(str(k).strip() for k in values if len(str(k).strip()) >= 20))
-
-
 async def _available_text_models(client: httpx.AsyncClient, key: str) -> list[str]:
-    preferred = [
-        "gemini-3.6-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-    ]
+    preferred = ["gemini-2.5-flash", "gemini-flash-latest"]
     try:
-        response = await client.get(
-            "https://generativelanguage.googleapis.com/v1beta/models",
-            headers={"x-goog-api-key": key},
-        )
+        response = await client.get("https://generativelanguage.googleapis.com/v1beta/models", headers={"x-goog-api-key": key})
         if response.status_code >= 400:
             return preferred
         available: list[str] = []
@@ -56,21 +31,32 @@ async def _available_text_models(client: httpx.AsyncClient, key: str) -> list[st
             low = name.lower()
             if "generateContent" not in methods:
                 continue
-            if any(x in low for x in ("tts", "image", "embedding", "aqa", "vision")):
+            if any(x in low for x in ("tts", "image", "embedding", "aqa")):
                 continue
             if name:
                 available.append(name)
-        ordered = [m for m in preferred if m in available]
-        ordered.extend(m for m in available if m not in ordered)
+        ordered = [model for model in preferred if model in available]
+        ordered.extend(model for model in available if model not in ordered)
         return ordered or preferred
     except Exception:
         return preferred
 
 
+def _error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+        if isinstance(payload, dict):
+            return str((payload.get("error") or {}).get("message") or response.text[:500])
+    except Exception:
+        pass
+    return response.text[:500]
+
+
 async def _ask_gemini(prompt: str, temperature: float = 0.45) -> str:
-    keys = _keys()
+    """Use the exact same enabled and active key pool as TTS and interviews."""
+    keys = ordered_keys()
     if not keys:
-        raise HTTPException(status_code=400, detail="أضف مفتاح Gemini صالحًا أولًا.")
+        raise HTTPException(status_code=400, detail="لا يوجد مفتاح Gemini مفعّل وجاهز. افتح إدارة المفاتيح، اختبر مفتاحًا ثم شغّله.")
     payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": temperature}}
     errors: list[str] = []
     for key_index, key in enumerate(keys, start=1):
@@ -84,23 +70,25 @@ async def _ask_gemini(prompt: str, temperature: float = 0.45) -> str:
                             headers={"x-goog-api-key": key, "Content-Type": "application/json"},
                             json=payload,
                         )
-                        if response.status_code in {401, 403, 429}:
-                            errors.append(f"المفتاح {key_index}: HTTP {response.status_code}")
-                            break
+                        if response.status_code == 429:
+                            detail = _error_detail(response); record_result(key, "quota", detail); errors.append(f"المفتاح {key_index}: انتهت الحصة"); break
+                        if response.status_code == 401:
+                            detail = _error_detail(response); record_result(key, "invalid", detail); errors.append(f"المفتاح {key_index}: غير صحيح"); break
+                        if response.status_code == 403:
+                            detail = _error_detail(response); record_result(key, "forbidden", detail); errors.append(f"المفتاح {key_index}: مرفوض"); break
                         if response.status_code in {400, 404}:
-                            errors.append(f"{model}: HTTP {response.status_code}")
-                            continue
+                            errors.append(f"{model}: غير متاح"); continue
                         response.raise_for_status()
                         parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                        result = "\n".join(str(p.get("text", "")) for p in parts).strip()
+                        result = "\n".join(str(part.get("text", "")) for part in parts).strip()
                         if result:
+                            record_result(key, "working", f"Text model: {model}")
                             return result
                     except Exception as exc:
                         errors.append(f"{model}: {str(exc)[:160]}")
-                        continue
         except Exception as exc:
             errors.append(f"المفتاح {key_index}: {str(exc)[:160]}")
-    raise HTTPException(status_code=502, detail="تعذر استخدام محرر Gemini بالنماذج المتاحة. " + "; ".join(errors[-4:]))
+    raise HTTPException(status_code=502, detail="تعذر استخدام محرر Gemini بالمفاتيح المفعّلة. " + "; ".join(errors[-5:]))
 
 
 class RewriteRequest(BaseModel):
@@ -179,52 +167,57 @@ async def export_folder():
     return {"success": True, "path": str(_desktop_exports())}
 
 
-@router.post("/mix-music")
-async def mix_music(voice: UploadFile = File(...), music: UploadFile = File(...), music_volume: float = Form(0.12), fade_seconds: float = Form(2.5)):
-    if not (0 <= music_volume <= 0.5):
-        raise HTTPException(status_code=400, detail="مستوى الموسيقى يجب أن يكون بين 0 و0.5")
+class MixRequest(BaseModel):
+    voice_filename: str = Field(min_length=1, max_length=300)
+    music_filename: str = Field(min_length=1, max_length=300)
+    music_volume: float = Field(default=0.12, ge=0.01, le=0.8)
+
+
+@router.post("/mix")
+async def mix_audio(req: MixRequest):
+    voice = OUTPUTS_DIR / Path(req.voice_filename).name
+    music = OUTPUTS_DIR / Path(req.music_filename).name
+    if not voice.exists() or not music.exists():
+        raise HTTPException(status_code=404, detail="ملف الصوت أو الموسيقى غير موجود.")
     ffmpeg = _ffmpeg_executable()
     if not ffmpeg:
-        raise HTTPException(status_code=500, detail="FFmpeg غير متاح داخل البرنامج.")
-    token = uuid.uuid4().hex[:12]
-    voice_path = UPLOADS_DIR / f"voice_{token}{Path(voice.filename or '.wav').suffix or '.wav'}"
-    music_path = UPLOADS_DIR / f"music_{token}{Path(music.filename or '.mp3').suffix or '.mp3'}"
-    voice_path.write_bytes(await voice.read())
-    music_path.write_bytes(await music.read())
-    output = OUTPUTS_DIR / f"studio_mix_{token}.mp3"
-    filters = (
-        f"[1:a]volume={music_volume},afade=t=in:st=0:d={fade_seconds},aloop=loop=-1:size=2147483647[bg];"
-        "[0:a]highpass=f=65,acompressor=threshold=-22dB:ratio=2.7:attack=10:release=140,loudnorm=I=-16:TP=-1.2:LRA=7[vc];"
-        "[vc][bg]sidechaincompress=threshold=0.035:ratio=8:attack=15:release=500[ducked];"
-        "[ducked]loudnorm=I=-15:TP=-1.0:LRA=7[out]"
-    )
-    cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(voice_path), "-stream_loop", "-1", "-i", str(music_path), "-filter_complex", filters, "-map", "[out]", "-shortest", "-c:a", "libmp3lame", "-b:a", "192k", str(output)]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=False)
-    if proc.returncode != 0 or not output.exists():
-        raise HTTPException(status_code=500, detail=(proc.stderr or "فشل دمج الموسيقى")[-1000:])
+        raise HTTPException(status_code=500, detail="FFmpeg غير متاح.")
+    output = OUTPUTS_DIR / f"mix_{uuid.uuid4().hex[:10]}.mp3"
+    filter_graph = f"[1:a]volume={req.music_volume},aloop=loop=-1:size=2e+09[bg];[bg][0:a]sidechaincompress=threshold=0.04:ratio=8:attack=20:release=500[duck];[0:a][duck]amix=inputs=2:duration=first:weights='1 1',loudnorm=I=-16:TP=-1.5:LRA=11[out]"
+    command = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(voice), "-i", str(music), "-filter_complex", filter_graph, "-map", "[out]", "-c:a", "libmp3lame", "-b:a", "192k", str(output)]
+    process = subprocess.run(command, capture_output=True, text=True, timeout=900, check=False)
+    if process.returncode != 0 or not output.exists():
+        raise HTTPException(status_code=500, detail=(process.stderr or "فشل دمج الصوت والموسيقى")[-1200:])
     target = _desktop_exports() / output.name
     shutil.copy2(output, target)
-    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target), "message": "تم دمج الموسيقى بخفض تلقائي تحت الكلام وحفظ الملف على سطح المكتب."}
+    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target), "message": "تم دمج الموسيقى وخفضها تلقائيًا تحت الكلام وحفظ الملف على سطح المكتب."}
 
 
 @router.post("/clone")
-async def clone_voice(sample: UploadFile = File(...), text: str = Form(...), consent: bool = Form(False), engine: str = Form("coqui")):
+async def clone_voice(sample: UploadFile = File(...), text: str = Form(...), consent: bool = Form(...)):
     if not consent:
-        raise HTTPException(status_code=400, detail="يجب تأكيد أن الصوت لك أو لديك إذن صريح من صاحبه.")
+        raise HTTPException(status_code=400, detail="يجب تأكيد أن الصوت لك أو أن لديك إذنًا صريحًا من صاحبه.")
     if len(text.strip()) < 2:
-        raise HTTPException(status_code=400, detail="أدخل نصًا للاستنساخ.")
+        raise HTTPException(status_code=400, detail="اكتب النص المطلوب.")
     suffix = Path(sample.filename or "sample.wav").suffix.lower()
     if suffix not in {".wav", ".mp3", ".m4a", ".flac", ".ogg"}:
         raise HTTPException(status_code=400, detail="صيغة عينة الصوت غير مدعومة.")
-    sample_path = UPLOADS_DIR / f"clone_{uuid.uuid4().hex[:12]}{suffix}"
-    sample_path.write_bytes(await sample.read())
-    plugin = tts_registry.get_plugin(engine)
-    if not plugin or not hasattr(plugin, "clone"):
-        raise HTTPException(status_code=503, detail="محرك الاستنساخ المحلي غير مثبت. ثبّت XTTS/Coqui أولًا من إدارة المحركات.")
-    try:
-        result = await plugin.clone(reference_audio_path=str(sample_path), text=text.strip())
-    except TypeError:
-        result = await plugin.clone(str(sample_path), text.strip())
+    sample_path = UPLOADS_DIR / f"consented_clone_{uuid.uuid4().hex[:10]}{suffix}"
+    with sample_path.open("wb") as target:
+        while chunk := await sample.read(1024 * 1024):
+            target.write(chunk)
+            if target.tell() > 50 * 1024 * 1024:
+                target.close(); sample_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="عينة الصوت أكبر من 50MB.")
+    plugin = tts_registry.get_plugin("coqui")
+    if not plugin or not plugin.check():
+        raise HTTPException(status_code=503, detail="واجهة الاستنساخ جاهزة، لكن محرك XTTS المحلي غير مثبت في هذه النسخة. ثبّت Coqui/XTTS ثم أعد المحاولة.")
+    result = await plugin.generate(text=text.strip(), voice=str(sample_path), language="ar", speed=1.0)
     if not result or not result.get("success"):
-        raise HTTPException(status_code=500, detail=(result or {}).get("message", "فشل استنساخ الصوت."))
-    return result
+        raise HTTPException(status_code=502, detail=(result or {}).get("message", "فشل استنساخ الصوت."))
+    source = Path(result.get("file", ""))
+    if not source.exists():
+        raise HTTPException(status_code=500, detail="لم يُنشأ ملف الاستنساخ.")
+    target = _desktop_exports() / source.name
+    shutil.copy2(source, target)
+    return {"success": True, "url": result.get("url") or f"/api/downloads/{source.name}", "desktop_path": str(target), "message": "تم إنشاء الصوت بالعينة المصرح بها وحفظه على سطح المكتب."}
