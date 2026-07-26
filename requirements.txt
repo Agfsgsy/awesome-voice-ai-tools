@@ -1,5 +1,5 @@
 # Voice AI Studio Arabic - Universal Core Requirements
-# Compatible: Python 3.9 - 3.13 | Linux | Colab | Termux
+# Compatible: Python 3.9 - 3.13 | Linux | Windows | Colab | Termux
 # Install: pip install -r requirements.txt
 
 fastapi==0.115.6
@@ -13,3 +13,5 @@ aiofiles==24.1.0
 requests>=2.31.0
 speechrecognition>=3.10.0
 pydub>=0.25.1
+soundfile>=0.12.1
+edge-tts>=7.0.0,<8.0.0
