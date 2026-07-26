@@ -44,23 +44,24 @@ if errorlevel 1 goto :failed
 if not exist "dist\VoiceAIStudioArabic\VoiceAIStudioArabic.exe" goto :failed
 
 echo [4/4] Building Setup.exe...
-set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-if not exist "%ISCC%" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
-if not exist "%ISCC%" (
+call :find_iscc
+if not defined ISCC (
   where winget >nul 2>&1
   if not errorlevel 1 (
     echo Installing Inno Setup automatically...
     winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
+    timeout /t 5 /nobreak >nul
+    call :find_iscc
   )
 )
-set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-if not exist "%ISCC%" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
-if not exist "%ISCC%" (
-  echo [ERROR] Inno Setup 6 was not found. Restart Windows and run this file again.
+if not defined ISCC (
+  echo [ERROR] Inno Setup 6 was installed but ISCC.exe could not be located.
+  echo Close this window, open a new Command Prompt, and run the builder again.
   pause
   exit /b 1
 )
 
+echo Using Inno Setup: %ISCC%
 "%ISCC%" "installer\VoiceAIStudio.iss"
 if errorlevel 1 goto :failed
 if not exist "dist-installer\VoiceAIStudioSetup.exe" goto :failed
@@ -70,6 +71,20 @@ echo [SUCCESS] Installer created:
 echo %CD%\dist-installer\VoiceAIStudioSetup.exe
 start "" explorer.exe "%CD%\dist-installer"
 pause
+exit /b 0
+
+:find_iscc
+set "ISCC="
+for %%P in (
+  "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+  "%ProgramFiles%\Inno Setup 6\ISCC.exe"
+  "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
+  "%USERPROFILE%\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
+) do if not defined ISCC if exist "%%~P" set "ISCC=%%~P"
+if not defined ISCC for /f "delims=" %%P in ('where ISCC.exe 2^>nul') do if not defined ISCC set "ISCC=%%P"
+if not defined ISCC for /f "delims=" %%P in ('where /r "%ProgramFiles%" ISCC.exe 2^>nul') do if not defined ISCC set "ISCC=%%P"
+if not defined ISCC if defined ProgramFiles(x86) for /f "delims=" %%P in ('where /r "%ProgramFiles(x86)%" ISCC.exe 2^>nul') do if not defined ISCC set "ISCC=%%P"
+if not defined ISCC for /f "delims=" %%P in ('where /r "%LOCALAPPDATA%" ISCC.exe 2^>nul') do if not defined ISCC set "ISCC=%%P"
 exit /b 0
 
 :failed
