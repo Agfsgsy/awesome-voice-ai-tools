@@ -1,13 +1,16 @@
-"""Microsoft Edge neural TTS plugin with Arabic voices and sermon profiles."""
+"""Microsoft Edge neural TTS plugin with Arabic voices and humanized prosody."""
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from backend.core.config import OUTPUTS_DIR
+from backend.core.config import CACHE_DIR, OUTPUTS_DIR
 from backend.core.logger import get_logger
 from backend.plugins.tts_plugin_base import TTSPluginBase
 
@@ -17,7 +20,7 @@ logger = get_logger("plugin_edge")
 class EdgeTTSPlugin(TTSPluginBase):
     name = "edge"
     label = "Microsoft Edge Neural TTS"
-    description = "أصوات عربية عصبية عالية الجودة مع أنماط للمواعظ والدعاء"
+    description = "أصوات عربية عصبية مع تنغيم بشري متغير وأنماط للمواعظ والدعاء"
     homepage = "https://github.com/rany2/edge-tts"
     is_open_source = True
     requires_gpu = False
@@ -60,16 +63,18 @@ class EdgeTTSPlugin(TTSPluginBase):
     }
 
     PROFILES = {
-        "natural": {"label": "طبيعي بشري", "rate": -1, "pitch": 0, "volume": 2},
-        "sermon_calm": {"label": "واعظ هادئ", "rate": -12, "pitch": -2, "volume": 4},
-        "sermon_powerful": {"label": "خطيب قوي", "rate": -7, "pitch": -5, "volume": 16},
-        "dua_emotional": {"label": "دعاء مؤثر", "rate": -18, "pitch": 0, "volume": -2},
-        "documentary": {"label": "وثائقي رزين", "rate": -6, "pitch": -3, "volume": 7},
-        "energetic": {"label": "حماسي", "rate": 8, "pitch": 2, "volume": 10},
+        "human_ultra": {"label": "بشري فائق", "rate": -4, "pitch": 0, "volume": 5, "pause": 190, "chunk": 340, "variation": True},
+        "natural": {"label": "طبيعي بشري", "rate": -1, "pitch": 0, "volume": 2, "pause": 170, "chunk": 500, "variation": False},
+        "sermon_calm": {"label": "واعظ هادئ", "rate": -13, "pitch": -2, "volume": 5, "pause": 340, "chunk": 310, "variation": True},
+        "sermon_powerful": {"label": "خطيب قوي", "rate": -7, "pitch": -4, "volume": 17, "pause": 270, "chunk": 300, "variation": True},
+        "dua_emotional": {"label": "دعاء مؤثر", "rate": -19, "pitch": -1, "volume": 0, "pause": 430, "chunk": 270, "variation": True},
+        "documentary": {"label": "وثائقي رزين", "rate": -6, "pitch": -3, "volume": 8, "pause": 240, "chunk": 360, "variation": True},
+        "energetic": {"label": "حماسي", "rate": 8, "pitch": 2, "volume": 11, "pause": 125, "chunk": 330, "variation": True},
+        "broadcast_power": {"label": "إذاعي قوي", "rate": -2, "pitch": -2, "volume": 13, "pause": 170, "chunk": 360, "variation": True},
     }
 
     DEFAULT_BY_LANGUAGE = {"ar": "ar-SA-HamedNeural", "en": "en-US-GuyNeural"}
-    MAX_TEXT_LENGTH = 5000
+    MAX_TEXT_LENGTH = 8000
 
     def check(self) -> bool:
         try:
@@ -79,21 +84,16 @@ class EdgeTTSPlugin(TTSPluginBase):
             return False
 
     def install(self) -> Dict[str, Any]:
-        import subprocess
+        import subprocess as sp
         import sys
-
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "edge-tts>=7,<8"])
+            sp.check_call([sys.executable, "-m", "pip", "install", "edge-tts>=7,<8"])
             return {"success": self.check(), "engine": self.name, "message": "edge-tts installed successfully"}
         except Exception as exc:
             return {"success": False, "engine": self.name, "message": str(exc)}
 
     def download_models(self, model_name: str = "default") -> Dict[str, Any]:
-        return {
-            "success": self.check(),
-            "model": "cloud-neural",
-            "message": "لا يحتاج إلى تنزيل نموذج، لكنه يحتاج الإنترنت.",
-        }
+        return {"success": self.check(), "model": "cloud-neural", "message": "لا يحتاج إلى تنزيل نموذج، لكنه يحتاج الإنترنت."}
 
     def list_models(self) -> List[Dict[str, Any]]:
         return [{"name": "cloud-neural", "language": "multi", "downloaded": self.check()}]
@@ -104,7 +104,7 @@ class EdgeTTSPlugin(TTSPluginBase):
     @classmethod
     def _parse_voice_profile(cls, value: str, language: str) -> Tuple[str, str]:
         raw = value or "default"
-        profile = "natural"
+        profile = "human_ultra"
         if "|" in raw:
             raw, requested_profile = raw.split("|", 1)
             if requested_profile in cls.PROFILES:
@@ -114,7 +114,6 @@ class EdgeTTSPlugin(TTSPluginBase):
 
     @staticmethod
     def _prepare_text(text: str) -> str:
-        """تنظيم النص وعلامات الوقف لإلقاء عربي أكثر طبيعية."""
         text = text.replace("\r\n", "\n").replace("\r", "\n")
         text = re.sub(r"[ \t]+", " ", text)
         text = re.sub(r"\s*([،؛:؟!.…])\s*", r"\1 ", text)
@@ -130,52 +129,154 @@ class EdgeTTSPlugin(TTSPluginBase):
         return "\n\n".join(paragraphs)
 
     @staticmethod
+    def _split_words(text: str, limit: int) -> List[str]:
+        chunks: List[str] = []
+        current: List[str] = []
+        length = 0
+        for word in text.split():
+            extra = len(word) + (1 if current else 0)
+            if current and length + extra > limit:
+                chunks.append(" ".join(current))
+                current = [word]
+                length = len(word)
+            else:
+                current.append(word)
+                length += extra
+        if current:
+            chunks.append(" ".join(current))
+        return chunks
+
+    @classmethod
+    def _split_segments(cls, text: str, limit: int) -> List[Tuple[str, int]]:
+        result: List[Tuple[str, int]] = []
+        paragraphs = [item.strip() for item in text.split("\n\n") if item.strip()]
+        for paragraph_index, paragraph in enumerate(paragraphs):
+            sentences = [item.strip() for item in re.split(r"(?<=[؟!.…؛])\s+", paragraph) if item.strip()]
+            current = ""
+            for sentence in sentences:
+                pieces = cls._split_words(sentence, limit) if len(sentence) > limit else [sentence]
+                for piece in pieces:
+                    candidate = f"{current} {piece}".strip()
+                    if current and len(candidate) > limit:
+                        result.append((current, 115))
+                        current = piece
+                    else:
+                        current = candidate
+            if current:
+                paragraph_pause = 0 if paragraph_index == len(paragraphs) - 1 else 1
+                result.append((current, paragraph_pause))
+        return result or [(text, 0)]
+
+    @staticmethod
     def _friendly_error(exc: Exception) -> str:
         raw = str(exc)
         lowered = raw.lower()
         if any(token in lowered for token in ("getaddrinfo", "cannot connect", "speech.platform.bing.com", "ssl", "timed out")):
             return "تعذر الاتصال بخدمة الصوت العصبي. افحص الإنترنت أو DNS أو VPN ثم أعد المحاولة."
         if "winerror 2" in lowered or "cannot find the file" in lowered:
-            return "تعذر تشغيل أحد مكونات الصوت داخل النسخة الحالية. ثبّت آخر تحديث للبرنامج."
+            return "تعذر تشغيل أداة الصوت المرفقة. أعد بناء النسخة من آخر تحديث."
         return f"فشل إنشاء الصوت: {raw}"
 
     @staticmethod
-    async def _generate_audio(edge_tts, text: str, filepath: Path, voice: str, rate: int, pitch: int, volume: int) -> None:
-        """إنشاء ملف MP3 واحد؛ مكتبة Edge تقسّم الرسائل الطويلة داخليًا دون FFmpeg."""
-        if filepath.exists() and filepath.stat().st_size > 0:
-            return
+    def _ffmpeg_executable() -> str | None:
+        executable = shutil.which("ffmpeg")
+        if executable:
+            return executable
+        try:
+            import imageio_ffmpeg
+            executable = imageio_ffmpeg.get_ffmpeg_exe()
+            return executable if Path(executable).exists() else None
+        except Exception:
+            return None
 
+    @classmethod
+    def _segment_prosody(cls, segment: str, index: int, base_rate: int, base_pitch: int, base_volume: int, variation: bool) -> Tuple[int, int, int]:
+        if not variation:
+            return base_rate, base_pitch, base_volume
+        patterns = [(-2, 0, 0), (0, 1, 1), (-1, -1, 0), (1, 0, 2), (-2, 1, 0), (0, -1, 1)]
+        rate_delta, pitch_delta, volume_delta = patterns[index % len(patterns)]
+        if segment.endswith("؟"):
+            pitch_delta += 2
+            rate_delta -= 1
+        if segment.endswith("!"):
+            volume_delta += 2
+            rate_delta += 1
+        if any(word in segment for word in ("اللهم", "يا رب", "سبحانه", "رحمة الله")):
+            rate_delta -= 2
+            pitch_delta -= 1
+        return (
+            max(-50, min(100, base_rate + rate_delta)),
+            max(-20, min(20, base_pitch + pitch_delta)),
+            max(-50, min(50, base_volume + volume_delta)),
+        )
+
+    @staticmethod
+    async def _render(edge_tts, text: str, path: Path, voice: str, rate: int, pitch: int, volume: int) -> None:
+        if path.exists() and path.stat().st_size > 0:
+            return
         last_error: Exception | None = None
         for attempt in range(3):
             try:
-                communication = edge_tts.Communicate(
+                communicator = edge_tts.Communicate(
                     text=text,
                     voice=voice,
                     rate=f"{rate:+d}%",
                     pitch=f"{pitch:+d}Hz",
                     volume=f"{volume:+d}%",
                 )
-                await communication.save(str(filepath))
-                if filepath.exists() and filepath.stat().st_size > 0:
+                await communicator.save(str(path))
+                if path.exists() and path.stat().st_size > 0:
                     return
                 raise RuntimeError("لم تُنشأ بيانات صوتية.")
             except Exception as exc:
                 last_error = exc
-                filepath.unlink(missing_ok=True)
+                path.unlink(missing_ok=True)
                 if attempt < 2:
-                    await asyncio.sleep(1.2 * (2 ** attempt))
-        raise last_error or RuntimeError("فشل إنشاء الصوت.")
+                    await asyncio.sleep(1.1 * (2**attempt))
+        raise last_error or RuntimeError("فشل إنشاء المقطع الصوتي.")
 
-    async def generate(
-        self,
-        text: str,
-        voice: str = "default",
-        language: str = "ar",
-        speed: float = 1.0,
-    ) -> Dict[str, Any]:
+    @classmethod
+    def _merge_with_ffmpeg(cls, parts: List[Tuple[Path, int]], output: Path, paragraph_pause_ms: int) -> bool:
+        ffmpeg = cls._ffmpeg_executable()
+        if not ffmpeg or len(parts) < 2:
+            return False
+        work_dir = Path(tempfile.mkdtemp(prefix="voice_ai_merge_"))
+        try:
+            list_path = work_dir / "concat.txt"
+            entries: List[str] = []
+            silence_cache: Dict[int, Path] = {}
+            for index, (part, pause_kind) in enumerate(parts):
+                safe = str(part.resolve()).replace("\\", "/").replace("'", "'\\''")
+                entries.append(f"file '{safe}'")
+                pause_ms = paragraph_pause_ms if pause_kind == 1 else pause_kind
+                if pause_ms and index < len(parts) - 1:
+                    if pause_ms not in silence_cache:
+                        silence = work_dir / f"silence_{pause_ms}.mp3"
+                        command = [
+                            ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                            "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
+                            "-t", f"{pause_ms / 1000:.3f}", "-c:a", "libmp3lame", "-b:a", "64k", str(silence),
+                        ]
+                        completed = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
+                        if completed.returncode != 0:
+                            raise RuntimeError(completed.stderr.strip() or "تعذر إنشاء الوقفة الصوتية")
+                        silence_cache[pause_ms] = silence
+                    safe_silence = str(silence_cache[pause_ms].resolve()).replace("\\", "/").replace("'", "'\\''")
+                    entries.append(f"file '{safe_silence}'")
+            list_path.write_text("\n".join(entries), encoding="utf-8")
+            command = [
+                ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "concat", "-safe", "0", "-i", str(list_path),
+                "-vn", "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "24000", "-ac", "1", str(output),
+            ]
+            completed = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
+            return completed.returncode == 0 and output.exists() and output.stat().st_size > 0
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
+
+    async def generate(self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
         if not self.check():
             return {"success": False, "engine": self.name, "message": "محرك الصوت العصبي غير موجود داخل البرنامج."}
-
         text = self._prepare_text((text or "").strip())
         if not text:
             return {"success": False, "engine": self.name, "message": "النص فارغ."}
@@ -191,25 +292,48 @@ class EdgeTTSPlugin(TTSPluginBase):
             return {"success": False, "engine": self.name, "message": "الصوت المحدد غير موجود في قائمة الأصوات المدعومة."}
 
         profile = self.PROFILES[profile_name]
-        rate = max(-50, min(100, round((speed - 1.0) * 100) + int(profile["rate"])))
-        pitch = int(profile["pitch"])
-        volume = int(profile["volume"])
+        base_rate = max(-50, min(100, round((speed - 1.0) * 100) + int(profile["rate"])))
+        base_pitch = int(profile["pitch"])
+        base_volume = int(profile["volume"])
+        segments = self._split_segments(text, int(profile["chunk"]))
         digest = hashlib.sha256(
-            f"{selected_voice}|{profile_name}|{rate}|{pitch}|{volume}|{text}".encode("utf-8")
-        ).hexdigest()[:16]
-        filepath = OUTPUTS_DIR / f"edge_{profile_name}_{digest}.mp3"
+            f"v230|{selected_voice}|{profile_name}|{base_rate}|{base_pitch}|{base_volume}|{text}".encode("utf-8")
+        ).hexdigest()[:18]
+        output = OUTPUTS_DIR / f"edge_{profile_name}_{digest}.mp3"
+        parts_dir = CACHE_DIR / "edge_human_parts"
+        parts_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            await self._generate_audio(edge_tts, text, filepath, selected_voice, rate, pitch, volume)
+            if not output.exists() or output.stat().st_size == 0:
+                rendered: List[Tuple[Path, int]] = []
+                for index, (segment, pause_kind) in enumerate(segments):
+                    rate, pitch, volume = self._segment_prosody(
+                        segment, index, base_rate, base_pitch, base_volume, bool(profile["variation"])
+                    )
+                    part_digest = hashlib.sha256(
+                        f"{selected_voice}|{rate}|{pitch}|{volume}|{segment}".encode("utf-8")
+                    ).hexdigest()[:18]
+                    part_path = parts_dir / f"{part_digest}.mp3"
+                    await self._render(edge_tts, segment, part_path, selected_voice, rate, pitch, volume)
+                    rendered.append((part_path, pause_kind))
+
+                merged = await asyncio.to_thread(
+                    self._merge_with_ffmpeg, rendered, output, int(profile["pause"])
+                )
+                if not merged:
+                    output.unlink(missing_ok=True)
+                    await self._render(edge_tts, text, output, selected_voice, base_rate, base_pitch, base_volume)
+
             return {
                 "success": True,
                 "engine": self.name,
                 "voice": selected_voice,
                 "profile": profile_name,
-                "segments": 1,
-                "file": str(filepath),
-                "url": f"/api/downloads/{filepath.name}",
-                "message": f"تم إنشاء الصوت بنجاح بأسلوب {profile['label']}.",
+                "segments": len(segments),
+                "humanized": bool(profile["variation"]),
+                "file": str(output),
+                "url": f"/api/downloads/{output.name}",
+                "message": f"تم إنشاء الصوت بأسلوب {profile['label']} مع تنغيم ووقفات طبيعية.",
             }
         except Exception as exc:
             logger.exception("Edge TTS generation failed")
@@ -218,4 +342,4 @@ class EdgeTTSPlugin(TTSPluginBase):
 
 PLUGIN_CLASS = EdgeTTSPlugin
 PLUGIN_NAME = "Microsoft Edge Neural TTS"
-PLUGIN_DESCRIPTION = "أصوات عربية عصبية وأنماط احترافية للمواعظ والدعاء"
+PLUGIN_DESCRIPTION = "أصوات عربية عصبية مع Human Ultra وأنماط احترافية للمواعظ والدعاء"
