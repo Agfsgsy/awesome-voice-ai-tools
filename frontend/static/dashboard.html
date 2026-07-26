@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة تحكم استوديو ابن الواقدي</title>
+<style>
+:root{--bg:#07101d;--panel:#0e1a2b;--panel2:#111f33;--line:#203450;--text:#f6f9ff;--muted:#91a4bc;--green:#25c6a4;--blue:#2797ff;--gold:#dfb550;--red:#ff7777;--shadow:0 18px 45px rgba(0,0,0,.24)}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 80% 0,#15395d 0,#081321 38%,#050a12 100%);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif}body{padding:24px}.container{max-width:1480px;margin:auto}.hero{display:grid;grid-template-columns:1.5fr .75fr;gap:18px;margin-bottom:20px}.heroMain,.heroSide,.card{background:linear-gradient(145deg,rgba(17,31,51,.98),rgba(10,22,38,.98));border:1px solid rgba(255,255,255,.08);border-radius:24px;box-shadow:var(--shadow)}.heroMain{padding:30px;position:relative;overflow:hidden}.heroMain:after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(39,151,255,.23),transparent 70%);left:-65px;top:-95px}.eyebrow{color:#88f0dc;font-weight:900;font-size:14px;margin-bottom:10px}.hero h1{font-size:clamp(30px,4vw,52px);margin:0 0 10px;letter-spacing:-1px}.hero p{color:var(--muted);font-size:17px;line-height:1.8;max-width:850px;margin:0}.heroActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:23px}.btn{border:1px solid var(--line);background:#172a43;color:white;padding:12px 17px;border-radius:13px;font-weight:900;cursor:pointer;transition:.2s}.btn:hover{transform:translateY(-2px);border-color:#4b6f9a}.btn.primary{border:0;background:linear-gradient(135deg,var(--green),var(--blue))}.btn.gold{background:#604a18;border-color:#8d6c22}.heroSide{padding:22px;display:flex;flex-direction:column;justify-content:space-between}.version{display:flex;justify-content:space-between;align-items:center}.versionBadge{background:#0d4038;border:1px solid #2e8f7c;color:#94ffe8;padding:8px 12px;border-radius:999px;font-weight:900}.phone{direction:ltr;color:#ffd879;font-size:19px;font-weight:900}.statusLine{display:flex;align-items:center;gap:8px;color:#a7bdd3;margin-top:18px}.dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 14px var(--green)}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}.stat{padding:18px}.statTop{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}.statIcon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:#152b45;font-size:20px}.statValue{font-size:31px;font-weight:950;margin-top:15px}.statNote{color:var(--muted);font-size:12px;margin-top:4px}.sectionHead{display:flex;justify-content:space-between;align-items:end;margin:26px 0 12px}.sectionHead h2{margin:0;font-size:23px}.sectionHead p{margin:4px 0 0;color:var(--muted)}.modules{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.module{padding:20px;cursor:pointer;transition:.22s;position:relative;overflow:hidden}.module:hover{transform:translateY(-4px);border-color:#416995}.moduleIcon{width:50px;height:50px;border-radius:15px;display:grid;place-items:center;font-size:24px;background:linear-gradient(145deg,#1d3553,#102238);margin-bottom:16px}.module h3{margin:0 0 7px;font-size:18px}.module p{color:var(--muted);font-size:13px;line-height:1.7;min-height:66px;margin:0}.moduleGo{margin-top:14px;color:#92f2de;font-weight:900;font-size:13px}.grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;margin-top:18px}.cardPad{padding:21px}.workflow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:15px}.step{background:#0a1728;border:1px solid #1d3452;border-radius:15px;padding:14px}.stepNo{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:#173d5f;color:#8cead7;font-weight:900;margin-bottom:9px}.step b{display:block;margin-bottom:5px}.step span{color:var(--muted);font-size:12px;line-height:1.6}.healthList,.recentList{display:grid;gap:9px;margin-top:14px}.health,.recent{background:#091726;border:1px solid #1c314d;border-radius:13px;padding:12px 13px;display:flex;align-items:center;justify-content:space-between;gap:10px}.healthInfo{display:flex;align-items:center;gap:10px}.healthMark{width:10px;height:10px;border-radius:50%;background:#6f8398}.healthMark.good{background:var(--green)}.healthMark.warn{background:var(--gold)}.healthMark.bad{background:var(--red)}.health small,.recent small{color:var(--muted)}.recentName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:330px}.empty{color:var(--muted);padding:15px;text-align:center;border:1px dashed #29415f;border-radius:13px}.footer{color:#73879e;text-align:center;padding:24px 10px 8px;font-size:12px}@media(max-width:1150px){.stats,.modules{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.workflow{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){body{padding:12px}.heroMain{padding:21px}.stats,.modules,.workflow{grid-template-columns:1fr}.sectionHead{align-items:flex-start;flex-direction:column}.heroActions .btn{width:100%}.hero h1{font-size:31px}.recentName{max-width:190px}}
+</style>
+</head>
+<body>
+<div class="container">
+<section class="hero">
+  <div class="heroMain">
+    <div class="eyebrow">لوحة الإنتاج الصوتي الاحترافية</div>
+    <h1>مرحبًا بك في استوديو ابن الواقدي</h1>
+    <p>ابدأ من مكان واحد: كتابة النص، إنشاء الصوت، إنتاج المقابلات، ضبط المؤثرات، إدارة المفاتيح، ومراجعة الملفات النهائية.</p>
+    <div class="heroActions">
+      <button class="btn primary" onclick="go('/static/producer.html','المنتج الصوتي')">بدء إنتاج صوت جديد</button>
+      <button class="btn" onclick="go('/static/interview_ultra.html','الحوار الطبيعي Ultra')">إنشاء مقابلة احترافية</button>
+      <button class="btn gold" onclick="openExports()">فتح مجلد الملفات</button>
+    </div>
+  </div>
+  <div class="heroSide">
+    <div class="version"><span class="versionBadge">الإصدار 3.4</span><span>🎙️</span></div>
+    <div><div class="phone">+967771550103</div><div class="statusLine"><span class="dot"></span><span id="systemText">جاري فحص النظام...</span></div></div>
+  </div>
+</section>
+
+<section class="stats">
+  <div class="card stat"><div class="statTop"><span>مفاتيح Gemini</span><span class="statIcon">🔑</span></div><div class="statValue" id="keyCount">—</div><div class="statNote" id="keyNote">جاري التحميل</div></div>
+  <div class="card stat"><div class="statTop"><span>المحركات الجاهزة</span><span class="statIcon">⚙️</span></div><div class="statValue" id="engineCount">—</div><div class="statNote" id="engineNote">جاري الفحص</div></div>
+  <div class="card stat"><div class="statTop"><span>ملفات التصدير</span><span class="statIcon">📁</span></div><div class="statValue" id="exportCount">—</div><div class="statNote">محفوظة على سطح المكتب</div></div>
+  <div class="card stat"><div class="statTop"><span>Human Pro</span><span class="statIcon">✨</span></div><div class="statValue" id="humanState">—</div><div class="statNote" id="humanNote">ElevenLabs اختياري</div></div>
+</section>
+
+<div class="sectionHead"><div><h2>مركز الأدوات</h2><p>كل أداة في مكان واضح، من دون تكرار أو ازدحام.</p></div><button class="btn" onclick="refreshStatus()">تحديث الحالة</button></div>
+<section class="modules">
+  <article class="card module" onclick="go('/static/producer.html','المنتج الصوتي')"><div class="moduleIcon">🎚️</div><h3>المنتج الصوتي</h3><p>إنتاج صوت رجل أو امرأة، لهجات، مؤثرات، موسيقى، ونصوص الفيديو والبودكاست.</p><div class="moduleGo">فتح الأداة ←</div></article>
+  <article class="card module" onclick="go('/static/interview_pro.html','المقابلات البشرية Pro')"><div class="moduleIcon">🎤</div><h3>المقابلات البشرية Pro</h3><p>سيناريو منظم، عدة متحدثين، أصوات مختلفة، وماستر بودكاست احترافي.</p><div class="moduleGo">فتح الأداة ←</div></article>
+  <article class="card module" onclick="go('/static/interview_ultra.html','الحوار الطبيعي Ultra')"><div class="moduleIcon">🧠</div><h3>الحوار الطبيعي Ultra</h3><p>أعلى وضع للمقابلات: سياق حواري، إخراج بشري، وتبديل تلقائي للمفاتيح والمحركات.</p><div class="moduleGo">فتح الأداة ←</div></article>
+  <article class="card module" onclick="go('/static/pro.html','الاستوديو الكامل')"><div class="moduleIcon">🎛️</div><h3>الاستوديو الكامل</h3><p>جميع الأدوات المتقدمة: تحرير النص، المواعظ، الموسيقى، الاستنساخ المصرح، والتصدير.</p><div class="moduleGo">فتح الأداة ←</div></article>
+</section>
+
+<section class="grid2">
+  <div class="card cardPad">
+    <div class="sectionHead" style="margin:0"><div><h2>مسار العمل المقترح</h2><p>أربع خطوات واضحة للحصول على نتيجة احترافية.</p></div></div>
+    <div class="workflow">
+      <div class="step"><div class="stepNo">1</div><b>اكتب أو اجلب النص</b><span>الصق النص أو استخدم رابطًا، ثم حدد نوع المحتوى واللهجة.</span></div>
+      <div class="step"><div class="stepNo">2</div><b>رتّب النص</b><span>استخدم المخرج الذكي لتحسين البداية والوقفات والخاتمة.</span></div>
+      <div class="step"><div class="stepNo">3</div><b>اختر الصوت</b><span>حدد رجلًا أو امرأة، المحرك، النبرة، والماستر المناسب.</span></div>
+      <div class="step"><div class="stepNo">4</div><b>راجع وصدّر</b><span>استمع للنتيجة ثم افتح مجلد التصدير أو حمّل الملف النهائي.</span></div>
+    </div>
+  </div>
+  <div class="card cardPad">
+    <div class="sectionHead" style="margin:0"><div><h2>حالة النظام</h2><p>ملخص سريع للمفاتيح والمحركات.</p></div></div>
+    <div class="healthList" id="healthList"><div class="empty">جاري فحص النظام...</div></div>
+  </div>
+</section>
+
+<section class="card cardPad" style="margin-top:18px">
+  <div class="sectionHead" style="margin:0"><div><h2>آخر الملفات</h2><p>أحدث النتائج المحفوظة في مجلد Voice AI Studio Exports.</p></div><button class="btn" onclick="openExports()">فتح المجلد</button></div>
+  <div class="recentList" id="recentList"><div class="empty">لا توجد بيانات بعد.</div></div>
+</section>
+<div class="footer">استوديو ابن الواقدي — واجهة إنتاج صوتي عربية احترافية</div>
+</div>
+<script>
+const fmtTime=ts=>{try{return new Date(ts*1000).toLocaleString('ar')}catch{return ''}};
+function go(page,title){parent.postMessage({type:'studio:navigate',page,title},'*')}
+async function openExports(){try{const r=await fetch('/api/dashboard/open-exports',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'تعذر فتح المجلد')}catch(e){alert(e.message)}}
+function healthRow(label,note,state='good'){return `<div class="health"><div class="healthInfo"><span class="healthMark ${state}"></span><div><b>${label}</b><br><small>${note}</small></div></div></div>`}
+async function refreshStatus(){
+  document.getElementById('systemText').textContent='جاري فحص النظام...';
+  try{
+    const r=await fetch('/api/dashboard/status');const d=await r.json();if(!r.ok)throw new Error(d.detail||'فشل الفحص');
+    const g=d.gemini||{};const e=d.engines||[];const x=d.exports||{};const h=d.elevenlabs||{};
+    keyCount.textContent=g.count??0;keyNote.textContent=`${g.working||0} يعمل، ${g.quota||0} حصة منتهية`;
+    engineCount.textContent=e.length;engineNote.textContent=e.length?e.map(v=>v.label||v.name).slice(0,3).join('، '):'لا توجد محركات جاهزة';
+    exportCount.textContent=x.count??0;humanState.textContent=h.configured?'جاهز':'غير معد';humanNote.textContent=h.configured?`${h.dialogue_voices||0} أصوات حوار محفوظة`:'يمكن إعداده لاحقًا';
+    systemText.textContent='النظام جاهز للعمل';
+    const rows=[];
+    rows.push(healthRow('Gemini',g.count?`${g.count} مفتاح محفوظ`:'لم تتم إضافة مفاتيح',g.count?'good':'warn'));
+    rows.push(healthRow('التدوير التلقائي',g.count>1?'مفعّل بين عدة مفاتيح':'يحتاج مفتاحًا ثانيًا للتبديل',g.count>1?'good':'warn'));
+    rows.push(healthRow('الأصوات المجانية',e.some(v=>v.name==='edge')?'جاهزة كمحرك احتياطي':'غير متاحة حاليًا',e.some(v=>v.name==='edge')?'good':'bad'));
+    rows.push(healthRow('Human Pro',h.configured?'تم حفظ الإعدادات':'اختياري وغير معد',h.configured?'good':'warn'));
+    healthList.innerHTML=rows.join('');
+    const recent=x.recent||[];
+    recentList.innerHTML=recent.length?recent.map(f=>`<div class="recent"><div class="recentName"><b>${f.name}</b><br><small>${fmtTime(f.modified)}</small></div><small>${f.size_mb} MB</small></div>`).join(''):'<div class="empty">لم يتم إنشاء ملفات بعد.</div>';
+  }catch(e){systemText.textContent='تعذر قراءة حالة النظام';healthList.innerHTML=healthRow('خطأ في الفحص',e.message,'bad')}
+}
+refreshStatus();
+</script>
+</body>
+</html>
