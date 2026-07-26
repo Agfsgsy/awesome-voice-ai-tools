@@ -1,6 +1,5 @@
 """سجل محركات TTS - نظام كشف وتحديد تلقائي للمحركات المتاحة"""
 from typing import Dict, List, Any, Optional
-from pathlib import Path
 from backend.core.logger import get_logger
 from backend.core.config import ENGINE_PRIORITY
 
@@ -16,93 +15,80 @@ class TTSRegistry:
         self._initialized = False
 
     def register(self, name: str, plugin_instance) -> None:
-        """تسجيل إضافة TTS"""
         self.plugins[name] = plugin_instance
         logger.info(f"Registered TTS plugin: {name}")
 
     def get_all_plugins(self) -> List:
-        """الحصول على جميع الإضافات المسجلة"""
         if not self._initialized:
             self.initialize()
         return list(self.plugins.values())
 
     def get_plugin(self, name: str):
-        """الحصول على إضافة محددة"""
         if not self._initialized:
             self.initialize()
         return self.plugins.get(name)
 
     def get_available_engines(self) -> List[Dict]:
-        """الحصول على المحركات المتاحة فعلياً"""
         if not self._initialized:
             self.initialize()
         available = []
         for name, plugin in self.plugins.items():
             try:
-                installed = plugin.check()
-                if installed:
+                if plugin.check():
                     available.append({
                         "name": plugin.name,
                         "label": plugin.label,
                         "installed": True,
                         "models": plugin.list_models(),
+                        "voices": plugin.list_voices(),
                     })
-            except Exception as e:
-                logger.warning(f"Error checking {name}: {e}")
+            except Exception as exc:
+                logger.warning(f"Error checking {name}: {exc}")
         return available
 
     def auto_select_engine(self) -> Optional[str]:
-        """اختيار المحرك المتاح تلقائياً حسب الأولوية"""
         if not self._initialized:
             self.initialize()
         for name in self.priority:
             plugin = self.plugins.get(name)
-            if plugin:
-                try:
-                    if plugin.check():
-                        # Verify at least one model is downloaded
-                        models = plugin.list_models()
-                        downloaded = [m for m in models if m.get("downloaded")]
-                        if downloaded:
-                            logger.info(f"Auto-selected engine: {name}")
-                            return name
-                except Exception:
+            if not plugin:
+                continue
+            try:
+                if not plugin.check():
                     continue
-        logger.warning("No TTS engine available with downloaded models")
+                models = plugin.list_models()
+                if any(model.get("downloaded") for model in models):
+                    logger.info(f"Auto-selected engine: {name}")
+                    return name
+            except Exception as exc:
+                logger.warning(f"Engine selection failed for {name}: {exc}")
+        logger.warning("No usable TTS engine is available")
         return None
 
     def initialize(self) -> None:
-        """تهيئة وتسجيل جميع إضافات TTS"""
         if self._initialized:
             return
-        try:
-            from backend.plugins.piper_plugin import PiperPlugin
-            self.register("piper", PiperPlugin())
-        except Exception as e:
-            logger.warning(f"Failed to register Piper: {e}")
-        try:
-            from backend.plugins.coqui_plugin import CoquiPlugin
-            self.register("coqui", CoquiPlugin())
-        except Exception as e:
-            logger.warning(f"Failed to register Coqui: {e}")
-        try:
-            from backend.plugins.kokoro_plugin import KokoroPlugin
-            self.register("kokoro", KokoroPlugin())
-        except Exception as e:
-            logger.warning(f"Failed to register Kokoro: {e}")
-        try:
-            from backend.plugins.melotts_plugin import MeloTTSPlugin
-            self.register("melotts", MeloTTSPlugin())
-        except Exception as e:
-            logger.warning(f"Failed to register MeloTTS: {e}")
-        try:
-            from backend.plugins.styletts2_plugin import StyleTTS2Plugin
-            self.register("styletts2", StyleTTS2Plugin())
-        except Exception as e:
-            logger.warning(f"Failed to register StyleTTS2: {e}")
+
+        plugin_specs = [
+            ("edge", "backend.plugins.edge_plugin", "EdgeTTSPlugin"),
+            ("piper", "backend.plugins.piper_plugin", "PiperPlugin"),
+            ("coqui", "backend.plugins.coqui_plugin", "CoquiPlugin"),
+            ("kokoro", "backend.plugins.kokoro_plugin", "KokoroPlugin"),
+            ("melotts", "backend.plugins.melotts_plugin", "MeloTTSPlugin"),
+            ("styletts2", "backend.plugins.styletts2_plugin", "StyleTTS2Plugin"),
+        ]
+        for name, module_name, class_name in plugin_specs:
+            try:
+                module = __import__(module_name, fromlist=[class_name])
+                plugin_class = getattr(module, class_name)
+                self.register(name, plugin_class())
+            except Exception as exc:
+                logger.warning(f"Failed to register {name}: {exc}")
 
         self._initialized = True
-        logger.info(f"TTS Registry initialized with {len(self.plugins)} plugins: {list(self.plugins.keys())}")
+        logger.info(
+            f"TTS Registry initialized with {len(self.plugins)} plugins: {list(self.plugins.keys())}"
+        )
 
 
 tts_registry = TTSRegistry()
