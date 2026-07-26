@@ -1,11 +1,12 @@
 """Quota-safe additive renderer for Dialogue Ultra.
 
-It never removes the existing Dialogue Ultra route. It adds a resilient endpoint that
-tries premium/native providers first and falls back to free Arabic voices when cloud
-quotas are exhausted.
+It keeps every existing route and adds a resilient endpoint that tries native/premium
+providers first, then immediately completes the whole interview with free Arabic voices
+when cloud quotas are exhausted.
 """
 from __future__ import annotations
 
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -42,6 +43,12 @@ EDGE_ROLE_VOICES = {
 }
 
 
+def _clean_edge_text(text: str) -> str:
+    value = re.sub(r"^\s*\[[^\]]{1,140}\]\s*", "", text.strip())
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
 async def _edge_contextual(turns: list[tuple[str, str]], pause_ms: int) -> Path:
     plugin = tts_registry.get_plugin("edge")
     if not plugin:
@@ -53,7 +60,7 @@ async def _edge_contextual(turns: list[tuple[str, str]], pause_ms: int) -> Path:
         canonical = dialogue._canonical_role(role)
         voice, role_speed = EDGE_ROLE_VOICES[canonical]
         speed = max(0.80, min(1.10, role_speed * variations[index % len(variations)]))
-        natural_text = dialogue._humanized_turn_text(role, text, index)
+        natural_text = _clean_edge_text(text)
         result = await plugin.generate(text=natural_text, voice=voice, language="ar", speed=speed)
         if not result or not result.get("success"):
             raise HTTPException(status_code=502, detail=(result or {}).get("message", f"فشل الصوت الاحتياطي للشخصية {role}"))
@@ -96,11 +103,11 @@ def _provider_order(req: SafeRenderRequest, turns: list[tuple[str, str]]) -> lis
     all_ids = all(dialogue._voice_id_for_role(role) for role, _ in turns)
     eleven_ready = bool(dialogue._eleven_api_key() and all_ids)
     if requested == "auto":
-        order = (["eleven_dialogue"] if eleven_ready else []) + ["gemini_native", "legacy_contextual", "edge_fallback"]
+        order = (["eleven_dialogue"] if eleven_ready else []) + ["gemini_native", "edge_fallback", "legacy_contextual"]
     elif requested == "eleven_dialogue":
-        order = ["eleven_dialogue", "gemini_native", "legacy_contextual", "edge_fallback"]
+        order = ["eleven_dialogue", "gemini_native", "edge_fallback", "legacy_contextual"]
     elif requested == "gemini_native":
-        order = ["gemini_native", "legacy_contextual", "edge_fallback"]
+        order = ["gemini_native", "edge_fallback", "legacy_contextual"]
     elif requested == "legacy_contextual":
         order = ["legacy_contextual", "edge_fallback"]
     else:
@@ -141,7 +148,7 @@ async def render_safe(req: SafeRenderRequest):
     used_free_fallback = used_provider == "edge_fallback"
     message = "تم إنتاج المقابلة وحفظها على سطح المكتب."
     if used_free_fallback:
-        message += " كانت حصة الخدمات السحابية منتهية، فانتقل الاستوديو تلقائيًا إلى الأصوات العربية المجانية وأكمل الإنتاج."
+        message += " كانت حصة الخدمات السحابية منتهية، فبدأ الاستوديو فورًا بالأصوات العربية المجانية وأكمل المقابلة كاملة."
     elif fallback:
         message += " انتقل الاستوديو تلقائيًا إلى محرك احتياطي بعد تعذر المحرك المطلوب."
     return {
