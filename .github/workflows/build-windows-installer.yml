@@ -3,29 +3,21 @@ name: Build Windows Installer
 on:
   workflow_dispatch:
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - "desktop_app.py"
-      - "main.py"
       - "backend/**"
       - "frontend/**"
+      - "desktop_app.py"
+      - "main.py"
       - "requirements*.txt"
       - "VoiceAIStudio.spec"
       - "installer/**"
       - ".github/workflows/build-windows-installer.yml"
   push:
     branches:
-      - agent/professional-tts-engine
-    paths:
-      - "desktop_app.py"
-      - "main.py"
-      - "backend/**"
-      - "frontend/**"
-      - "requirements*.txt"
-      - "VoiceAIStudio.spec"
-      - "installer/**"
-      - ".github/workflows/build-windows-installer.yml"
+      - "agent/professional-tts-engine"
+    tags:
+      - "v*"
 
 permissions:
   contents: read
@@ -33,10 +25,10 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout source
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -45,28 +37,48 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install application and build dependencies
+      - name: Install Python dependencies
         shell: pwsh
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip wheel
           python -m pip install -r requirements.txt -r requirements-desktop.txt
+
+      - name: Validate Python source
+        shell: pwsh
+        run: python -m compileall -q main.py desktop_app.py backend
 
       - name: Build desktop application
         shell: pwsh
-        run: python -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
+        run: |
+          python -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
+          if (-not (Test-Path "dist/VoiceAIStudioArabic/VoiceAIStudioArabic.exe")) {
+            throw "Desktop executable was not created."
+          }
 
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
 
-      - name: Build Windows installer
+      - name: Build installer
         shell: pwsh
-        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\VoiceAIStudio.iss"'
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\VoiceAIStudio.iss"
+          if (-not (Test-Path "dist-installer/VoiceAIStudioSetup.exe")) {
+            throw "Installer was not created."
+          }
 
-      - name: Upload installable application
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: VoiceAIStudioArabic-Windows-Installer
-          path: dist_installer/*.exe
+          name: VoiceAIStudio-Windows-Setup
+          path: dist-installer/VoiceAIStudioSetup.exe
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload portable folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceAIStudio-Windows-Portable
+          path: dist/VoiceAIStudioArabic
+          if-no-files-found: error
+          retention-days: 14
