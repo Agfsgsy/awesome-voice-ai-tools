@@ -1,8 +1,8 @@
 # Voice AI Studio Arabic - AI TTS Engines Requirements
 # Install: pip install -r requirements-ai.txt
-# These are open-source TTS engines - no paid APIs
+# Install only the engines you need on low-memory devices.
 
-# Core (required)
+# Core API and audio stack
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
@@ -11,31 +11,31 @@ httpx==0.28.1
 aiofiles==24.1.0
 numpy==1.26.4
 scipy==1.14.1
+soundfile>=0.12.0
+librosa>=0.10.0
+pydub>=0.25.1
 
-# TTS Engines (open source, no paid APIs)
-# 1. Piper TTS - lightweight, works on CPU
-piper-tts>=1.2.0
-
-# 2. Kokoro TTS - lightweight, good quality
-kokoro>=0.8.4
-
-# 3. Coqui TTS - multilingual with XTTS-v2
+# Recommended for Arabic and voice cloning
+# XTTS-v2 is multilingual and requires a reference voice for cloning.
 TTS>=0.22.0
 torch>=2.1.0
 torchaudio>=2.1.0
 
-# 4. MeloTTS - multilingual with Arabic
-# Install via git: pip install git+https://github.com/myshell-ai/MeloTTS.git
+# Lightweight English-focused engine
+kokoro>=0.8.4
+
+# Optional expressive engine
+bark>=0.1.5
+
+# Optional Google Gemini TTS client (requires GEMINI_API_KEY)
+google-genai>=1.0.0
+
+# Optional CPU engine. Models/voices must be installed separately.
+piper-tts>=1.2.0
+
+# MeloTTS optional dependencies
+# Install engine from its upstream repository when required.
 unidic>=1.1.0
 cn2an>=0.5.1
 jieba>=0.42.1
 g2p-en>=2.1.0
-
-# 5. StyleTTS2 - high quality, needs GPU
-# Install via git: pip install git+https://github.com/yl4579/StyleTTS2.git
-# Requires manual model download from HuggingFace
-
-# Audio processing
-soundfile>=0.12.0
-librosa>=0.10.0
-pydub>=0.25.1
