@@ -1,6 +1,7 @@
-"""Google Gemini TTS plugin with Arabic direction, dialect profiles, and automatic key rotation."""
+"""Google Gemini TTS plugin with Arabic direction, dialect profiles, retries and automatic key rotation."""
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import os
@@ -34,7 +35,7 @@ class GeminiTTSPlugin(TTSPluginBase):
     VOICES = {
         "Kore": "قوي وثابت", "Sulafat": "دافئ", "Gacrux": "ناضج", "Iapetus": "واضح",
         "Charon": "معلوماتي", "Alnilam": "حازم", "Achernar": "ناعم", "Vindemiatrix": "لطيف",
-        "Puck": "حيوي", "Aoede": "خفيف",
+        "Puck": "حيوي", "Aoede": "خفيف", "Algieba": "هادئ وقريب",
     }
     PROFILES = {
         "human_ultra": "اقرأ العربية بصوت بشري شديد الطبيعية، بتنغيم متوازن وتنفس ووقفات واقعية، دون أداء آلي.",
@@ -77,7 +78,10 @@ class GeminiTTSPlugin(TTSPluginBase):
     def _save_wav(path: Path, pcm: bytes) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(path), "wb") as output:
-            output.setnchannels(1); output.setsampwidth(2); output.setframerate(24000); output.writeframes(pcm)
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(24000)
+            output.writeframes(pcm)
 
     @staticmethod
     def _extract_audio(data: Dict[str, Any]) -> bytes | None:
@@ -91,9 +95,20 @@ class GeminiTTSPlugin(TTSPluginBase):
     @staticmethod
     def _detail(response: httpx.Response) -> str:
         try:
-            return response.json().get("error", {}).get("message") or response.text[:700]
+            payload = response.json()
+            return payload.get("error", {}).get("message") or response.text[:700]
         except Exception:
             return response.text[:700]
+
+    @staticmethod
+    def _retry_delay(response: httpx.Response, attempt: int) -> float:
+        raw = response.headers.get("retry-after", "").strip()
+        try:
+            if raw:
+                return max(1.0, min(12.0, float(raw)))
+        except ValueError:
+            pass
+        return min(8.0, 1.5 * (2 ** max(0, attempt - 1)))
 
     async def generate(self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
         keys = self._api_keys()
@@ -109,39 +124,68 @@ class GeminiTTSPlugin(TTSPluginBase):
         if "|" in raw_voice:
             raw_voice, profile = raw_voice.split("|", 1)
         selected_voice = raw_voice if raw_voice in self.VOICES else "Kore"
-        model = self._model() if self._model() in self.MODELS else "gemini-2.5-flash-preview-tts"
+        preferred = self._model() if self._model() in self.MODELS else "gemini-2.5-flash-preview-tts"
+        models = list(dict.fromkeys([preferred, "gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"]))
         guidance = self.PROFILES.get(profile, self.PROFILES["human_ultra"])
         speed_note = "متوسطة" if 0.9 <= speed <= 1.1 else ("بطيئة قليلًا" if speed < 0.9 else "سريعة قليلًا")
         prompt = f"{guidance}\nالسرعة: {speed_note}. افهم المعنى قبل الإلقاء، وغيّر النبرة والوقفات حسب الجملة. انطق النص فقط دون إضافة:\n\n{clean_text}"
-        digest = hashlib.sha256(f"gemini-v260|{model}|{selected_voice}|{profile}|{speed}|{clean_text}".encode()).hexdigest()[:18]
+        digest = hashlib.sha256(f"gemini-v310|{preferred}|{selected_voice}|{profile}|{speed}|{clean_text}".encode()).hexdigest()[:18]
         output = OUTPUTS_DIR / f"gemini_{profile}_{digest}.wav"
         if output.exists() and output.stat().st_size > 44:
             return {"success": True, "engine": self.name, "url": f"/api/downloads/{output.name}", "file": str(output), "message": "تم تحميل الصوت من الذاكرة المؤقتة."}
 
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"languageCode": "ar-XA", "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": selected_voice}}}}}
-        errors = []
+        errors: list[str] = []
+        quota_only = True
         async with httpx.AsyncClient(timeout=httpx.Timeout(240.0, connect=30.0)) as client:
             for number, key in enumerate(keys, start=1):
-                try:
-                    response = await client.post(endpoint, headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload)
-                    if response.status_code >= 400:
-                        errors.append(f"المفتاح {number}: {response.status_code}")
-                        if response.status_code in {401, 403, 429}:
-                            continue
-                        return {"success": False, "engine": self.name, "message": self._detail(response)}
-                    pcm = self._extract_audio(response.json())
-                    if not pcm:
-                        errors.append(f"المفتاح {number}: لا توجد بيانات صوتية")
-                        continue
-                    self._save_wav(output, pcm)
-                    return {"success": True, "engine": self.name, "model": model, "voice": selected_voice, "profile": profile, "key_used": number, "file": str(output), "url": f"/api/downloads/{output.name}", "message": f"تم إنشاء الصوت بنجاح باستخدام المفتاح رقم {number}."}
-                except Exception as exc:
-                    errors.append(f"المفتاح {number}: {type(exc).__name__}")
-                    continue
-        return {"success": False, "engine": self.name, "message": "تعذر التوليد بكل المفاتيح: " + "، ".join(errors)}
+                key_exhausted = False
+                for model in models:
+                    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"languageCode": "ar-XA", "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": selected_voice}}}}}
+                    for attempt in (1, 2):
+                        try:
+                            response = await client.post(endpoint, headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload)
+                            if response.status_code == 429:
+                                if attempt == 1:
+                                    await asyncio.sleep(self._retry_delay(response, attempt))
+                                    continue
+                                errors.append(f"المفتاح {number}: انتهت الحصة أو تم تجاوز الحد 429")
+                                key_exhausted = True
+                                break
+                            if response.status_code in {401, 403}:
+                                quota_only = False
+                                errors.append(f"المفتاح {number}: مرفوض {response.status_code}")
+                                key_exhausted = True
+                                break
+                            if response.status_code in {400, 404}:
+                                quota_only = False
+                                errors.append(f"{model}: غير متاح {response.status_code}")
+                                break
+                            if response.status_code >= 400:
+                                quota_only = False
+                                return {"success": False, "engine": self.name, "status_code": response.status_code, "message": self._detail(response)}
+                            pcm = self._extract_audio(response.json())
+                            if not pcm:
+                                quota_only = False
+                                errors.append(f"{model}: لم يرجع بيانات صوتية")
+                                break
+                            self._save_wav(output, pcm)
+                            return {"success": True, "engine": self.name, "model": model, "voice": selected_voice, "profile": profile, "key_used": number, "file": str(output), "url": f"/api/downloads/{output.name}", "message": f"تم إنشاء الصوت بنجاح باستخدام المفتاح رقم {number}."}
+                        except Exception as exc:
+                            quota_only = False
+                            if attempt == 1:
+                                await asyncio.sleep(1.0)
+                                continue
+                            errors.append(f"المفتاح {number}: {type(exc).__name__}")
+                    if key_exhausted:
+                        break
+
+        message = "تعذر التوليد بكل مفاتيح Gemini: " + "، ".join(errors[-8:])
+        if quota_only:
+            message = "انتهت حصة جميع مفاتيح Gemini حاليًا. سيستخدم الاستوديو المحرك الاحتياطي تلقائيًا عند توفره."
+        return {"success": False, "engine": self.name, "status_code": 429 if quota_only else 502, "error_code": "quota_exhausted" if quota_only else "generation_failed", "all_keys_exhausted": quota_only, "message": message}
 
 
 PLUGIN_CLASS = GeminiTTSPlugin
 PLUGIN_NAME = "Google Gemini TTS"
-PLUGIN_DESCRIPTION = "Arabic studio TTS with Yemeni/Gulf profiles and multi-key fallback"
+PLUGIN_DESCRIPTION = "Arabic studio TTS with Yemeni/Gulf profiles, retry and multi-key fallback"
