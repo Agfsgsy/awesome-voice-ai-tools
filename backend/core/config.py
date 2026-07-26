@@ -1,36 +1,62 @@
-"""إعدادات المشروع المركزية"""
+"""إعدادات المشروع المركزية مع دعم التشغيل العادي والنسخة المجمعة لويندوز."""
+from __future__ import annotations
+
 import os
+import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-BACKEND_DIR = BASE_DIR / "backend"
-PLUGINS_DIR = BACKEND_DIR / "plugins" / "builtin"
-FRONTEND_DIR = BASE_DIR / "frontend"
 
-MODELS_DIR = BASE_DIR / "models"
-VOICES_DIR = BASE_DIR / "voices"
-DOWNLOADS_DIR = BASE_DIR / "downloads"
-UPLOADS_DIR = BASE_DIR / "uploads"
-OUTPUTS_DIR = BASE_DIR / "outputs"
-CACHE_DIR = BASE_DIR / "cache"
-LOGS_DIR = BASE_DIR / "logs"
-CONFIG_DIR = BASE_DIR / "config"
+def _resource_dir() -> Path:
+    """مكان الملفات المرفقة بالتطبيق، بما في ذلك ملفات PyInstaller."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS).resolve()
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _data_dir() -> Path:
+    """مجلد قابل للكتابة لحفظ الأصوات والسجلات والإعدادات."""
+    override = os.getenv("VOICE_AI_DATA_DIR", "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    if getattr(sys, "frozen", False):
+        local_app_data = os.getenv("LOCALAPPDATA")
+        root = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
+        return root / "VoiceAIStudioArabic"
+    return _resource_dir()
+
+
+RESOURCE_DIR = _resource_dir()
+BASE_DIR = RESOURCE_DIR
+DATA_DIR = _data_dir()
+BACKEND_DIR = RESOURCE_DIR / "backend"
+PLUGINS_DIR = BACKEND_DIR / "plugins" / "builtin"
+FRONTEND_DIR = RESOURCE_DIR / "frontend"
+
+MODELS_DIR = DATA_DIR / "models"
+VOICES_DIR = DATA_DIR / "voices"
+DOWNLOADS_DIR = DATA_DIR / "downloads"
+UPLOADS_DIR = DATA_DIR / "uploads"
+OUTPUTS_DIR = DATA_DIR / "outputs"
+CACHE_DIR = DATA_DIR / "cache"
+LOGS_DIR = DATA_DIR / "logs"
+CONFIG_DIR = DATA_DIR / "config"
 
 for directory in [
-    MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR,
+    DATA_DIR, MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR,
     OUTPUTS_DIR, CACHE_DIR, LOGS_DIR, CONFIG_DIR,
 ]:
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "Voice AI Studio Arabic"
-APP_VERSION = "2.1.0"
-APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
+APP_VERSION = "2.2.0"
+APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
 
 IS_TERMUX = os.path.exists("/data/data/com.termux/files/usr")
 IS_ANDROID = IS_TERMUX
 IS_COLAB = os.path.exists("/content")
+IS_FROZEN = bool(getattr(sys, "frozen", False))
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
@@ -38,6 +64,5 @@ GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
 
-# Prefer the lightweight, high-quality Arabic neural engine by default.
-# Local engines remain available when offline operation or voice cloning is needed.
+# الصوت العصبي المتصل بالإنترنت هو الأعلى جودة افتراضيًا.
 ENGINE_PRIORITY = ["edge", "piper", "coqui", "kokoro", "melotts", "styletts2"]
