@@ -1,5 +1,5 @@
 #define MyAppName "Voice AI Studio Arabic Pro"
-#define MyAppVersion "2.2.0"
+#define MyAppVersion "2.2.1"
 #define MyAppPublisher "Agfsgsy"
 #define MyAppExeName "VoiceAIStudioArabic.exe"
 
@@ -28,14 +28,14 @@ RestartApplications=no
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
 Source: "..\dist\VoiceAIStudioArabic\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
+Filename: "{cmd}"; Parameters: "/C copy /Y ""{autoprograms}\{#MyAppName}.lnk"" ""{userdesktop}\Voice AI Studio Pro.lnk"""; Flags: runhidden waituntilterminated; Tasks: desktopicon
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
