@@ -48,7 +48,7 @@ for directory in [
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "Voice AI Studio Arabic Pro"
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.4.0"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
@@ -60,9 +60,12 @@ IS_FROZEN = bool(getattr(sys, "frozen", False))
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
+ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
 
-# الصوت العصبي المتصل بالإنترنت هو الأعلى جودة افتراضيًا.
-ENGINE_PRIORITY = ["edge", "piper", "coqui", "kokoro", "melotts", "styletts2"]
+# Human Pro is preferred when configured; Edge remains the free online fallback.
+ENGINE_PRIORITY = ["elevenlabs", "edge", "piper", "coqui", "kokoro", "melotts", "styletts2"]
