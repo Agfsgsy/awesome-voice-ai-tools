@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.api.routes import router
 from backend.api.human_pro_routes import router as human_pro_router
 from backend.api.gemini_routes import router as gemini_router
+from backend.api.studio_routes import router as studio_router
 from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
 
@@ -27,13 +28,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=APP_NAME,
-    description="استوديو عربي لتوليد الصوت ومعالجته عبر Gemini وElevenLabs والمحركات المجانية.",
+    description="استوديو عربي ذكي للنص والصوت والبودكاست والمحاضرات والمواعظ.",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1", "http://localhost", "null"],
@@ -44,6 +44,7 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(human_pro_router)
 app.include_router(gemini_router)
+app.include_router(studio_router)
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
