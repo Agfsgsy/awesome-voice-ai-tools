@@ -1,14 +1,14 @@
 """Intelligent Arabic studio preparation: structure text, infer dialect, and recommend delivery."""
 from __future__ import annotations
 
-import json
-import os
 import re
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
+
+from backend.core.gemini_key_pool import ordered_keys, record_result
 
 router = APIRouter(prefix="/api/studio", tags=["Studio"])
 
@@ -30,12 +30,6 @@ PRESETS = {
     "documentary": ("documentary", "warm_broadcast"),
     "ad": ("energetic", "studio"),
 }
-
-
-def _keys() -> list[str]:
-    raw = os.getenv("GEMINI_API_KEYS", "") or os.getenv("GEMINI_API_KEY", "")
-    items = re.split(r"[\n,;|]+", raw)
-    return list(dict.fromkeys(k.strip() for k in items if len(k.strip()) >= 20))
 
 
 def _infer_type(text: str) -> str:
@@ -76,15 +70,32 @@ def _clean_local(text: str, content_type: str) -> str:
     return "\n\n".join(fixed)
 
 
+async def _available_models(client: httpx.AsyncClient, key: str) -> list[str]:
+    preferred = ["gemini-2.5-flash", "gemini-flash-latest"]
+    try:
+        response = await client.get("https://generativelanguage.googleapis.com/v1beta/models", headers={"x-goog-api-key": key})
+        if response.status_code >= 400:
+            return preferred
+        available = []
+        for item in response.json().get("models", []):
+            name = str(item.get("name", "")).replace("models/", "")
+            methods = item.get("supportedGenerationMethods") or []
+            low = name.lower()
+            if "generateContent" not in methods or any(x in low for x in ("tts", "image", "embedding", "aqa")):
+                continue
+            available.append(name)
+        ordered = [m for m in preferred if m in available]
+        ordered.extend(m for m in available if m not in ordered)
+        return ordered or preferred
+    except Exception:
+        return preferred
+
+
 async def _gemini_prepare(req: PrepareRequest, selected_type: str, selected_dialect: str) -> str | None:
-    keys = _keys()
+    keys = ordered_keys()
     if not keys:
         return None
-    dialect_note = {
-        "msa": "عربية فصحى طبيعية وسهلة",
-        "yemeni": "روح يمنية طبيعية مفهومة، دون كلمات محلية غامضة أو مبالغة",
-        "gulf": "أسلوب خليجي طبيعي مفهوم، مع الحفاظ على وضوح العربية",
-    }[selected_dialect]
+    dialect_note = {"msa": "عربية فصحى طبيعية وسهلة", "yemeni": "روح يمنية طبيعية مفهومة، دون كلمات محلية غامضة أو مبالغة", "gulf": "أسلوب خليجي طبيعي مفهوم، مع الحفاظ على وضوح العربية"}[selected_dialect]
     prompt = f"""أنت محرر نصوص ومخرج صوت عربي محترف. رتّب النص التالي ليصبح جاهزًا للتسجيل الصوتي.
 نوع المحتوى: {selected_type}
 اللهجة: {dialect_note}
@@ -104,19 +115,27 @@ async def _gemini_prepare(req: PrepareRequest, selected_type: str, selected_dial
     payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.35}}
     for key in keys:
         try:
-            async with httpx.AsyncClient(timeout=90.0) as client:
-                response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-                    headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-                    json=payload,
-                )
-            if response.status_code in {401, 403, 429}:
-                continue
-            response.raise_for_status()
-            parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            result = "\n".join(str(p.get("text", "")) for p in parts).strip()
-            if result:
-                return result
+            async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=20.0)) as client:
+                for model in await _available_models(client, key):
+                    response = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                        headers={"x-goog-api-key": key, "Content-Type": "application/json"},
+                        json=payload,
+                    )
+                    if response.status_code == 429:
+                        record_result(key, "quota", response.text[:500]); break
+                    if response.status_code == 401:
+                        record_result(key, "invalid", response.text[:500]); break
+                    if response.status_code == 403:
+                        record_result(key, "forbidden", response.text[:500]); break
+                    if response.status_code in {400, 404}:
+                        continue
+                    response.raise_for_status()
+                    parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                    result = "\n".join(str(p.get("text", "")) for p in parts).strip()
+                    if result:
+                        record_result(key, "working", f"Text model: {model}")
+                        return result
         except Exception:
             continue
     return None
@@ -138,14 +157,4 @@ async def prepare_text(req: PrepareRequest):
     elif selected_dialect == "gulf":
         voice = "Sulafat"
         profile = "gulf_natural" if selected_type not in {"dua", "sermon"} else profile
-    return {
-        "success": True,
-        "text": prepared,
-        "content_type": selected_type,
-        "dialect": selected_dialect,
-        "profile": profile,
-        "effect": effect,
-        "voice": voice,
-        "used_ai": used_ai,
-        "message": "تم فهم النص وترتيبه وإعداد الاستوديو تلقائيًا." if used_ai else "تم ترتيب النص محليًا؛ تعذر استخدام محرر Gemini حاليًا.",
-    }
+    return {"success": True, "text": prepared, "content_type": selected_type, "dialect": selected_dialect, "profile": profile, "effect": effect, "voice": voice, "used_ai": used_ai, "message": "تم فهم النص وترتيبه وإعداد الاستوديو تلقائيًا." if used_ai else "تم ترتيب النص محليًا؛ لا يوجد مفتاح Gemini عامل حاليًا."}
