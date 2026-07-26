@@ -20,6 +20,7 @@ from backend.api.dialogue_ultra_routes import router as dialogue_ultra_router
 from backend.api import dialogue_audio_runtime as _dialogue_audio_runtime
 from backend.api.dialogue_safe_routes import router as dialogue_safe_router
 from backend.api import gemini_rotation_runtime as _gemini_rotation_runtime
+from backend.api.dashboard_routes import router as dashboard_router
 from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
 
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=APP_NAME,
-    description="استوديو ابن الواقدي: توليد وإنتاج صوت عربي، حوار طبيعي متعدد المتحدثين، حفظ وتجربة وتدوير فعلي لمفاتيح Gemini، تحرير النص، المواعظ، المؤثرات والموسيقى والاستنساخ المصرح به.",
+    description="استوديو ابن الواقدي: واجهة إنتاج عربية احترافية، توليد وإنتاج صوت، حوار طبيعي متعدد المتحدثين، حفظ وتجربة وتدوير فعلي لمفاتيح Gemini، تحرير النص، المواعظ، المؤثرات والموسيقى والاستنساخ المصرح به.",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -58,6 +59,7 @@ app.include_router(producer_router)
 app.include_router(interview_pro_router)
 app.include_router(dialogue_ultra_router)
 app.include_router(dialogue_safe_router)
+app.include_router(dashboard_router)
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
