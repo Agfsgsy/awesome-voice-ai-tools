@@ -41,7 +41,7 @@ for directory in [DATA_DIR, MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, 
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "استوديو ابن الواقدي"
-APP_VERSION = "3.6.0"
+APP_VERSION = "3.7.0"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
