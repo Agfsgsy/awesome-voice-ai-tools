@@ -48,7 +48,7 @@ for directory in [
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "Voice AI Studio Arabic"
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.2.1"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
