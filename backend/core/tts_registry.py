@@ -70,6 +70,7 @@ class TTSRegistry:
             return
 
         plugin_specs = [
+            ("elevenlabs", "backend.plugins.elevenlabs_plugin", "ElevenLabsPlugin"),
             ("edge", "backend.plugins.edge_plugin", "EdgeTTSPlugin"),
             ("piper", "backend.plugins.piper_plugin", "PiperPlugin"),
             ("coqui", "backend.plugins.coqui_plugin", "CoquiPlugin"),
