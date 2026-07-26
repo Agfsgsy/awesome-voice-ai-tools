@@ -1,27 +1,38 @@
-"""نقطة تشغيل التطبيق الرئيسية"""
-import uvicorn
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+"""نقطة تشغيل التطبيق الرئيسية."""
+from __future__ import annotations
 
-from backend.core.config import APP_NAME, APP_VERSION, APP_HOST, APP_PORT, APP_DEBUG, FRONTEND_DIR
-from backend.core.logger import get_logger
+import sys
+from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from backend.api.routes import router
+from backend.core.config import (
+    APP_DEBUG,
+    APP_HOST,
+    APP_NAME,
+    APP_PORT,
+    APP_VERSION,
+    FRONTEND_DIR,
+)
+from backend.core.logger import get_logger
 
 logger = get_logger("main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info(f"Starting {APP_NAME} v{APP_VERSION}")
+    logger.info("Starting %s v%s", APP_NAME, APP_VERSION)
     yield
-    logger.info(f"Shutting down {APP_NAME}")
+    logger.info("Shutting down %s", APP_NAME)
 
 
 app = FastAPI(
     title=APP_NAME,
-    description="منصة صوتيات عربية لتوليد واستنساخ الصوت - مفتوحة المصدر",
+    description="استوديو عربي لتوليد الصوت ومعالجته محليًا عبر واجهة سطح مكتب.",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -30,24 +41,25 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["http://127.0.0.1", "http://localhost", "null"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(router)
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+
 if __name__ == "__main__":
-    logger.info(f"Running on http://{APP_HOST}:{APP_PORT}")
+    logger.info("Running on http://%s:%s", APP_HOST, APP_PORT)
+    target = app if getattr(sys, "frozen", False) else "main:app"
     uvicorn.run(
-        "main:app",
+        target,
         host=APP_HOST,
         port=APP_PORT,
-        reload=APP_DEBUG,
+        reload=APP_DEBUG and not getattr(sys, "frozen", False),
         log_level="info",
     )
