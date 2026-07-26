@@ -1,4 +1,4 @@
-"""Standalone Windows desktop launcher for Voice AI Studio Arabic."""
+"""Standalone Windows desktop launcher for Ibn Al-Waqadi Voice Studio."""
 from __future__ import annotations
 
 import ctypes
@@ -9,15 +9,14 @@ import threading
 import time
 from typing import Optional
 
-APP_TITLE = "Voice AI Studio Arabic Producer"
+APP_TITLE = "استوديو ابن الواقدي"
 START_PORT = 8000
 MUTEX_NAME = "Local\\VoiceAIStudioArabicPro"
 
 
 def _message(text: str, title: str = APP_TITLE, error: bool = False) -> None:
     if sys.platform == "win32":
-        flags = 0x10 if error else 0x40
-        ctypes.windll.user32.MessageBoxW(None, text, title, flags)
+        ctypes.windll.user32.MessageBoxW(None, text, title, 0x10 if error else 0x40)
     else:
         print(f"{title}: {text}")
 
@@ -72,8 +71,7 @@ def main() -> int:
     except Exception as exc:
         _message(f"تعذر تحميل مكونات التطبيق:\n{exc}", error=True)
         return 1
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", access_log=False)
-    server = uvicorn.Server(config)
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", access_log=False))
     server.install_signal_handlers = lambda: None
     server_thread = threading.Thread(target=server.run, name="voice-ai-local-server", daemon=True)
     server_thread.start()
@@ -83,9 +81,9 @@ def main() -> int:
         return 2
     window = webview.create_window(
         APP_TITLE,
-        url=f"http://127.0.0.1:{port}/static/producer.html",
-        width=1400,
-        height=900,
+        url=f"http://127.0.0.1:{port}/static/studio_shell.html",
+        width=1440,
+        height=920,
         min_size=(900, 650),
         resizable=True,
         text_select=True,
