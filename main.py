@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.routes import router
+from backend.api.human_pro_routes import router as human_pro_router
 from backend.core.config import (
     APP_DEBUG,
     APP_HOST,
@@ -47,6 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router)
+app.include_router(human_pro_router)
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
