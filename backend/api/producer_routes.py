@@ -1,4 +1,4 @@
-"""Studio 2.8 producer tools: adaptive ambience, male/female presets and multi-speaker interviews."""
+"""Studio producer tools with quota-safe interview rendering and local script fallback."""
 from __future__ import annotations
 
 import math
@@ -14,10 +14,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from backend.api.studio_pro_routes import _ask_gemini, _desktop_exports
 from backend.core.config import OUTPUTS_DIR
 from backend.core.tts_registry import tts_registry
 from backend.plugins.builtin.audio_effects import _ffmpeg_executable, process_audio
-from backend.api.studio_pro_routes import _ask_gemini, _desktop_exports
 
 router = APIRouter(prefix="/api/producer", tags=["Producer"])
 
@@ -112,6 +112,35 @@ async def generate_ambient(req: AmbientRequest):
     }
 
 
+def _local_interview_script(topic: str, roles: list[str], dialect: str) -> str:
+    host = roles[0]
+    guest = roles[1]
+    extra = roles[2:]
+    lines = [
+        f"{host}: أهلًا بكم في حلقة جديدة. موضوعنا اليوم هو: {topic}. سنناقشه بهدوء وبخطوات عملية واضحة.",
+        f"{guest}: شكرًا على الاستضافة. هذا موضوع مهم، والبداية الصحيحة فيه هي فهم الواقع قبل اتخاذ أي قرار.",
+        f"{host}: ما أول نقطة ينبغي أن يعرفها المستمع حتى يتعامل مع هذا الموضوع بصورة أفضل؟",
+        f"{guest}: أول نقطة هي تحديد الهدف بوضوح، ثم تقسيمه إلى خطوات صغيرة يمكن قياسها والاستمرار عليها.",
+    ]
+    if extra:
+        lines += [
+            f"{extra[0]}: وأضيف أن الهدوء وعدم مقارنة النفس بالآخرين يساعدان على اتخاذ قرارات أنضج وأكثر واقعية.",
+            f"{host}: هذه نقطة مهمة. ما الخطأ الأكثر شيوعًا الذي ينبغي تجنبه؟",
+            f"{extra[0]}: التسرع وانتظار نتيجة فورية. التحسن الحقيقي يحتاج إلى تعلم ومراجعة وصبر.",
+        ]
+    if len(extra) > 1:
+        lines += [
+            f"{extra[1]}: من الناحية العملية، من المفيد كتابة خطة أسبوعية ومراجعة النتائج بدل العمل بلا اتجاه واضح.",
+            f"{host}: كيف يحافظ الشخص على الاستمرار عندما تقل الحماسة؟",
+            f"{extra[1]}: يعتمد على العادات الصغيرة والالتزام بالموعد، لا على الحماسة وحدها.",
+        ]
+    lines += [
+        f"{guest}: والخلاصة أن النجاح في هذا الموضوع لا يأتي من خطوة ضخمة واحدة، بل من قرارات صغيرة صحيحة تتكرر.",
+        f"{host}: شكرًا لكم. تذكروا أن البداية الواضحة والاستمرار الهادئ يصنعان فرقًا كبيرًا. نلتقي في حلقة جديدة.",
+    ]
+    return "\n\n".join(lines)
+
+
 @router.post("/interview-script")
 async def interview_script(req: InterviewRequest):
     roles = ["المذيع_رجل", "الضيف_رجل"]
@@ -126,8 +155,20 @@ async def interview_script(req: InterviewRequest):
 كل سطر يجب أن يبدأ حرفيًا باسم المتحدث ثم نقطتين، مثل: المذيع_رجل: النص
 اجعل الحوار طبيعيًا، بأسئلة قصيرة، إجابات مفيدة، انتقالات سلسة، وخاتمة واضحة.
 لا تضف وصفًا للمشهد ولا تعليمات أداء، وأعد الحوار فقط."""
-    script = await _ask_gemini(prompt, 0.6)
-    return {"success": True, "script": script, "roles": roles, "message": "تم إنشاء سيناريو مقابلة متعددة الأصوات."}
+    try:
+        script = await _ask_gemini(prompt, 0.6)
+        if not str(script).strip():
+            raise RuntimeError("empty script")
+        return {"success": True, "script": script, "roles": roles, "fallback": False, "message": "تم إنشاء سيناريو مقابلة متعددة الأصوات."}
+    except Exception:
+        script = _local_interview_script(req.topic, roles, dialect)
+        return {
+            "success": True,
+            "script": script,
+            "roles": roles,
+            "fallback": True,
+            "message": "حصة محرر Gemini غير متاحة حاليًا؛ أنشأ الاستوديو سيناريو احترافيًا محليًا لتتمكن من متابعة العمل.",
+        }
 
 
 def _voice_for_role(role: str, engine: str) -> str:
@@ -135,7 +176,9 @@ def _voice_for_role(role: str, engine: str) -> str:
     female = any(x in role for x in ("امرأة", "فتاة", "ضيفة", "مذيعة"))
     if engine == "edge":
         if female:
-            return "ar-YE-MaryamNeural" if "يمن" in role else "ar-SA-ZariyahNeural"
+            return "ar-YE-MaryamNeural" if "مذيعة" in role else "ar-SA-ZariyahNeural"
+        if "خبير" in role:
+            return "ar-AE-HamdanNeural"
         if "ضيف" in role:
             return "ar-SA-HamedNeural"
         return "ar-YE-SalehNeural"
@@ -170,13 +213,94 @@ def _parse_dialogue(script: str) -> list[tuple[str, str]]:
     return [(r, t) for r, t in result if t]
 
 
-def _silence(path: Path, milliseconds: int = 360) -> None:
-    rate = 24000
-    with wave.open(str(path), "wb") as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(rate)
-        out.writeframes(b"\x00\x00" * int(rate * milliseconds / 1000))
+def _clean_spoken_text(text: str) -> str:
+    value = re.sub(r"^\s*\[[^\]]{1,120}\]\s*", "", text.strip())
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _speed_for_role(role: str, base_speed: float, index: int) -> float:
+    low = role.lower()
+    factor = 1.0
+    if "مذيع" in low:
+        factor = 0.96
+    elif "خبير" in low:
+        factor = 0.93
+    elif "ضيفة" in low or "مذيعة" in low:
+        factor = 0.99
+    elif "ضيف" in low:
+        factor = 0.97
+    variation = (1.0, 1.008, 0.994, 1.004, 0.989)[index % 5]
+    return max(0.75, min(1.20, base_speed * factor * variation))
+
+
+def _normalize_and_concat(sources: list[Path], output: Path, pause_ms: int = 340) -> None:
+    ffmpeg = _ffmpeg_executable()
+    if not ffmpeg:
+        raise RuntimeError("FFmpeg غير متاح داخل البرنامج.")
+    work = OUTPUTS_DIR / f".producer_concat_{uuid.uuid4().hex[:8]}"
+    work.mkdir(parents=True, exist_ok=True)
+    try:
+        normalized: list[Path] = []
+        for index, source in enumerate(sources):
+            target = work / f"part_{index:04d}.wav"
+            cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vn", "-c:a", "pcm_s16le", "-ar", "24000", "-ac", "1", str(target)]
+            completed = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=False)
+            if completed.returncode != 0 or not target.exists():
+                raise RuntimeError((completed.stderr or "فشل توحيد مقطع صوتي")[-1200:])
+            normalized.append(target)
+        pause = work / "pause.wav"
+        with wave.open(str(pause), "wb") as out:
+            out.setnchannels(1)
+            out.setsampwidth(2)
+            out.setframerate(24000)
+            out.writeframes(b"\x00\x00" * int(24000 * pause_ms / 1000))
+        sequence: list[Path] = []
+        for index, source in enumerate(normalized):
+            sequence.append(source)
+            if index < len(normalized) - 1:
+                sequence.append(pause)
+        manifest = work / "files.txt"
+        manifest.write_text("\n".join("file '" + str(path).replace("'", "'\\''") + "'" for path in sequence), encoding="utf-8")
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(manifest), "-c:a", "pcm_s16le", "-ar", "24000", "-ac", "1", str(output)]
+        completed = subprocess.run(cmd, capture_output=True, text=True, timeout=1200, check=False)
+        if completed.returncode != 0 or not output.exists():
+            raise RuntimeError((completed.stderr or "فشل دمج أصوات المقابلة")[-1200:])
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+async def _render_with_engine(segments: list[tuple[str, str]], engine: str, speed: float, token: str) -> Path:
+    plugin = tts_registry.get_plugin(engine)
+    if not plugin:
+        raise RuntimeError(f"محرك {engine} غير متاح.")
+    sources: list[Path] = []
+    for index, (role, text) in enumerate(segments):
+        spoken = _clean_spoken_text(text) if engine == "edge" else text
+        result = await plugin.generate(
+            text=spoken,
+            voice=_voice_for_role(role, engine),
+            language="ar",
+            speed=_speed_for_role(role, speed, index),
+        )
+        if not result or not result.get("success"):
+            raise RuntimeError((result or {}).get("message", f"فشل صوت المتحدث {role}"))
+        source = Path(result.get("file", ""))
+        if not source.exists():
+            raise RuntimeError(f"ملف المتحدث {role} غير موجود.")
+        sources.append(source)
+    raw = OUTPUTS_DIR / f"interview_{engine}_{token}.wav"
+    _normalize_and_concat(sources, raw)
+    return raw
+
+
+def _engine_order(requested: str) -> list[str]:
+    if requested == "edge":
+        return ["edge"]
+    if requested == "elevenlabs":
+        return ["elevenlabs", "gemini", "edge"]
+    if requested == "gemini":
+        return ["gemini", "edge"]
+    return [requested, "edge"]
 
 
 @router.post("/render-dialogue")
@@ -184,35 +308,22 @@ async def render_dialogue(req: DialogueRenderRequest):
     segments = _parse_dialogue(req.script)
     if not segments:
         raise HTTPException(status_code=400, detail="لم أجد حوارًا بصيغة اسم المتحدث: النص")
-    plugin = tts_registry.get_plugin(req.engine)
-    if not plugin:
-        raise HTTPException(status_code=503, detail="محرك الصوت المحدد غير متاح.")
+
     token = uuid.uuid4().hex[:10]
-    work = OUTPUTS_DIR / f"dialogue_{token}_parts"
-    work.mkdir(parents=True, exist_ok=True)
-    files: list[Path] = []
-    silence = work / "pause.wav"
-    _silence(silence)
-    for index, (role, text) in enumerate(segments):
-        result = await plugin.generate(text=text, voice=_voice_for_role(role, req.engine), language="ar", speed=req.speed)
-        if not result or not result.get("success"):
-            raise HTTPException(status_code=502, detail=(result or {}).get("message", f"فشل صوت المتحدث {role}"))
-        source = Path(result.get("file", ""))
-        if not source.exists():
-            raise HTTPException(status_code=500, detail=f"ملف المتحدث {role} غير موجود.")
-        files.append(source)
-        if index < len(segments) - 1:
-            files.append(silence)
-    ffmpeg = _ffmpeg_executable()
-    if not ffmpeg:
-        raise HTTPException(status_code=500, detail="FFmpeg غير متاح داخل البرنامج.")
-    concat = work / "concat.txt"
-    concat.write_text("\n".join(f"file '{str(p).replace(chr(39), chr(39)+chr(92)+chr(39)+chr(39))}'" for p in files), encoding="utf-8")
-    raw = OUTPUTS_DIR / f"interview_{token}.wav"
-    cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(concat), "-c:a", "pcm_s16le", "-ar", "24000", "-ac", "1", str(raw)]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900, check=False)
-    if proc.returncode != 0 or not raw.exists():
-        raise HTTPException(status_code=500, detail=(proc.stderr or "فشل دمج أصوات المقابلة")[-1200:])
+    errors: list[str] = []
+    raw: Path | None = None
+    engine_used = ""
+    for engine in _engine_order(req.engine):
+        try:
+            raw = await _render_with_engine(segments, engine, req.speed, token)
+            engine_used = engine
+            break
+        except Exception as exc:
+            errors.append(f"{engine}: {str(exc)[:300]}")
+
+    if raw is None or not raw.exists():
+        raise HTTPException(status_code=502, detail="تعذر إنتاج المقابلة بالمحركات المتاحة. " + " | ".join(errors[-3:]))
+
     final = OUTPUTS_DIR / f"interview_final_{token}.mp3"
     if req.effect != "none" and process_audio(str(raw), str(final), req.effect):
         output = final
@@ -220,11 +331,21 @@ async def render_dialogue(req: DialogueRenderRequest):
         output = raw
     target = _desktop_exports() / output.name
     shutil.copy2(output, target)
+    fallback = engine_used != req.engine
+    message = "تم إنتاج المقابلة بأصوات مختلفة وحفظها على سطح المكتب."
+    if fallback and engine_used == "edge":
+        message += " انتهت حصة Gemini، لذلك انتقل الاستوديو فورًا إلى الأصوات العربية المجانية وأكمل الملف بالكامل."
+    elif fallback:
+        message += f" تم الانتقال تلقائيًا إلى المحرك الاحتياطي {engine_used}."
     return {
         "success": True,
         "url": f"/api/downloads/{output.name}",
         "desktop_path": str(target),
         "speakers": len({r for r, _ in segments}),
         "segments": len(segments),
-        "message": "تم إنتاج المقابلة بأصوات مختلفة وحفظها على سطح المكتب.",
+        "engine_requested": req.engine,
+        "engine_used": engine_used,
+        "fallback": fallback,
+        "attempt_errors": errors,
+        "message": message,
     }
