@@ -1,45 +1,75 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 cd /d "%~dp0"
-title Voice AI Studio - Build Installer
+title Voice AI Studio - Build Windows Setup
 
-echo Voice AI Studio Arabic - Windows Installer Builder
+echo =====================================================
+echo   Voice AI Studio Arabic Pro - Windows Setup Builder
+echo =====================================================
 echo.
 
-where py >nul 2>&1
+where python >nul 2>&1
 if errorlevel 1 (
-  echo Python Launcher is not installed.
+  echo [ERROR] Python 3.11 is required to build the installer.
   pause
   exit /b 1
 )
 
-py -m pip install --upgrade pip
-if errorlevel 1 goto failed
-py -m pip install -r requirements.txt -r requirements-desktop.txt
-if errorlevel 1 goto failed
+python -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3,11) else 1)"
+if errorlevel 1 (
+  echo [ERROR] Build with Python 3.11 for maximum Windows compatibility.
+  echo Install Python 3.11, then run this file again.
+  pause
+  exit /b 1
+)
 
-py -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
-if errorlevel 1 goto failed
+echo [1/4] Installing build dependencies...
+python -m pip install --upgrade pip wheel
+if errorlevel 1 goto :failed
+python -m pip install -r requirements.txt -r requirements-desktop.txt
+if errorlevel 1 goto :failed
 
+echo [2/4] Validating source files...
+python -m compileall -q main.py desktop_app.py backend
+if errorlevel 1 goto :failed
+
+echo [3/4] Building standalone desktop application...
+python -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
+if errorlevel 1 goto :failed
+if not exist "dist\VoiceAIStudioArabic\VoiceAIStudioArabic.exe" goto :failed
+
+echo [4/4] Building Setup.exe...
 set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
 if not exist "%ISCC%" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
 if not exist "%ISCC%" (
-  echo The desktop program was built successfully.
-  echo Run dist\VoiceAIStudio\VoiceAIStudio.exe
-  echo Install Inno Setup 6 to create the Setup file.
+  where winget >nul 2>&1
+  if not errorlevel 1 (
+    echo Installing Inno Setup...
+    winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
+  )
+)
+set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC%" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC%" (
+  echo [ERROR] Inno Setup 6 was not found.
+  echo Install Inno Setup, then run this builder again.
   pause
-  exit /b 0
+  exit /b 1
 )
 
-"%ISCC%" installer\VoiceAIStudio.iss
-if errorlevel 1 goto failed
+"%ISCC%" "installer\VoiceAIStudio.iss"
+if errorlevel 1 goto :failed
+if not exist "dist-installer\VoiceAIStudioSetup.exe" goto :failed
 
 echo.
-echo Installer created in the dist_installer folder.
+echo [SUCCESS] Installer created:
+echo %CD%\dist-installer\VoiceAIStudioSetup.exe
+start "" explorer.exe "%CD%\dist-installer"
 pause
 exit /b 0
 
 :failed
-echo Build failed. Review the messages above.
+echo.
+echo [ERROR] The build failed. Review the messages above.
 pause
 exit /b 1
