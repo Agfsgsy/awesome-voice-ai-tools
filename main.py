@@ -24,6 +24,7 @@ from backend.api.dashboard_routes import router as dashboard_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
+from backend.api import gemini_cloud_control_patch as _gemini_cloud_control_patch
 from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
 
