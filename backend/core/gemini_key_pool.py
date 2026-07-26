@@ -1,8 +1,8 @@
-"""Persistent Gemini API-key manager with enable/disable and sticky active-key rotation.
+"""Persistent Gemini API-key manager with real per-key control.
 
-The settings file stores full keys locally on the user's device. API responses expose only
-masked values and stable fingerprints. A manually selected key remains active while it works;
-rotation happens only when it is paused, rejected, or out of quota.
+Full keys are stored only in the local app config. API responses expose masked values
+and stable fingerprints. A key is reported as active only after a successful real TTS
+test. Disabled, exhausted, invalid, or forbidden keys are never sent to Gemini.
 """
 from __future__ import annotations
 
@@ -18,6 +18,9 @@ from backend.core.config import CONFIG_DIR
 SETTINGS_FILE = CONFIG_DIR / "gemini.json"
 STATE_FILE = CONFIG_DIR / "gemini_key_state.json"
 API_KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z_-]{20,}")
+BLOCKED_STATUSES = {"quota", "invalid", "forbidden"}
+DEFAULT_MODEL = "gemini-2.5-flash-preview-tts"
+DEFAULT_VOICE = "Kore"
 
 
 def _read_json(path) -> dict[str, Any]:
@@ -75,10 +78,9 @@ def load_config() -> dict[str, Any]:
 
 def _normalise_entries(data: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     data = data if data is not None else load_config()
-    raw_entries = data.get("api_key_entries")
     entries: list[dict[str, Any]] = []
     seen: set[str] = set()
-
+    raw_entries = data.get("api_key_entries")
     if isinstance(raw_entries, list):
         for index, item in enumerate(raw_entries, start=1):
             if not isinstance(item, dict):
@@ -96,13 +98,10 @@ def _normalise_entries(data: dict[str, Any] | None = None) -> list[dict[str, Any
                 "label": str(item.get("label") or f"المفتاح {index}")[:80],
                 "added_at": int(item.get("added_at") or time.time()),
             })
-
     if not entries:
         legacy: list[str] = []
         legacy.extend(parse_keys(data.get("api_keys") or []))
         legacy.extend(parse_keys(data.get("api_key") or ""))
-        # Import environment keys only during first migration. Once a local list exists,
-        # stale environment values are never merged back into it.
         if not legacy:
             legacy.extend(parse_keys(os.getenv("GEMINI_API_KEYS", "")))
             legacy.extend(parse_keys(os.getenv("GEMINI_API_KEY", "")))
@@ -118,6 +117,33 @@ def load_entries() -> list[dict[str, Any]]:
 def load_keys(enabled_only: bool = False) -> list[str]:
     entries = load_entries()
     return [entry["key"] for entry in entries if not enabled_only or entry.get("enabled", True)]
+
+
+def _state_for_keys(keys: list[str]) -> dict[str, Any]:
+    old = _read_json(STATE_FILE)
+    fps = [fingerprint(key) for key in keys]
+    records = old.get("records") if isinstance(old.get("records"), dict) else {}
+    records = {fp: records.get(fp, {}) for fp in fps}
+    selected_fp = str(old.get("selected_fp") or old.get("active_fp") or "")
+    active_fp = str(old.get("active_fp") or "")
+    if selected_fp not in fps:
+        selected_fp = fps[0] if fps else ""
+    if active_fp not in fps:
+        active_fp = ""
+    if active_fp and str((records.get(active_fp) or {}).get("status")) != "working":
+        active_fp = ""
+    return {"selected_fp": selected_fp, "active_fp": active_fp, "records": records, "updated_at": int(time.time())}
+
+
+def _save_state(state: dict[str, Any]) -> None:
+    state["updated_at"] = int(time.time())
+    _write_json(STATE_FILE, state)
+
+
+def _sync_state(keys: list[str]) -> dict[str, Any]:
+    state = _state_for_keys(keys)
+    _save_state(state)
+    return state
 
 
 def _save_entries(entries: list[dict[str, Any]], model_id: str | None = None, voice_name: str | None = None) -> None:
@@ -141,12 +167,12 @@ def _save_entries(entries: list[dict[str, Any]], model_id: str | None = None, vo
     data = {
         "api_key_entries": cleaned,
         "api_keys": [entry["key"] for entry in cleaned],
-        "model_id": model_id or str(previous.get("model_id") or "gemini-2.5-flash-preview-tts"),
-        "voice_name": voice_name or str(previous.get("voice_name") or "Kore"),
+        "model_id": model_id or str(previous.get("model_id") or DEFAULT_MODEL),
+        "voice_name": voice_name or str(previous.get("voice_name") or DEFAULT_VOICE),
     }
     _write_json(SETTINGS_FILE, data)
-    apply_environment([entry["key"] for entry in cleaned if entry.get("enabled", True)], data["model_id"])
     _sync_state([entry["key"] for entry in cleaned])
+    apply_environment(ordered_keys(), data["model_id"])
 
 
 def save_config(keys: list[str] | list[dict[str, Any]], model_id: str, voice_name: str) -> None:
@@ -169,25 +195,19 @@ def append_keys(raw: str | Iterable[str], model_id: str, voice_name: str, replac
             if label:
                 by_key[key]["label"] = label[:80]
             continue
-        entry = {
-            "key": key,
-            "enabled": True,
-            "label": (label.strip() or f"المفتاح {len(entries) + 1}")[:80],
-            "added_at": int(time.time()),
-        }
+        entry = {"key": key, "enabled": True, "label": (label.strip() or f"المفتاح {len(entries) + 1}")[:80], "added_at": int(time.time())}
         entries.append(entry)
         by_key[key] = entry
     _save_entries(entries, model_id, voice_name)
     state = _sync_state([entry["key"] for entry in entries])
-    if entries and not state.get("active_fp"):
-        state["active_fp"] = fingerprint(entries[0]["key"])
-        state["cursor"] = 0
-        _write_json(STATE_FILE, state)
+    if entries and not state.get("selected_fp"):
+        state["selected_fp"] = fingerprint(entries[0]["key"])
+        _save_state(state)
     return [entry["key"] for entry in entries]
 
 
 def apply_environment(keys: list[str] | None = None, model_id: str | None = None) -> None:
-    keys = list(keys if keys is not None else load_keys(enabled_only=True))
+    keys = list(keys if keys is not None else ordered_keys())
     if keys:
         os.environ["GEMINI_API_KEYS"] = "||".join(keys)
         os.environ["GEMINI_API_KEY"] = keys[0]
@@ -198,82 +218,92 @@ def apply_environment(keys: list[str] | None = None, model_id: str | None = None
         os.environ["GEMINI_TTS_MODEL"] = model_id
 
 
-def _sync_state(keys: list[str]) -> dict[str, Any]:
-    state = _read_json(STATE_FILE)
-    fingerprints = [fingerprint(key) for key in keys]
-    records = state.get("records") if isinstance(state.get("records"), dict) else {}
-    records = {fp: records.get(fp, {}) for fp in fingerprints}
-    cursor = int(state.get("cursor", 0) or 0)
-    active_fp = str(state.get("active_fp") or "")
-    if active_fp not in fingerprints:
-        active_fp = fingerprints[0] if fingerprints else ""
-    state = {
-        "cursor": cursor % max(1, len(keys)),
-        "active_fp": active_fp,
-        "records": records,
-        "updated_at": int(time.time()),
-    }
-    _write_json(STATE_FILE, state)
-    return state
+def _entry_by_id(key_id: str) -> tuple[int, dict[str, Any]]:
+    entries = load_entries()
+    for index, entry in enumerate(entries):
+        if fingerprint(entry["key"]) == key_id:
+            return index, entry
+    raise KeyError("key_not_found")
 
 
 def set_key_enabled(key_id: str, enabled: bool) -> dict[str, Any]:
     entries = load_entries()
-    target = next((entry for entry in entries if fingerprint(entry["key"]) == key_id), None)
-    if not target:
-        raise KeyError("key_not_found")
-    target["enabled"] = bool(enabled)
+    index, _ = _entry_by_id(key_id)
+    entries[index]["enabled"] = bool(enabled)
     data = load_config()
-    _save_entries(entries, str(data.get("model_id") or "gemini-2.5-flash-preview-tts"), str(data.get("voice_name") or "Kore"))
-    state = _sync_state([entry["key"] for entry in entries])
-    if not enabled and state.get("active_fp") == key_id:
-        next_enabled = next((entry for entry in entries if entry.get("enabled", True)), None)
-        state["active_fp"] = fingerprint(next_enabled["key"]) if next_enabled else ""
-        _write_json(STATE_FILE, state)
-    apply_environment(load_keys(enabled_only=True), str(data.get("model_id") or ""))
-    return key_status_by_id(key_id)
-
-
-def set_active_key(key_id: str) -> dict[str, Any]:
-    entries = load_entries()
-    target_index = next((i for i, entry in enumerate(entries) if fingerprint(entry["key"]) == key_id), None)
-    if target_index is None:
-        raise KeyError("key_not_found")
-    entries[target_index]["enabled"] = True
-    data = load_config()
-    _save_entries(entries, str(data.get("model_id") or "gemini-2.5-flash-preview-tts"), str(data.get("voice_name") or "Kore"))
+    _save_entries(entries, str(data.get("model_id") or DEFAULT_MODEL), str(data.get("voice_name") or DEFAULT_VOICE))
     keys = [entry["key"] for entry in entries]
     state = _sync_state(keys)
-    state["active_fp"] = key_id
-    state["cursor"] = target_index
-    record = dict((state.get("records") or {}).get(key_id) or {})
-    record["cooldown_until"] = 0
-    state.setdefault("records", {})[key_id] = record
-    _write_json(STATE_FILE, state)
-    ordered = ordered_keys()
-    apply_environment(ordered, str(data.get("model_id") or ""))
+    if not enabled:
+        if state.get("selected_fp") == key_id:
+            state["selected_fp"] = ""
+        if state.get("active_fp") == key_id:
+            state["active_fp"] = ""
+    else:
+        record = dict((state.get("records") or {}).get(key_id) or {})
+        if record.get("status") in BLOCKED_STATUSES:
+            record["status"] = "untested"
+            record["detail"] = "تم تشغيل المفتاح ويحتاج اختبارًا صوتيًا."
+            record["checked_at"] = None
+            state.setdefault("records", {})[key_id] = record
+    _save_state(state)
+    apply_environment(ordered_keys(), str(data.get("model_id") or ""))
     return key_status_by_id(key_id)
+
+
+def set_selected_key(key_id: str) -> dict[str, Any]:
+    entries = load_entries()
+    index, _ = _entry_by_id(key_id)
+    entries[index]["enabled"] = True
+    data = load_config()
+    _save_entries(entries, str(data.get("model_id") or DEFAULT_MODEL), str(data.get("voice_name") or DEFAULT_VOICE))
+    state = _sync_state([entry["key"] for entry in entries])
+    state["selected_fp"] = key_id
+    record = dict((state.get("records") or {}).get(key_id) or {})
+    state["active_fp"] = key_id if record.get("status") == "working" else ""
+    _save_state(state)
+    apply_environment(ordered_keys(), str(data.get("model_id") or ""))
+    return key_status_by_id(key_id)
+
+
+set_active_key = set_selected_key
+
+
+def delete_key(key_id: str) -> None:
+    entries = load_entries()
+    index, _ = _entry_by_id(key_id)
+    entries.pop(index)
+    data = load_config()
+    _save_entries(entries, str(data.get("model_id") or DEFAULT_MODEL), str(data.get("voice_name") or DEFAULT_VOICE))
+    state = _sync_state([entry["key"] for entry in entries])
+    if state.get("selected_fp") == key_id:
+        state["selected_fp"] = ""
+    if state.get("active_fp") == key_id:
+        state["active_fp"] = ""
+    _save_state(state)
+    apply_environment(ordered_keys(), str(data.get("model_id") or ""))
 
 
 def ordered_keys() -> list[str]:
     entries = [entry for entry in load_entries() if entry.get("enabled", True)]
     if not entries:
         return []
-    all_keys = [entry["key"] for entry in load_entries()]
+    all_entries = load_entries()
+    all_keys = [entry["key"] for entry in all_entries]
     state = _sync_state(all_keys)
-    active_fp = str(state.get("active_fp") or "")
-    active = next((entry for entry in entries if fingerprint(entry["key"]) == active_fp), None)
-    remaining = [entry for entry in entries if entry is not active]
-    ordered_entries = ([active] if active else []) + remaining
-    now = time.time()
-    ready: list[str] = []
-    cooling: list[str] = []
+    selected_fp = str(state.get("selected_fp") or "")
     records = state.get("records", {})
+    selected = next((entry for entry in entries if fingerprint(entry["key"]) == selected_fp), None)
+    remaining = [entry for entry in entries if entry is not selected]
+    ordered_entries = ([selected] if selected else []) + remaining
+    eligible: list[str] = []
     for entry in ordered_entries:
         key = entry["key"]
-        cooldown_until = float((records.get(fingerprint(key)) or {}).get("cooldown_until", 0) or 0)
-        (ready if cooldown_until <= now else cooling).append(key)
-    return ready + cooling
+        status = str((records.get(fingerprint(key)) or {}).get("status") or "untested")
+        if status in BLOCKED_STATUSES:
+            continue
+        eligible.append(key)
+    return eligible
 
 
 def record_result(key: str, status: str, detail: str = "") -> None:
@@ -284,32 +314,25 @@ def record_result(key: str, status: str, detail: str = "") -> None:
     state = _sync_state(all_keys)
     fp = fingerprint(key)
     record = dict((state.get("records") or {}).get(fp) or {})
-    now = time.time()
-    record.update({"status": status, "detail": detail[:300], "checked_at": int(now)})
-    if status == "working":
-        record["cooldown_until"] = 0
-        # Sticky behaviour: keep the successful key active until it fails or is paused.
-        state["active_fp"] = fp
-        state["cursor"] = all_keys.index(key)
-    elif status == "quota":
-        record["cooldown_until"] = int(now + 60)
-        enabled = [entry for entry in entries if entry.get("enabled", True) and entry["key"] != key]
-        if enabled:
-            next_entry = enabled[0]
-            state["active_fp"] = fingerprint(next_entry["key"])
-            state["cursor"] = all_keys.index(next_entry["key"])
-    elif status in {"invalid", "forbidden"}:
-        record["cooldown_until"] = int(now + 600)
-        enabled = [entry for entry in entries if entry.get("enabled", True) and entry["key"] != key]
-        if enabled:
-            next_entry = enabled[0]
-            state["active_fp"] = fingerprint(next_entry["key"])
-            state["cursor"] = all_keys.index(next_entry["key"])
-    else:
-        record["cooldown_until"] = int(now + 20)
+    record.update({"status": status, "detail": detail[:500], "checked_at": int(time.time())})
     state.setdefault("records", {})[fp] = record
-    state["updated_at"] = int(now)
-    _write_json(STATE_FILE, state)
+    if status == "working":
+        state["selected_fp"] = fp
+        state["active_fp"] = fp
+    else:
+        if state.get("active_fp") == fp:
+            state["active_fp"] = ""
+        if status in BLOCKED_STATUSES:
+            next_working = next((entry for entry in entries if entry.get("enabled", True) and entry["key"] != key and str((state.get("records", {}).get(fingerprint(entry["key"])) or {}).get("status")) == "working"), None)
+            if next_working:
+                next_fp = fingerprint(next_working["key"])
+                state["selected_fp"] = next_fp
+                state["active_fp"] = next_fp
+            elif state.get("selected_fp") == fp:
+                state["selected_fp"] = ""
+    _save_state(state)
+    data = load_config()
+    apply_environment(ordered_keys(), str(data.get("model_id") or ""))
 
 
 def key_status_by_id(key_id: str) -> dict[str, Any]:
@@ -322,23 +345,31 @@ def key_status_by_id(key_id: str) -> dict[str, Any]:
 def key_statuses() -> list[dict[str, Any]]:
     entries = load_entries()
     keys = [entry["key"] for entry in entries]
-    state = _sync_state(keys) if keys else {"records": {}, "active_fp": ""}
+    state = _sync_state(keys) if keys else {"records": {}, "selected_fp": "", "active_fp": ""}
     records = state.get("records", {})
+    selected_fp = str(state.get("selected_fp") or "")
     active_fp = str(state.get("active_fp") or "")
     result: list[dict[str, Any]] = []
     for number, entry in enumerate(entries, start=1):
         key = entry["key"]
         fp = fingerprint(key)
         record = dict(records.get(fp) or {})
+        status = str(record.get("status") or "untested")
+        enabled = bool(entry.get("enabled", True))
+        working = status == "working"
         result.append({
             "id": fp,
             "number": number,
             "label": entry.get("label") or f"المفتاح {number}",
             "masked": masked_key(key, number),
-            "enabled": bool(entry.get("enabled", True)),
-            "active": fp == active_fp and bool(entry.get("enabled", True)),
-            "status": record.get("status", "untested"),
+            "enabled": enabled,
+            "selected": fp == selected_fp and enabled,
+            "active": fp == active_fp and enabled and working,
+            "usable": enabled and status not in BLOCKED_STATUSES,
+            "working": working,
+            "status": status,
             "detail": record.get("detail", ""),
             "checked_at": record.get("checked_at"),
+            "added_at": entry.get("added_at"),
         })
     return result
