@@ -7,8 +7,6 @@ logger = get_logger("tts_registry")
 
 
 class TTSRegistry:
-    """سجل موحد لجميع محركات TTS - يكتشف ويختار المحرك المتاح تلقائياً"""
-
     def __init__(self):
         self.plugins: Dict[str, Any] = {}
         self.priority = ENGINE_PRIORITY
@@ -35,13 +33,7 @@ class TTSRegistry:
         for name, plugin in self.plugins.items():
             try:
                 if plugin.check():
-                    available.append({
-                        "name": plugin.name,
-                        "label": plugin.label,
-                        "installed": True,
-                        "models": plugin.list_models(),
-                        "voices": plugin.list_voices(),
-                    })
+                    available.append({"name": plugin.name, "label": plugin.label, "installed": True, "models": plugin.list_models(), "voices": plugin.list_voices()})
             except Exception as exc:
                 logger.warning(f"Error checking {name}: {exc}")
         return available
@@ -54,10 +46,7 @@ class TTSRegistry:
             if not plugin:
                 continue
             try:
-                if not plugin.check():
-                    continue
-                models = plugin.list_models()
-                if any(model.get("downloaded") for model in models):
+                if plugin.check() and any(model.get("downloaded") for model in plugin.list_models()):
                     logger.info(f"Auto-selected engine: {name}")
                     return name
             except Exception as exc:
@@ -68,8 +57,8 @@ class TTSRegistry:
     def initialize(self) -> None:
         if self._initialized:
             return
-
         plugin_specs = [
+            ("gemini", "backend.plugins.gemini_tts_plugin", "GeminiTTSPlugin"),
             ("elevenlabs", "backend.plugins.elevenlabs_plugin", "ElevenLabsPlugin"),
             ("edge", "backend.plugins.edge_plugin", "EdgeTTSPlugin"),
             ("piper", "backend.plugins.piper_plugin", "PiperPlugin"),
@@ -81,15 +70,11 @@ class TTSRegistry:
         for name, module_name, class_name in plugin_specs:
             try:
                 module = __import__(module_name, fromlist=[class_name])
-                plugin_class = getattr(module, class_name)
-                self.register(name, plugin_class())
+                self.register(name, getattr(module, class_name)())
             except Exception as exc:
                 logger.warning(f"Failed to register {name}: {exc}")
-
         self._initialized = True
-        logger.info(
-            f"TTS Registry initialized with {len(self.plugins)} plugins: {list(self.plugins.keys())}"
-        )
+        logger.info(f"TTS Registry initialized with {len(self.plugins)} plugins: {list(self.plugins.keys())}")
 
 
 tts_registry = TTSRegistry()
