@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 PLUGIN_NAME = "Audio Effects Pro"
 PLUGIN_DESCRIPTION = "تنقية وتحسين وضغط وصدى ودفء ووضوح للصوت العربي"
 
@@ -34,22 +36,73 @@ def get_presets() -> Dict[str, Dict[str, Any]]:
     return PRESETS
 
 
+def _ffmpeg_executable() -> str | None:
+    executable = shutil.which("ffmpeg")
+    if executable:
+        return executable
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
 def _audio_segment():
     from pydub import AudioSegment
 
-    if not shutil.which("ffmpeg"):
-        try:
-            import imageio_ffmpeg
-            AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
-        except Exception:
-            pass
+    executable = _ffmpeg_executable()
+    if executable:
+        AudioSegment.converter = executable
     return AudioSegment
 
 
 def _load_audio(path: str):
+    """Load audio without requiring a separate ffprobe executable.
+
+    imageio-ffmpeg bundles ffmpeg but not ffprobe. Pydub normally calls ffprobe
+    for compressed files, so decode them to a temporary WAV first.
+    """
     AudioSegment = _audio_segment()
-    extension = Path(path).suffix.lower().lstrip(".") or None
-    return AudioSegment.from_file(path, format=extension)
+    source = Path(path)
+    extension = source.suffix.lower()
+    if extension == ".wav":
+        return AudioSegment.from_wav(str(source))
+
+    executable = _ffmpeg_executable()
+    if not executable:
+        raise RuntimeError("FFmpeg غير متوفر. ثبّت imageio-ffmpeg أو ffmpeg.")
+
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+            temp_path = Path(temp_file.name)
+        completed = subprocess.run(
+            [
+                executable,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(source),
+                "-vn",
+                "-acodec",
+                "pcm_s16le",
+                str(temp_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        if completed.returncode != 0:
+            detail = (completed.stderr or "تعذر فك ترميز الملف الصوتي").strip()
+            raise RuntimeError(detail)
+        return AudioSegment.from_wav(str(temp_path))
+    finally:
+        if temp_path:
+            temp_path.unlink(missing_ok=True)
 
 
 def _pitch_shift(audio, semitones: float):
@@ -88,6 +141,7 @@ def edit_audio(input_path: str, output_path: str, trim_start_ms: int = None, tri
             audio = audio[start:]
         if end:
             audio = audio[:-end] if end < len(audio) else audio[:0]
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         audio.export(output_path, format="wav")
         return True
     except Exception as exc:
