@@ -1,5 +1,5 @@
 #define MyAppName "استوديو ابن الواقدي"
-#define MyAppVersion "2.9.0"
+#define MyAppVersion "3.0.0"
 #define MyAppPublisher "ابن الواقدي"
 #define MyAppExeName "VoiceAIStudioArabic.exe"
 
