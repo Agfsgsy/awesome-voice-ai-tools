@@ -1,8 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-block_cipher = None
-
 datas = [("frontend", "frontend")]
 binaries = []
 hiddenimports = collect_submodules("backend.plugins")
@@ -36,7 +34,7 @@ a = Analysis(
     noarchive=False,
     optimize=1,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
