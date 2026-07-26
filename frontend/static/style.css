@@ -1,0 +1,21 @@
+* { font-family: 'Cairo', sans-serif; }
+body.dark { background: #0f0f1a; color: #e0e0e0; }
+body.light { background: #f0f0f5; color: #1a1a2e; }
+
+.dark .card { background: #1a1a2e; border: 1px solid #2a2a4a; }
+.light .card { background: #ffffff; border: 1px solid #e2e8f0; }
+.card { border-radius: 12px; }
+
+.btn-primary { background: linear-gradient(135deg, #0f6b6b, #0d9488); transition: all 0.3s; color: white; }
+.btn-primary:hover { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+
+.dark .nav-item.active { background: rgba(13, 148, 136, 0.15); border-right: 3px solid #0d9488; }
+.light .nav-item.active { background: rgba(13, 148, 136, 0.15); border-right: 3px solid #0d9488; font-weight: bold; }
+
+.dark input, .dark textarea, .dark select { background: #16213e; border: 1px solid #2a2a4a; color: #e0e0e0; }
+.light input, .light textarea, .light select { background: #ffffff; border: 1px solid #cbd5e1; color: #1e293b; }
+input:focus, textarea:focus, select:focus { border-color: #0d9488; outline: none; }
+
+audio { width: 100%; }
+.loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #0d9488; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
