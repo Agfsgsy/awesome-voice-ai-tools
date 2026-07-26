@@ -11,14 +11,8 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.routes import router
 from backend.api.human_pro_routes import router as human_pro_router
-from backend.core.config import (
-    APP_DEBUG,
-    APP_HOST,
-    APP_NAME,
-    APP_PORT,
-    APP_VERSION,
-    FRONTEND_DIR,
-)
+from backend.api.gemini_routes import router as gemini_router
+from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
 
 logger = get_logger("main")
@@ -33,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=APP_NAME,
-    description="استوديو عربي لتوليد الصوت ومعالجته محليًا عبر واجهة سطح مكتب.",
+    description="استوديو عربي لتوليد الصوت ومعالجته عبر Gemini وElevenLabs والمحركات المجانية.",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -49,6 +43,7 @@ app.add_middleware(
 )
 app.include_router(router)
 app.include_router(human_pro_router)
+app.include_router(gemini_router)
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
@@ -58,10 +53,4 @@ if static_dir.exists():
 if __name__ == "__main__":
     logger.info("Running on http://%s:%s", APP_HOST, APP_PORT)
     target = app if getattr(sys, "frozen", False) else "main:app"
-    uvicorn.run(
-        target,
-        host=APP_HOST,
-        port=APP_PORT,
-        reload=APP_DEBUG and not getattr(sys, "frozen", False),
-        log_level="info",
-    )
+    uvicorn.run(target, host=APP_HOST, port=APP_PORT, reload=APP_DEBUG and not getattr(sys, "frozen", False), log_level="info")
