@@ -13,7 +13,7 @@ from backend.core.config import CONFIG_DIR
 SETTINGS_FILE = CONFIG_DIR / "gemini.json"
 STATE_FILE = CONFIG_DIR / "gemini_key_state.json"
 KEY_RE = re.compile(r"AIza[0-9A-Za-z_-]{20,}")
-BLOCKED = {"quota", "invalid", "forbidden"}
+BLOCKED = {"quota", "invalid", "forbidden", "model_unavailable", "no_audio"}
 DEFAULT_MODEL = "gemini-2.5-flash-preview-tts"
 DEFAULT_VOICE = "Kore"
 
@@ -89,7 +89,7 @@ def load_entries() -> list[dict[str, Any]]:
         key = keys[0]
         seen.add(key)
         result.append({"key": key, "enabled": bool(item.get("enabled", True)), "label": str(item.get("label") or f"المفتاح {index}")[:80], "added_at": int(item.get("added_at") or time.time())})
-    return result or _legacy_entries(data)
+    return result
 
 
 def load_keys(enabled_only: bool = False) -> list[str]:
