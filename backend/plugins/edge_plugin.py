@@ -1,11 +1,14 @@
 """Microsoft Edge neural TTS plugin with Arabic voices and sermon profiles."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
+import shutil
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from backend.core.config import OUTPUTS_DIR
+from backend.core.config import CACHE_DIR, OUTPUTS_DIR
 from backend.core.logger import get_logger
 from backend.plugins.tts_plugin_base import TTSPluginBase
 
@@ -58,15 +61,17 @@ class EdgeTTSPlugin(TTSPluginBase):
     }
 
     PROFILES = {
-        "natural": {"label": "طبيعي بشري", "rate": -1, "pitch": 0, "volume": 2},
-        "sermon_calm": {"label": "واعظ هادئ", "rate": -12, "pitch": -2, "volume": 4},
-        "sermon_powerful": {"label": "خطيب قوي", "rate": -7, "pitch": -5, "volume": 18},
-        "dua_emotional": {"label": "دعاء مؤثر", "rate": -18, "pitch": 0, "volume": -2},
-        "documentary": {"label": "وثائقي رزين", "rate": -6, "pitch": -3, "volume": 7},
-        "energetic": {"label": "حماسي", "rate": 8, "pitch": 2, "volume": 10},
+        "natural": {"label": "طبيعي بشري", "rate": -1, "pitch": 0, "volume": 2, "pause": 180},
+        "sermon_calm": {"label": "واعظ هادئ", "rate": -12, "pitch": -2, "volume": 4, "pause": 330},
+        "sermon_powerful": {"label": "خطيب قوي", "rate": -7, "pitch": -5, "volume": 16, "pause": 260},
+        "dua_emotional": {"label": "دعاء مؤثر", "rate": -18, "pitch": 0, "volume": -2, "pause": 420},
+        "documentary": {"label": "وثائقي رزين", "rate": -6, "pitch": -3, "volume": 7, "pause": 230},
+        "energetic": {"label": "حماسي", "rate": 8, "pitch": 2, "volume": 10, "pause": 130},
     }
 
     DEFAULT_BY_LANGUAGE = {"ar": "ar-SA-HamedNeural", "en": "en-US-GuyNeural"}
+    MAX_TEXT_LENGTH = 5000
+    MAX_CHUNK_LENGTH = 850
 
     def check(self) -> bool:
         try:
@@ -106,26 +111,138 @@ class EdgeTTSPlugin(TTSPluginBase):
 
     @staticmethod
     def _prepare_text(text: str) -> str:
-        """تنسيق الفقرات وعلامات الوقف لإلقاء عربي أكثر طبيعية."""
+        """Normalize spacing and punctuation for steadier Arabic delivery."""
         text = text.replace("\r\n", "\n").replace("\r", "\n")
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\s*([،؛:؟!.…])\s*", r"\1 ", text)
+        text = re.sub(r"([؟!.…]){2,}", r"\1", text)
         paragraphs: List[str] = []
         for raw in re.split(r"\n+", text):
-            paragraph = re.sub(r"[ \t]+", " ", raw).strip()
+            paragraph = raw.strip()
             if not paragraph:
                 continue
-            paragraph = re.sub(r"\s*([،؛:؟!.…])\s*", r"\1 ", paragraph).strip()
             if paragraph[-1] not in "؟!.…":
                 paragraph += "."
             paragraphs.append(paragraph)
         return "\n\n".join(paragraphs)
 
+    @classmethod
+    def _hard_split(cls, text: str) -> List[str]:
+        """Split an oversized sentence at commas and finally at word boundaries."""
+        pieces: List[str] = []
+        current = ""
+        for part in re.split(r"(?<=[،؛:])\s+", text):
+            candidate = f"{current} {part}".strip()
+            if current and len(candidate) > cls.MAX_CHUNK_LENGTH:
+                pieces.append(current)
+                current = part
+            else:
+                current = candidate
+        if current:
+            pieces.append(current)
+
+        final: List[str] = []
+        for piece in pieces:
+            if len(piece) <= cls.MAX_CHUNK_LENGTH:
+                final.append(piece)
+                continue
+            current_words: List[str] = []
+            current_length = 0
+            for word in piece.split():
+                extra = len(word) + (1 if current_words else 0)
+                if current_words and current_length + extra > cls.MAX_CHUNK_LENGTH:
+                    final.append(" ".join(current_words))
+                    current_words = [word]
+                    current_length = len(word)
+                else:
+                    current_words.append(word)
+                    current_length += extra
+            if current_words:
+                final.append(" ".join(current_words))
+        return final
+
+    @classmethod
+    def _split_text(cls, text: str, paragraph_pause: int) -> List[Tuple[str, int]]:
+        chunks: List[Tuple[str, int]] = []
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        for paragraph_index, paragraph in enumerate(paragraphs):
+            sentences = [s.strip() for s in re.split(r"(?<=[؟!.…؛])\s+", paragraph) if s.strip()]
+            expanded: List[str] = []
+            for sentence in sentences:
+                expanded.extend(cls._hard_split(sentence) if len(sentence) > cls.MAX_CHUNK_LENGTH else [sentence])
+
+            current = ""
+            for sentence in expanded:
+                candidate = f"{current} {sentence}".strip()
+                if current and len(candidate) > cls.MAX_CHUNK_LENGTH:
+                    chunks.append((current, 120))
+                    current = sentence
+                else:
+                    current = candidate
+            if current:
+                is_last_paragraph = paragraph_index == len(paragraphs) - 1
+                chunks.append((current, 0 if is_last_paragraph else paragraph_pause))
+        return chunks
+
     @staticmethod
     def _friendly_error(exc: Exception) -> str:
         raw = str(exc)
         lowered = raw.lower()
-        if any(token in lowered for token in ("getaddrinfo", "cannot connect", "speech.platform.bing.com", "ssl")):
+        if any(token in lowered for token in ("getaddrinfo", "cannot connect", "speech.platform.bing.com", "ssl", "timed out")):
             return "تعذر الاتصال بخدمة الصوت العصبي. افحص الإنترنت أو DNS أو VPN ثم أعد المحاولة."
         return f"فشل إنشاء الصوت: {raw}"
+
+    @staticmethod
+    def _configure_ffmpeg() -> None:
+        if shutil.which("ffmpeg"):
+            return
+        try:
+            import imageio_ffmpeg
+            from pydub import AudioSegment
+            AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            return
+
+    @staticmethod
+    async def _generate_part(edge_tts, text: str, filepath: Path, voice: str, rate: int, pitch: int, volume: int) -> None:
+        if filepath.exists() and filepath.stat().st_size > 0:
+            return
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                communication = edge_tts.Communicate(
+                    text=text,
+                    voice=voice,
+                    rate=f"{rate:+d}%",
+                    pitch=f"{pitch:+d}Hz",
+                    volume=f"{volume:+d}%",
+                )
+                await communication.save(str(filepath))
+                if filepath.exists() and filepath.stat().st_size > 0:
+                    return
+                raise RuntimeError("لم تُنشأ بيانات صوتية.")
+            except Exception as exc:
+                last_error = exc
+                if filepath.exists():
+                    filepath.unlink(missing_ok=True)
+                if attempt < 2:
+                    await asyncio.sleep(1.2 * (2 ** attempt))
+        raise last_error or RuntimeError("فشل إنشاء الجزء الصوتي.")
+
+    @classmethod
+    def _merge_parts(cls, parts: List[Tuple[Path, int]], output_path: Path) -> None:
+        if len(parts) == 1 and parts[0][1] == 0:
+            shutil.copyfile(parts[0][0], output_path)
+            return
+        cls._configure_ffmpeg()
+        from pydub import AudioSegment
+
+        combined = AudioSegment.empty()
+        for part_path, pause_ms in parts:
+            combined += AudioSegment.from_file(str(part_path), format="mp3")
+            if pause_ms:
+                combined += AudioSegment.silent(duration=pause_ms, frame_rate=24000)
+        combined.export(str(output_path), format="mp3", bitrate="192k")
 
     async def generate(self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
         if not self.check():
@@ -133,40 +250,50 @@ class EdgeTTSPlugin(TTSPluginBase):
         text = self._prepare_text((text or "").strip())
         if not text:
             return {"success": False, "engine": self.name, "message": "النص فارغ."}
-        if len(text) > 5000:
-            return {"success": False, "engine": self.name, "message": "النص أطول من 5000 حرف."}
+        if len(text) > self.MAX_TEXT_LENGTH:
+            return {"success": False, "engine": self.name, "message": f"النص أطول من {self.MAX_TEXT_LENGTH} حرف."}
         if not 0.5 <= speed <= 2.0:
             return {"success": False, "engine": self.name, "message": "السرعة يجب أن تكون بين 0.5 و2.0."}
 
         import edge_tts
 
         selected_voice, profile_name = self._parse_voice_profile(voice, language)
+        if selected_voice not in self.VOICES:
+            return {"success": False, "engine": self.name, "message": "الصوت المحدد غير موجود في قائمة الأصوات المدعومة."}
+
         profile = self.PROFILES[profile_name]
         rate = max(-50, min(100, round((speed - 1.0) * 100) + profile["rate"]))
-        pitch = profile["pitch"]
-        volume = profile["volume"]
+        pitch = int(profile["pitch"])
+        volume = int(profile["volume"])
+        chunks = self._split_text(text, int(profile["pause"]))
         digest = hashlib.sha256(
             f"{selected_voice}|{profile_name}|{rate}|{pitch}|{volume}|{text}".encode("utf-8")
         ).hexdigest()[:16]
         filepath = OUTPUTS_DIR / f"edge_{profile_name}_{digest}.mp3"
+        parts_dir = CACHE_DIR / "edge_parts"
+        parts_dir.mkdir(parents=True, exist_ok=True)
+
         try:
-            if not filepath.exists():
-                communication = edge_tts.Communicate(
-                    text=text,
-                    voice=selected_voice,
-                    rate=f"{rate:+d}%",
-                    pitch=f"{pitch:+d}Hz",
-                    volume=f"{volume:+d}%",
-                )
-                await communication.save(str(filepath))
+            if not filepath.exists() or filepath.stat().st_size == 0:
+                generated_parts: List[Tuple[Path, int]] = []
+                for index, (chunk, pause_ms) in enumerate(chunks):
+                    part_hash = hashlib.sha256(
+                        f"{selected_voice}|{profile_name}|{rate}|{pitch}|{volume}|{chunk}".encode("utf-8")
+                    ).hexdigest()[:16]
+                    part_path = parts_dir / f"{index:03d}_{part_hash}.mp3"
+                    await self._generate_part(edge_tts, chunk, part_path, selected_voice, rate, pitch, volume)
+                    generated_parts.append((part_path, pause_ms))
+                await asyncio.to_thread(self._merge_parts, generated_parts, filepath)
+
             return {
                 "success": True,
                 "engine": self.name,
                 "voice": selected_voice,
                 "profile": profile_name,
+                "segments": len(chunks),
                 "file": str(filepath),
                 "url": f"/api/downloads/{filepath.name}",
-                "message": f"تم إنشاء الصوت: {profile['label']}.",
+                "message": f"تم إنشاء الصوت: {profile['label']}، مع {len(chunks)} مقطع منسق.",
             }
         except Exception as exc:
             logger.exception("Edge TTS generation failed")
