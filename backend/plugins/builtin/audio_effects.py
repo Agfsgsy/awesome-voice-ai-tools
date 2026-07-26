@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
-__version__ = "2.9.0"
+__version__ = "3.0.0"
 PLUGIN_NAME = "Audio Effects Pro"
 PLUGIN_DESCRIPTION = "تنقية وماسترينغ وضغط ودفء ووضوح وصدى احترافي للصوت العربي"
 
@@ -25,6 +25,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
     "radio": {"label": "إذاعي قوي", "filters": ["highpass=f=100", "lowpass=f=9000", "equalizer=f=2500:t=q:w=0.9:g=2.8", "acompressor=threshold=-25dB:ratio=5:attack=3:release=80:makeup=4", "loudnorm=I=-13:TP=-0.8:LRA=4"]},
     "podcast": {"label": "بودكاست احترافي", "filters": ["highpass=f=72", "lowpass=f=15000", "equalizer=f=140:t=q:w=1:g=1.2", "equalizer=f=3200:t=q:w=1:g=1.4", "acompressor=threshold=-22dB:ratio=3:attack=9:release=140:makeup=2", "loudnorm=I=-16:TP=-1.2:LRA=6"]},
     "podcast_ultra": {"label": "بودكاست بشري فائق", "filters": ["highpass=f=62", "lowpass=f=15800", "equalizer=f=115:t=q:w=0.9:g=1.6", "equalizer=f=420:t=q:w=1.0:g=-0.7", "equalizer=f=2850:t=q:w=1.1:g=1.7", "equalizer=f=7600:t=q:w=1.3:g=0.6", "acompressor=threshold=-24dB:ratio=2.6:attack=14:release=190:makeup=2.1", "dynaudnorm=f=250:g=7:p=0.85", "loudnorm=I=-15:TP=-1.0:LRA=7"]},
+    "podcast_truth": {"label": "True Podcast - طبيعي بلا صدى", "filters": ["highpass=f=55", "lowpass=f=17000", "equalizer=f=120:t=q:w=0.9:g=0.9", "equalizer=f=360:t=q:w=1.0:g=-0.5", "equalizer=f=2900:t=q:w=1.1:g=1.1", "equalizer=f=6800:t=q:w=1.3:g=0.35", "acompressor=threshold=-24dB:ratio=2.0:attack=24:release=230:makeup=1.25", "alimiter=limit=0.94:attack=8:release=90", "loudnorm=I=-16:TP=-1.2:LRA=8"]},
     "echo": {"label": "صدى واضح", "filters": ["aecho=0.8:0.6:220|440|660:0.18|0.09|0.045", "loudnorm=I=-17:TP=-1.5:LRA=8"]},
     "video_commentary": {"label": "تعليق فيديو قوي", "filters": ["highpass=f=78", "lowpass=f=14500", "equalizer=f=3000:t=q:w=1:g=2", "acompressor=threshold=-23dB:ratio=3.8:attack=5:release=100:makeup=2.8", "loudnorm=I=-14:TP=-0.9:LRA=5"]},
 }
