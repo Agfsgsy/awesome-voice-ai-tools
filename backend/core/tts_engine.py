@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from backend.core.config import GEMINI_API_KEY, GEMINI_TTS_MODEL, OUTPUTS_DIR
+from backend.core.config import GEMINI_API_KEY, GEMINI_TTS_MODEL, OUTPUTS_DIR, UPLOADS_DIR
 from backend.core.logger import get_logger
 
 logger = get_logger("tts_engine")
@@ -308,7 +308,7 @@ class TTSEngine:
         language: str = "ar",
     ) -> Dict[str, Any]:
         reference = Path(reference_audio_path).resolve()
-        uploads_root = Path("data/uploads").resolve()
+        uploads_root = UPLOADS_DIR.resolve()
         if not reference.exists() or not reference.is_file():
             return self._failure(engine, "ملف الصوت المرجعي غير موجود.")
         if uploads_root not in reference.parents:
