@@ -17,6 +17,7 @@ from backend.api.studio_pro_routes import router as studio_pro_router
 from backend.api.producer_routes import router as producer_router
 from backend.api.interview_pro_routes import router as interview_pro_router
 from backend.api.dialogue_ultra_routes import router as dialogue_ultra_router
+from backend.api import dialogue_audio_runtime as _dialogue_audio_runtime
 from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
 
