@@ -1,8 +1,4 @@
-"""Professional dashboard endpoints for Ibn Al-Waqadi Studio.
-
-This module is additive. It exposes sanitized local status information and a safe
-command to open the desktop exports folder from the Windows application.
-"""
+"""Professional dashboard endpoints for Ibn Al-Waqadi Studio."""
 from __future__ import annotations
 
 import json
@@ -16,7 +12,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.api.studio_pro_routes import _desktop_exports
 from backend.core.config import APP_NAME, APP_VERSION, CONFIG_DIR
-from backend.core.gemini_key_pool import key_statuses, load_keys
+from backend.core.gemini_key_pool import key_statuses
 from backend.core.tts_registry import tts_registry
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -40,19 +36,16 @@ def _recent_exports(limit: int = 6) -> tuple[int, list[dict[str, Any]]]:
     recent: list[dict[str, Any]] = []
     for item in files[:limit]:
         stat = item.stat()
-        recent.append({
-            "name": item.name,
-            "size_mb": round(stat.st_size / (1024 * 1024), 2),
-            "modified": int(stat.st_mtime),
-        })
+        recent.append({"name": item.name, "size_mb": round(stat.st_size / (1024 * 1024), 2), "modified": int(stat.st_mtime)})
     return len(files), recent
 
 
 @router.get("/status")
 async def dashboard_status():
-    keys = load_keys()
     statuses = key_statuses()
-    working = sum(1 for item in statuses if item.get("status") == "working")
+    active = next((item for item in statuses if item.get("active")), None)
+    working = sum(1 for item in statuses if item.get("working"))
+    enabled = sum(1 for item in statuses if item.get("enabled"))
     quota = sum(1 for item in statuses if item.get("status") == "quota")
     untested = sum(1 for item in statuses if item.get("status") in {None, "", "untested"})
 
@@ -71,10 +64,14 @@ async def dashboard_status():
         "success": True,
         "app": {"name": APP_NAME, "version": APP_VERSION},
         "gemini": {
-            "count": len(keys),
+            "count": len(statuses),
+            "enabled": enabled,
             "working": working,
             "quota": quota,
             "untested": untested,
+            "active": bool(active),
+            "active_id": active.get("id", "") if active else "",
+            "active_label": active.get("label", "") if active else "",
             "statuses": statuses,
         },
         "elevenlabs": {
@@ -82,11 +79,7 @@ async def dashboard_status():
             "dialogue_voices": sum(1 for key, value in dialogue.items() if key.endswith("_voice_id") and str(value).strip()),
         },
         "engines": available_engines,
-        "exports": {
-            "path": str(_desktop_exports()),
-            "count": export_count,
-            "recent": recent,
-        },
+        "exports": {"path": str(_desktop_exports()), "count": export_count, "recent": recent},
     }
 
 
