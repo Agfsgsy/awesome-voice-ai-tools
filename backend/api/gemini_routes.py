@@ -1,9 +1,8 @@
-"""Gemini settings, persistent multi-key rotation, diagnostics, guided links and URL import."""
+"""Gemini settings, per-key controls, persistent rotation, diagnostics and URL import."""
 from __future__ import annotations
 
 import base64
 import ipaddress
-import json
 import socket
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -15,13 +14,16 @@ from pydantic import BaseModel, Field, HttpUrl
 from backend.core.gemini_key_pool import (
     append_keys,
     apply_environment,
+    key_status_by_id,
     key_statuses,
     load_config,
+    load_entries,
     load_keys,
-    masked_key,
     parse_keys,
     record_result,
     save_config,
+    set_active_key,
+    set_key_enabled,
 )
 
 router = APIRouter(prefix="/api/gemini", tags=["Gemini"])
@@ -47,6 +49,16 @@ class GeminiSettings(BaseModel):
     model_id: str = Field(default="gemini-2.5-flash-preview-tts", max_length=100)
     voice_name: str = Field(default="Kore", max_length=50)
     replace_existing: bool = False
+    label: str = Field(default="", max_length=80)
+
+
+class KeyAddRequest(BaseModel):
+    api_keys: str = Field(min_length=10, max_length=16000)
+    label: str = Field(default="", max_length=80)
+
+
+class KeyToggleRequest(BaseModel):
+    enabled: bool
 
 
 class UrlImportRequest(BaseModel):
@@ -77,7 +89,7 @@ class _TextExtractor(HTMLParser):
 
 def apply_saved_settings() -> None:
     data = load_config()
-    apply_environment(load_keys(), str(data.get("model_id", "")).strip() or None)
+    apply_environment(load_keys(enabled_only=True), str(data.get("model_id", "")).strip() or None)
 
 
 apply_saved_settings()
@@ -119,6 +131,68 @@ def _error_detail(response: httpx.Response) -> str:
     return response.text[:500]
 
 
+def _models() -> list[str]:
+    data = load_config()
+    preferred = str(data.get("model_id") or "gemini-2.5-flash-preview-tts")
+    return list(dict.fromkeys([preferred, "gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"]))
+
+
+async def _test_one(key: str, number: int = 1) -> dict:
+    outcome = {"number": number, "ok": False, "status": "failed", "model": "", "detail": ""}
+    async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=20.0)) as client:
+        for model in _models():
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            payload = {
+                "contents": [{"parts": [{"text": "اقرأ هذه العبارة فقط بصوت واضح: اختبار المفتاح."}]}],
+                "generationConfig": {
+                    "responseModalities": ["AUDIO"],
+                    "speechConfig": {"languageCode": "ar-XA", "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Kore"}}},
+                },
+            }
+            try:
+                response = await client.post(endpoint, headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload)
+                if response.status_code == 429:
+                    outcome.update(status="quota", detail="الحصة أو حد الطلبات غير متاح لهذا المفتاح حاليًا.")
+                    record_result(key, "quota", outcome["detail"])
+                    break
+                if response.status_code == 401:
+                    outcome.update(status="invalid", detail="المفتاح غير صحيح أو تم إلغاؤه.")
+                    record_result(key, "invalid", outcome["detail"])
+                    break
+                if response.status_code == 403:
+                    outcome.update(status="forbidden", detail="المفتاح موجود لكن الصلاحية أو المشروع أو المنطقة تمنع إنشاء الصوت.")
+                    record_result(key, "forbidden", outcome["detail"])
+                    break
+                if response.status_code in {400, 404}:
+                    outcome.update(status="model_unavailable", detail=f"النموذج {model} غير متاح لهذا المشروع.")
+                    continue
+                if response.status_code >= 400:
+                    outcome.update(status="failed", detail=_error_detail(response))
+                    continue
+                audio = _extract_audio(response.json())
+                if not audio:
+                    outcome.update(status="no_audio", detail=f"نجح الطلب على {model} لكنه لم يرجع صوتًا.")
+                    continue
+                outcome.update(ok=True, status="working", model=model, detail="تم إنشاء عينة صوتية فعلية بهذا المفتاح.")
+                record_result(key, "working", model)
+                break
+            except Exception as exc:
+                outcome.update(status="network", detail=f"تعذر الاتصال: {type(exc).__name__}")
+    return outcome
+
+
+def _key_payload() -> dict:
+    statuses = key_statuses()
+    return {
+        "success": True,
+        "total": len(statuses),
+        "enabled": sum(1 for item in statuses if item.get("enabled")),
+        "working": sum(1 for item in statuses if item.get("status") == "working"),
+        "active_id": next((item["id"] for item in statuses if item.get("active")), ""),
+        "keys": statuses,
+    }
+
+
 @router.get("/links")
 async def get_links():
     return LINKS
@@ -127,17 +201,22 @@ async def get_links():
 @router.get("/settings")
 async def get_settings():
     data = load_config()
-    keys = load_keys()
-    return {
-        "configured": bool(keys),
-        "key_count": len(keys),
-        "keys": [masked_key(key, index) for index, key in enumerate(keys, start=1)],
-        "statuses": key_statuses(),
+    payload = _key_payload()
+    payload.update({
+        "configured": bool(payload["total"]),
+        "key_count": payload["total"],
+        "statuses": payload["keys"],
         "model_id": data.get("model_id", "gemini-2.5-flash-preview-tts"),
         "voice_name": data.get("voice_name", "Kore"),
         "append_mode": True,
         "links": LINKS,
-    }
+    })
+    return payload
+
+
+@router.get("/keys")
+async def list_key_controls():
+    return _key_payload()
 
 
 @router.post("/settings")
@@ -150,82 +229,86 @@ async def save_settings(settings: GeminiSettings):
     if raw and not incoming:
         raise HTTPException(status_code=400, detail="لم أجد مفتاح Gemini كاملًا. الصق كل مفتاح كاملًا في سطر مستقل.")
     if incoming:
-        keys = append_keys(incoming, model_id, voice_name, replace=settings.replace_existing)
+        keys = append_keys(incoming, model_id, voice_name, replace=settings.replace_existing, label=settings.label)
     else:
+        entries = load_entries()
+        save_config(entries, model_id, voice_name)
         keys = load_keys()
-        save_config(keys, model_id, voice_name)
-    action = "استبدال" if settings.replace_existing else "إضافة"
-    return {
-        "success": True,
+    payload = _key_payload()
+    payload.update({
         "configured": bool(keys),
         "key_count": len(keys),
-        "keys": [masked_key(key, index) for index, key in enumerate(keys, start=1)],
-        "message": f"تمت {action} المفاتيح بنجاح. المحفوظ الآن {len(keys)} مفتاح Gemini، وسيجربها البرنامج واحدًا بعد الآخر.",
-    }
+        "message": f"تم حفظ المفاتيح. الإجمالي {payload['total']}، والمفعّل {payload['enabled']}. استخدم لوحة المفاتيح لتشغيل أو إيقاف أو اختيار أي مفتاح.",
+    })
+    return payload
+
+
+@router.post("/keys/add")
+async def add_keys(request: KeyAddRequest):
+    incoming = parse_keys(request.api_keys)
+    if not incoming:
+        raise HTTPException(status_code=400, detail="لم أجد مفتاح Gemini كاملًا.")
+    data = load_config()
+    append_keys(incoming, str(data.get("model_id") or "gemini-2.5-flash-preview-tts"), str(data.get("voice_name") or "Kore"), label=request.label)
+    payload = _key_payload()
+    payload["message"] = f"تمت إضافة {len(incoming)} مفتاح. الإجمالي الآن {payload['total']} والمفعّل {payload['enabled']}."
+    return payload
+
+
+@router.post("/keys/{key_id}/toggle")
+async def toggle_key(key_id: str, request: KeyToggleRequest):
+    try:
+        item = set_key_enabled(key_id, request.enabled)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="المفتاح غير موجود.")
+    payload = _key_payload()
+    payload["key"] = item
+    payload["message"] = "تم تشغيل المفتاح." if request.enabled else "تم إيقاف المفتاح ولن يستخدمه الاستوديو."
+    return payload
+
+
+@router.post("/keys/{key_id}/activate")
+async def activate_key(key_id: str):
+    try:
+        item = set_active_key(key_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="المفتاح غير موجود.")
+    payload = _key_payload()
+    payload["key"] = item
+    payload["message"] = "تم اختيار هذا المفتاح للاستخدام الآن. سيبقى نشطًا ما دام يعمل."
+    return payload
+
+
+@router.post("/keys/{key_id}/test")
+async def test_single_key(key_id: str):
+    entries = load_entries()
+    match = next(((index, entry) for index, entry in enumerate(entries, start=1) if key_status_by_id(key_id)["id"] == key_id and key_status_by_id(key_id)["number"] == index), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="المفتاح غير موجود.")
+    index, entry = match
+    outcome = await _test_one(entry["key"], index)
+    payload = _key_payload()
+    payload["result"] = outcome
+    payload["message"] = "المفتاح يعمل ويمكن تشغيله." if outcome["ok"] else f"نتيجة المفتاح: {outcome['status']} — {outcome['detail']}"
+    return payload
 
 
 @router.post("/test")
 async def test_keys():
-    keys = load_keys()
-    if not keys:
+    entries = load_entries()
+    if not entries:
         raise HTTPException(status_code=400, detail="احفظ مفتاح Gemini واحدًا على الأقل.")
-    data = load_config()
-    preferred = str(data.get("model_id") or "gemini-2.5-flash-preview-tts")
-    models = list(dict.fromkeys([preferred, "gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"]))
     results: list[dict] = []
-    async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=20.0)) as client:
-        for index, key in enumerate(keys, start=1):
-            outcome = {"number": index, "masked": masked_key(key, index), "ok": False, "status": "failed", "model": "", "detail": ""}
-            for model in models:
-                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-                payload = {
-                    "contents": [{"parts": [{"text": "اقرأ هذه العبارة فقط بصوت واضح: اختبار المفتاح."}]}],
-                    "generationConfig": {
-                        "responseModalities": ["AUDIO"],
-                        "speechConfig": {"languageCode": "ar-XA", "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Kore"}}},
-                    },
-                }
-                try:
-                    response = await client.post(endpoint, headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload)
-                    if response.status_code == 429:
-                        outcome.update(status="quota", detail="الحصة أو حد الطلبات غير متاح لهذا المفتاح حاليًا.")
-                        record_result(key, "quota", outcome["detail"])
-                        break
-                    if response.status_code == 401:
-                        outcome.update(status="invalid", detail="المفتاح غير صحيح أو تم إلغاؤه.")
-                        record_result(key, "invalid", outcome["detail"])
-                        break
-                    if response.status_code == 403:
-                        outcome.update(status="forbidden", detail="المفتاح صحيح غالبًا لكن الصلاحية أو المشروع أو المنطقة تمنع TTS.")
-                        record_result(key, "forbidden", outcome["detail"])
-                        break
-                    if response.status_code in {400, 404}:
-                        outcome.update(status="model_unavailable", detail=f"النموذج {model} غير متاح لهذا المشروع.")
-                        continue
-                    if response.status_code >= 400:
-                        outcome.update(status="failed", detail=_error_detail(response))
-                        continue
-                    audio = _extract_audio(response.json())
-                    if not audio:
-                        outcome.update(status="no_audio", detail=f"نجح الطلب على {model} لكنه لم يرجع صوتًا.")
-                        continue
-                    outcome.update(ok=True, status="working", model=model, detail="تم إنشاء عينة صوتية فعلية بهذا المفتاح.")
-                    record_result(key, "working", model)
-                    break
-                except Exception as exc:
-                    outcome.update(status="network", detail=f"تعذر الاتصال: {type(exc).__name__}")
-            results.append(outcome)
+    for index, entry in enumerate(entries, start=1):
+        outcome = await _test_one(entry["key"], index)
+        outcome["enabled"] = bool(entry.get("enabled", True))
+        results.append(outcome)
     working = sum(1 for item in results if item["ok"])
-    summary = "، ".join(f"المفتاح {item['number']}: {'يعمل' if item['ok'] else item['status']}" for item in results)
+    payload = _key_payload()
+    payload.update({"results": results, "working": working, "message": f"تم اختبار {len(entries)} مفتاح فعليًا. يعمل {working} منها. افتح لوحة المفاتيح لاختيار المفتاح الذي تريد استخدامه."})
     if not working:
-        raise HTTPException(status_code=429, detail=f"تم اختبار {len(keys)} مفتاح فعليًا ولم ينجح TTS بأي منها. {summary}")
-    return {
-        "success": True,
-        "working": working,
-        "total": len(keys),
-        "results": results,
-        "message": f"يعمل {working} من أصل {len(keys)} مفاتيح باختبار صوتي حقيقي. {summary}",
-    }
+        payload["warning"] = "لم ينجح إنشاء الصوت بأي مفتاح حاليًا. راجع حالة كل مفتاح في اللوحة."
+    return payload
 
 
 @router.post("/import-url")
@@ -235,7 +318,7 @@ async def import_url(request: UrlImportRequest):
         raise HTTPException(status_code=400, detail="استخدم رابط HTTP أو HTTPS صحيحًا.")
     _safe_public_host(parsed.hostname)
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=10.0), follow_redirects=True, headers={"User-Agent": "IbnAlWaqadiStudio/3.3"}) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=10.0), follow_redirects=True, headers={"User-Agent": "IbnAlWaqadiStudio/3.5"}) as client:
             response = await client.get(str(request.url))
         response.raise_for_status()
         content_type = response.headers.get("content-type", "")
