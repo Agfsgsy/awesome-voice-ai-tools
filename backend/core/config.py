@@ -42,8 +42,8 @@ CONFIG_DIR = DATA_DIR / "config"
 for directory in [DATA_DIR, MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, OUTPUTS_DIR, CACHE_DIR, LOGS_DIR, CONFIG_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
-APP_NAME = "Voice AI Studio Arabic Pro"
-APP_VERSION = "2.7.0"
+APP_NAME = "Voice AI Studio Arabic Producer"
+APP_VERSION = "2.8.0"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
