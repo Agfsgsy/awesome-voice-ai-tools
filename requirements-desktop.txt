@@ -1,0 +1,3 @@
+# Desktop window and Windows packaging
+pywebview>=5,<7
+pyinstaller>=6,<8
