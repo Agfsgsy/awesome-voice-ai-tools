@@ -1,5 +1,5 @@
 #define MyAppName "Voice AI Studio Arabic Pro"
-#define MyAppVersion "2.2.1"
+#define MyAppVersion "2.3.0"
 #define MyAppPublisher "Agfsgsy"
 #define MyAppExeName "VoiceAIStudioArabic.exe"
 
@@ -35,7 +35,7 @@ Source: "..\dist\VoiceAIStudioArabic\*"; DestDir: "{app}"; Flags: ignoreversion 
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{userdesktop}\Voice AI Studio Pro"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{cmd}"; Parameters: "/C copy /Y ""{autoprograms}\{#MyAppName}.lnk"" ""{userdesktop}\Voice AI Studio Pro.lnk"""; Flags: runhidden waituntilterminated; Tasks: desktopicon
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
