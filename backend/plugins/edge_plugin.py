@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any, Dict, List, Tuple
 
 from backend.core.config import OUTPUTS_DIR
@@ -57,12 +58,12 @@ class EdgeTTSPlugin(TTSPluginBase):
     }
 
     PROFILES = {
-        "natural": {"label": "طبيعي", "rate": 0, "pitch": 0, "volume": 0},
-        "sermon_calm": {"label": "واعظ هادئ", "rate": -10, "pitch": -2, "volume": 2},
-        "sermon_powerful": {"label": "خطيب قوي", "rate": -2, "pitch": -6, "volume": 12},
-        "dua_emotional": {"label": "دعاء مؤثر", "rate": -15, "pitch": 1, "volume": -2},
-        "documentary": {"label": "وثائقي رزين", "rate": -5, "pitch": -3, "volume": 5},
-        "energetic": {"label": "حماسي", "rate": 8, "pitch": 2, "volume": 8},
+        "natural": {"label": "طبيعي بشري", "rate": -1, "pitch": 0, "volume": 2},
+        "sermon_calm": {"label": "واعظ هادئ", "rate": -12, "pitch": -2, "volume": 4},
+        "sermon_powerful": {"label": "خطيب قوي", "rate": -7, "pitch": -5, "volume": 18},
+        "dua_emotional": {"label": "دعاء مؤثر", "rate": -18, "pitch": 0, "volume": -2},
+        "documentary": {"label": "وثائقي رزين", "rate": -6, "pitch": -3, "volume": 7},
+        "energetic": {"label": "حماسي", "rate": 8, "pitch": 2, "volume": 10},
     }
 
     DEFAULT_BY_LANGUAGE = {"ar": "ar-SA-HamedNeural", "en": "en-US-GuyNeural"}
@@ -103,10 +104,33 @@ class EdgeTTSPlugin(TTSPluginBase):
         voice = cls.DEFAULT_BY_LANGUAGE.get(language, cls.DEFAULT_BY_LANGUAGE["ar"]) if raw in {"", "default"} else raw
         return voice, profile
 
+    @staticmethod
+    def _prepare_text(text: str) -> str:
+        """تنسيق الفقرات وعلامات الوقف لإلقاء عربي أكثر طبيعية."""
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        paragraphs: List[str] = []
+        for raw in re.split(r"\n+", text):
+            paragraph = re.sub(r"[ \t]+", " ", raw).strip()
+            if not paragraph:
+                continue
+            paragraph = re.sub(r"\s*([،؛:؟!.…])\s*", r"\1 ", paragraph).strip()
+            if paragraph[-1] not in "؟!.…":
+                paragraph += "."
+            paragraphs.append(paragraph)
+        return "\n\n".join(paragraphs)
+
+    @staticmethod
+    def _friendly_error(exc: Exception) -> str:
+        raw = str(exc)
+        lowered = raw.lower()
+        if any(token in lowered for token in ("getaddrinfo", "cannot connect", "speech.platform.bing.com", "ssl")):
+            return "تعذر الاتصال بخدمة الصوت العصبي. افحص الإنترنت أو DNS أو VPN ثم أعد المحاولة."
+        return f"فشل إنشاء الصوت: {raw}"
+
     async def generate(self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
         if not self.check():
-            return {"success": False, "engine": self.name, "message": "edge-tts غير مثبت."}
-        text = (text or "").strip()
+            return {"success": False, "engine": self.name, "message": "محرك الصوت العصبي غير موجود داخل البرنامج."}
+        text = self._prepare_text((text or "").strip())
         if not text:
             return {"success": False, "engine": self.name, "message": "النص فارغ."}
         if len(text) > 5000:
@@ -146,7 +170,7 @@ class EdgeTTSPlugin(TTSPluginBase):
             }
         except Exception as exc:
             logger.exception("Edge TTS generation failed")
-            return {"success": False, "engine": self.name, "message": str(exc)}
+            return {"success": False, "engine": self.name, "message": self._friendly_error(exc)}
 
 
 PLUGIN_CLASS = EdgeTTSPlugin
