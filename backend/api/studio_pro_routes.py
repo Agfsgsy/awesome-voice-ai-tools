@@ -35,28 +35,72 @@ def _keys() -> list[str]:
     return list(dict.fromkeys(str(k).strip() for k in values if len(str(k).strip()) >= 20))
 
 
+async def _available_text_models(client: httpx.AsyncClient, key: str) -> list[str]:
+    preferred = [
+        "gemini-3.6-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-flash-latest",
+    ]
+    try:
+        response = await client.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            headers={"x-goog-api-key": key},
+        )
+        if response.status_code >= 400:
+            return preferred
+        available: list[str] = []
+        for item in response.json().get("models", []):
+            methods = item.get("supportedGenerationMethods") or []
+            name = str(item.get("name", "")).replace("models/", "")
+            low = name.lower()
+            if "generateContent" not in methods:
+                continue
+            if any(x in low for x in ("tts", "image", "embedding", "aqa", "vision")):
+                continue
+            if name:
+                available.append(name)
+        ordered = [m for m in preferred if m in available]
+        ordered.extend(m for m in available if m not in ordered)
+        return ordered or preferred
+    except Exception:
+        return preferred
+
+
 async def _ask_gemini(prompt: str, temperature: float = 0.45) -> str:
+    keys = _keys()
+    if not keys:
+        raise HTTPException(status_code=400, detail="أضف مفتاح Gemini صالحًا أولًا.")
     payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": temperature}}
     errors: list[str] = []
-    for key in _keys():
+    for key_index, key in enumerate(keys, start=1):
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-                    headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-                    json=payload,
-                )
-            if response.status_code in {401, 403, 429}:
-                errors.append(str(response.status_code))
-                continue
-            response.raise_for_status()
-            parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            result = "\n".join(str(p.get("text", "")) for p in parts).strip()
-            if result:
-                return result
+            async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=25.0)) as client:
+                models = await _available_text_models(client, key)
+                for model in models:
+                    try:
+                        response = await client.post(
+                            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                            headers={"x-goog-api-key": key, "Content-Type": "application/json"},
+                            json=payload,
+                        )
+                        if response.status_code in {401, 403, 429}:
+                            errors.append(f"المفتاح {key_index}: HTTP {response.status_code}")
+                            break
+                        if response.status_code in {400, 404}:
+                            errors.append(f"{model}: HTTP {response.status_code}")
+                            continue
+                        response.raise_for_status()
+                        parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                        result = "\n".join(str(p.get("text", "")) for p in parts).strip()
+                        if result:
+                            return result
+                    except Exception as exc:
+                        errors.append(f"{model}: {str(exc)[:160]}")
+                        continue
         except Exception as exc:
-            errors.append(str(exc))
-    raise HTTPException(status_code=502, detail="تعذر استخدام محرر Gemini بالمفاتيح المحفوظة. " + "; ".join(errors[-2:]))
+            errors.append(f"المفتاح {key_index}: {str(exc)[:160]}")
+    raise HTTPException(status_code=502, detail="تعذر استخدام محرر Gemini بالنماذج المتاحة. " + "; ".join(errors[-4:]))
 
 
 class RewriteRequest(BaseModel):
@@ -136,12 +180,7 @@ async def export_folder():
 
 
 @router.post("/mix-music")
-async def mix_music(
-    voice: UploadFile = File(...),
-    music: UploadFile = File(...),
-    music_volume: float = Form(0.12),
-    fade_seconds: float = Form(2.5),
-):
+async def mix_music(voice: UploadFile = File(...), music: UploadFile = File(...), music_volume: float = Form(0.12), fade_seconds: float = Form(2.5)):
     if not (0 <= music_volume <= 0.5):
         raise HTTPException(status_code=400, detail="مستوى الموسيقى يجب أن يكون بين 0 و0.5")
     ffmpeg = _ffmpeg_executable()
@@ -169,12 +208,7 @@ async def mix_music(
 
 
 @router.post("/clone")
-async def clone_voice(
-    sample: UploadFile = File(...),
-    text: str = Form(...),
-    consent: bool = Form(False),
-    engine: str = Form("coqui"),
-):
+async def clone_voice(sample: UploadFile = File(...), text: str = Form(...), consent: bool = Form(False), engine: str = Form("coqui")):
     if not consent:
         raise HTTPException(status_code=400, detail="يجب تأكيد أن الصوت لك أو لديك إذن صريح من صاحبه.")
     if len(text.strip()) < 2:
