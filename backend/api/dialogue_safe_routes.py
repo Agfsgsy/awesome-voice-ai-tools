@@ -1,8 +1,7 @@
-"""Quota-safe additive renderer for Dialogue Ultra.
+"""Strict cloud renderer for Dialogue Ultra with manual-only mechanical fallback.
 
-It keeps every existing route and adds a resilient endpoint that tries native/premium
-providers first, then immediately completes the whole interview with free Arabic voices
-when cloud quotas are exhausted.
+Cloud modes never switch silently to Edge/mechanical voices. The free Arabic engine remains
+available as an explicit manual choice. This module preserves all existing routes and tools.
 """
 from __future__ import annotations
 
@@ -63,12 +62,12 @@ async def _edge_contextual(turns: list[tuple[str, str]], pause_ms: int) -> Path:
         natural_text = _clean_edge_text(text)
         result = await plugin.generate(text=natural_text, voice=voice, language="ar", speed=speed)
         if not result or not result.get("success"):
-            raise HTTPException(status_code=502, detail=(result or {}).get("message", f"فشل الصوت الاحتياطي للشخصية {role}"))
+            raise HTTPException(status_code=502, detail=(result or {}).get("message", f"فشل الصوت اليدوي للشخصية {role}"))
         source = Path(result.get("file", ""))
         if not source.exists():
-            raise HTTPException(status_code=500, detail=f"ملف الصوت الاحتياطي للشخصية {role} غير موجود.")
+            raise HTTPException(status_code=500, detail=f"ملف الصوت اليدوي للشخصية {role} غير موجود.")
         paths.append(source)
-    raw = OUTPUTS_DIR / f"ibn_alwaqadi_edge_safe_{token}.wav"
+    raw = OUTPUTS_DIR / f"ibn_alwaqadi_edge_manual_{token}.wav"
     dialogue._concat_audio(paths, raw, pause_ms)
     return raw
 
@@ -84,35 +83,37 @@ async def _render_provider(provider: str, req: SafeRenderRequest, turns: list[tu
         models: list[str] = []
         for index, scene in enumerate(dialogue._scene_chunks(turns)):
             pcm, model, _key_index = await dialogue._gemini_scene_audio(scene, req.tone, req.dialect, req.gemini_model)
-            path = OUTPUTS_DIR / f"gemini_native_safe_{token}_{index}.wav"
+            path = OUTPUTS_DIR / f"gemini_native_strict_{token}_{index}.wav"
             dialogue._save_wav(path, pcm)
             scene_paths.append(path)
             models.append(model)
-        raw = OUTPUTS_DIR / f"ibn_alwaqadi_gemini_native_safe_{token}.wav"
+        raw = OUTPUTS_DIR / f"ibn_alwaqadi_gemini_native_strict_{token}.wav"
         dialogue._concat_audio(scene_paths, raw, req.pause_ms)
         return raw, ",".join(dict.fromkeys(models))
     if provider == "legacy_contextual":
         return await dialogue._legacy_contextual(turns, req.pause_ms), "gemini-segmented"
     if provider == "edge_fallback":
-        return await _edge_contextual(turns, req.pause_ms), "edge-arabic-neural"
+        return await _edge_contextual(turns, req.pause_ms), "edge-arabic-neural-manual"
     raise HTTPException(status_code=400, detail="وضع الإنتاج غير معروف.")
 
 
 def _provider_order(req: SafeRenderRequest, turns: list[tuple[str, str]]) -> list[str]:
+    """Cloud modes remain cloud-only; Edge is used only when explicitly selected."""
     requested = req.provider
     all_ids = all(dialogue._voice_id_for_role(role) for role, _ in turns)
     eleven_ready = bool(dialogue._eleven_api_key() and all_ids)
     if requested == "auto":
-        order = (["eleven_dialogue"] if eleven_ready else []) + ["gemini_native", "edge_fallback", "legacy_contextual"]
-    elif requested == "eleven_dialogue":
-        order = ["eleven_dialogue", "gemini_native", "edge_fallback", "legacy_contextual"]
-    elif requested == "gemini_native":
-        order = ["gemini_native", "edge_fallback", "legacy_contextual"]
-    elif requested == "legacy_contextual":
-        order = ["legacy_contextual", "edge_fallback"]
-    else:
-        order = ["edge_fallback"]
-    return list(dict.fromkeys(order))
+        # Automatic means best cloud provider only, never mechanical fallback.
+        return (["eleven_dialogue"] if eleven_ready else []) + ["gemini_native"]
+    if requested == "eleven_dialogue":
+        return ["eleven_dialogue"]
+    if requested == "gemini_native":
+        return ["gemini_native"]
+    if requested == "legacy_contextual":
+        return ["legacy_contextual"]
+    if requested == "edge_fallback":
+        return ["edge_fallback"]
+    raise HTTPException(status_code=400, detail="اختر محركًا معروفًا.")
 
 
 @router.post("/render")
@@ -135,22 +136,24 @@ async def render_safe(req: SafeRenderRequest):
         except HTTPException as exc:
             errors.append(f"{provider}: {exc.detail}")
         except Exception as exc:
-            errors.append(f"{provider}: {type(exc).__name__}: {str(exc)[:220]}")
+            errors.append(f"{provider}: {type(exc).__name__}: {str(exc)[:500]}")
 
     if raw is None or not raw.exists():
-        raise HTTPException(status_code=502, detail="تعذر الإنتاج بكل المحركات المتاحة. " + " | ".join(errors[-4:]))
+        detail = " | ".join(errors[-4:]) or "لم يرجع المحرك ملفًا صوتيًا."
+        if requested in {"auto", "gemini_native", "eleven_dialogue", "legacy_contextual"}:
+            detail += " لم يتم التحويل إلى الصوت الميكانيكي لأن هذا الخيار أصبح يدويًا فقط."
+        raise HTTPException(status_code=502, detail=detail)
 
-    final = OUTPUTS_DIR / f"ibn_alwaqadi_quota_safe_{token}.mp3"
+    final = OUTPUTS_DIR / f"ibn_alwaqadi_strict_cloud_{token}.mp3"
     output = final if req.master != "none" and process_audio(str(raw), str(final), req.master) else raw
     target = _desktop_exports() / output.name
     shutil.copy2(output, target)
-    fallback = used_provider != requested and requested != "auto"
-    used_free_fallback = used_provider == "edge_fallback"
+    manual_mechanical = used_provider == "edge_fallback"
     message = "تم إنتاج المقابلة وحفظها على سطح المكتب."
-    if used_free_fallback:
-        message += " كانت حصة الخدمات السحابية منتهية، فبدأ الاستوديو فورًا بالأصوات العربية المجانية وأكمل المقابلة كاملة."
-    elif fallback:
-        message += " انتقل الاستوديو تلقائيًا إلى محرك احتياطي بعد تعذر المحرك المطلوب."
+    if manual_mechanical:
+        message += " تم استخدام المحرك المجاني الميكانيكي لأنك اخترته يدويًا."
+    else:
+        message += " بقي الإنتاج على المحرك السحابي المختار ولم يتحول إلى الصوت الميكانيكي."
     return {
         "success": True,
         "url": f"/api/downloads/{output.name}",
@@ -158,7 +161,8 @@ async def render_safe(req: SafeRenderRequest):
         "provider_requested": requested,
         "provider": used_provider,
         "model": model_used,
-        "fallback": used_free_fallback or fallback,
+        "fallback": False,
+        "manual_mechanical": manual_mechanical,
         "attempt_errors": errors,
         "turns": len(turns),
         "speakers": len({dialogue._canonical_role(role) for role, _ in turns}),
