@@ -25,6 +25,8 @@ from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
 from backend.api import gemini_cloud_control_patch as _gemini_cloud_control_patch
+from backend.api import gemini_session_runtime as _gemini_session_runtime
+from backend.api.gemini_session_runtime import router as gemini_session_router
 from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
 
@@ -40,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=APP_NAME,
-    description="استوديو ابن الواقدي: إنتاج صوت عربي احترافي بسياسة Cloud-Only صارمة، تحقق نص وصوت لكل مفتاح، حوار طبيعي متعدد المتحدثين، تحرير النص، المواعظ، المؤثرات والموسيقى والاستنساخ المصرح به.",
+    description="استوديو ابن الواقدي: إنتاج صوت عربي احترافي بسياسة Cloud-Only، جلسات Gemini ثابتة، تحقق محفوظ للنص والصوت، حماية من كثرة الطلبات، حوار متعدد المتحدثين ومؤثرات احترافية.",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -57,6 +59,7 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(human_pro_router)
 app.include_router(gemini_router)
+app.include_router(gemini_session_router)
 app.include_router(studio_router)
 app.include_router(studio_pro_router)
 app.include_router(producer_router)
