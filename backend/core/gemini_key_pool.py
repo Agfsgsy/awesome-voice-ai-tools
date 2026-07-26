@@ -314,7 +314,16 @@ def record_result(key: str, status: str, detail: str = "") -> None:
     state = _sync_state(all_keys)
     fp = fingerprint(key)
     record = dict((state.get("records") or {}).get(fp) or {})
-    record.update({"status": status, "detail": detail[:500], "checked_at": int(time.time())})
+    now = int(time.time())
+    if status == "text_working":
+        record["text_status"] = "working"
+        record["text_detail"] = detail[:500]
+        record["text_checked_at"] = now
+        record.setdefault("status", "untested")
+        state.setdefault("records", {})[fp] = record
+        _save_state(state)
+        return
+    record.update({"status": status, "detail": detail[:500], "checked_at": now})
     state.setdefault("records", {})[fp] = record
     if status == "working":
         state["selected_fp"] = fp
@@ -370,6 +379,9 @@ def key_statuses() -> list[dict[str, Any]]:
             "status": status,
             "detail": record.get("detail", ""),
             "checked_at": record.get("checked_at"),
+            "text_status": record.get("text_status", "untested"),
+            "text_detail": record.get("text_detail", ""),
+            "text_checked_at": record.get("text_checked_at"),
             "added_at": entry.get("added_at"),
         })
     return result
