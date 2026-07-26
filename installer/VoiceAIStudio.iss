@@ -1,40 +1,41 @@
-#define MyAppName "Voice AI Studio Arabic"
+#define MyAppName "Voice AI Studio Arabic Pro"
 #define MyAppVersion "2.2.0"
 #define MyAppPublisher "Agfsgsy"
-#define MyAppExeName "VoiceAIStudio.exe"
+#define MyAppExeName "VoiceAIStudioArabic.exe"
 
 [Setup]
-AppId={{74A2FE78-3A6E-4B8A-A79D-4AE17D6EA2C9}
+AppId={{7D58AAB7-B834-4E98-9C8E-14C84B6D8CA1}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\Programs\Voice AI Studio Arabic
-DefaultGroupName=Voice AI Studio Arabic
+DefaultDirName={localappdata}\Programs\Voice AI Studio Arabic Pro
+DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputDir=..\dist_installer
-OutputBaseFilename=VoiceAIStudioArabic-Setup-2.2.0
-Compression=lzma2
-SolidCompression=yes
-WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+OutputDir=..\dist-installer
+OutputBaseFilename=VoiceAIStudioSetup
+Compression=lzma2/max
+SolidCompression=yes
+WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupLogging=yes
+CloseApplications=yes
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "arabic"; MessagesFile: "compiler:Languages\Arabic.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "إنشاء اختصار على سطح المكتب"; GroupDescription: "اختصارات إضافية:"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "..\dist\VoiceAIStudio\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\VoiceAIStudioArabic\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\Voice AI Studio Arabic"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\Voice AI Studio Arabic"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "تشغيل Voice AI Studio Arabic"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
