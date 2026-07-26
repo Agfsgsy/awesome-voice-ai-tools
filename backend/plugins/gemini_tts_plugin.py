@@ -76,16 +76,59 @@ class GeminiTTSPlugin(TTSPluginBase):
 
     @staticmethod
     def _save_wav(path: Path, pcm: bytes) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(path), "wb") as output:
             output.setnchannels(1)
             output.setsampwidth(2)
             output.setframerate(24000)
             output.writeframes(pcm)
 
+    @staticmethod
+    def _extract_audio(data: Dict[str, Any]) -> bytes | None:
+        """Read PCM audio from both generateContent and Interactions response shapes."""
+        candidates = data.get("candidates") or []
+        for candidate in candidates:
+            content = candidate.get("content") or {}
+            for part in content.get("parts") or []:
+                inline = part.get("inlineData") or part.get("inline_data") or {}
+                encoded = inline.get("data")
+                if encoded:
+                    return base64.b64decode(encoded)
+
+        output_audio = data.get("output_audio") or data.get("outputAudio") or {}
+        encoded = output_audio.get("data")
+        if encoded:
+            return base64.b64decode(encoded)
+
+        outputs = data.get("outputs") or []
+        for item in outputs:
+            audio = item.get("audio") or item.get("output_audio") or {}
+            encoded = audio.get("data")
+            if encoded:
+                return base64.b64decode(encoded)
+        return None
+
+    @staticmethod
+    def _error_message(response: httpx.Response) -> str:
+        try:
+            payload = response.json()
+            error = payload.get("error") or {}
+            detail = error.get("message") or response.text[:800]
+        except Exception:
+            detail = response.text[:800]
+        if response.status_code == 429:
+            return "تم تجاوز الحصة المجانية أو الرصيد. انتظر قليلًا أو فعّل الفوترة من زر Gemini المدفوع."
+        if response.status_code in {401, 403}:
+            return "مفتاح Gemini غير صالح، أو المشروع لا يملك صلاحية Gemini API، أو توجد قيود تمنع استخدامه."
+        if response.status_code == 404:
+            return "نموذج Gemini المحدد غير متاح لهذا المشروع. جرّب Gemini 2.5 Flash TTS."
+        return detail
+
     async def generate(self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
         api_key = self._api_key()
         if not api_key:
             return {"success": False, "engine": self.name, "message": "أدخل مفتاح Gemini API من إعداد Gemini أولًا."}
+
         clean_text = "\n".join(line.strip() for line in (text or "").splitlines() if line.strip())
         if not clean_text:
             return {"success": False, "engine": self.name, "message": "النص فارغ."}
@@ -97,52 +140,99 @@ class GeminiTTSPlugin(TTSPluginBase):
         if "|" in raw_voice:
             raw_voice, profile = raw_voice.split("|", 1)
         selected_voice = raw_voice if raw_voice in self.VOICES else "Kore"
+
         model = self._model()
         if model not in self.MODELS:
             model = "gemini-2.5-flash-preview-tts"
+
         guidance = self.PROFILES.get(profile, self.PROFILES["human_ultra"])
         speed_note = "متوسطة"
         if speed < 0.9:
             speed_note = "بطيئة قليلًا"
         elif speed > 1.1:
             speed_note = "سريعة قليلًا"
-        prompt = f"{guidance}\nالسرعة المطلوبة: {speed_note}.\nاقرأ النص التالي كما هو دون إضافة أو حذف:\n\n{clean_text}"
+        prompt = (
+            f"{guidance}\n"
+            f"السرعة المطلوبة: {speed_note}.\n"
+            "انطق النص العربي كما هو، دون شرح أو مقدمة أو إضافة أو حذف:\n\n"
+            f"{clean_text}"
+        )
 
-        digest = hashlib.sha256(f"gemini-v250|{model}|{selected_voice}|{profile}|{speed}|{clean_text}".encode("utf-8")).hexdigest()[:18]
+        digest = hashlib.sha256(
+            f"gemini-v251|{model}|{selected_voice}|{profile}|{speed}|{clean_text}".encode("utf-8")
+        ).hexdigest()[:18]
         output = OUTPUTS_DIR / f"gemini_{profile}_{digest}.wav"
-        if output.exists() and output.stat().st_size > 0:
-            return {"success": True, "engine": self.name, "model": model, "voice": selected_voice, "file": str(output), "url": f"/api/downloads/{output.name}", "message": "تم تحميل صوت Gemini من الذاكرة المؤقتة."}
+        if output.exists() and output.stat().st_size > 44:
+            return {
+                "success": True,
+                "engine": self.name,
+                "model": model,
+                "voice": selected_voice,
+                "file": str(output),
+                "url": f"/api/downloads/{output.name}",
+                "message": "تم تحميل صوت Gemini من الذاكرة المؤقتة.",
+            }
 
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         payload = {
-            "model": model,
-            "input": prompt,
-            "response_format": {"type": "audio"},
-            "generation_config": {"speech_config": [{"voice": selected_voice}]},
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseModalities": ["AUDIO"],
+                "speechConfig": {
+                    "languageCode": "ar-XA" if language.startswith("ar") else None,
+                    "voiceConfig": {
+                        "prebuiltVoiceConfig": {"voiceName": selected_voice}
+                    },
+                },
+            },
         }
+        if payload["generationConfig"]["speechConfig"]["languageCode"] is None:
+            payload["generationConfig"]["speechConfig"].pop("languageCode")
+
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=25.0)) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(240.0, connect=30.0)) as client:
                 response = await client.post(
-                    "https://generativelanguage.googleapis.com/v1beta/interactions",
+                    endpoint,
                     headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
                     json=payload,
                 )
+
             if response.status_code >= 400:
-                try:
-                    error = response.json().get("error", {})
-                    detail = error.get("message") or response.text[:600]
-                except Exception:
-                    detail = response.text[:600]
-                if response.status_code == 429:
-                    detail = "تم تجاوز الحصة المجانية أو الرصيد. انتظر أو فعّل الفوترة من زر Gemini المدفوع."
-                elif response.status_code in {401, 403}:
-                    detail = "مفتاح Gemini غير صالح أو محظور أو غير مقيّد لخدمة Gemini API."
-                return {"success": False, "engine": self.name, "message": detail}
+                return {
+                    "success": False,
+                    "engine": self.name,
+                    "message": self._error_message(response),
+                }
+
             data = response.json()
-            audio = data.get("output_audio", {}).get("data")
-            if not audio:
-                raise RuntimeError("لم تُرجع Gemini بيانات صوتية.")
-            self._save_wav(output, base64.b64decode(audio))
-            return {"success": True, "engine": self.name, "model": model, "voice": selected_voice, "profile": profile, "file": str(output), "url": f"/api/downloads/{output.name}", "message": "تم إنشاء صوت Gemini العربي بنجاح."}
+            pcm = self._extract_audio(data)
+            if not pcm:
+                finish_reason = ""
+                try:
+                    finish_reason = str(data.get("candidates", [{}])[0].get("finishReason", ""))
+                except Exception:
+                    pass
+                detail = "لم تُرجع Gemini بيانات صوتية."
+                if finish_reason:
+                    detail += f" سبب الإنهاء: {finish_reason}."
+                logger.error("Gemini response contained no audio: %s", str(data)[:2000])
+                return {"success": False, "engine": self.name, "message": detail}
+
+            self._save_wav(output, pcm)
+            if not output.exists() or output.stat().st_size <= 44:
+                output.unlink(missing_ok=True)
+                raise RuntimeError("تم استلام استجابة، لكن ملف الصوت الناتج فارغ.")
+
+            return {
+                "success": True,
+                "engine": self.name,
+                "model": model,
+                "voice": selected_voice,
+                "profile": profile,
+                "file": str(output),
+                "url": f"/api/downloads/{output.name}",
+                "message": "تم إنشاء صوت Gemini العربي بنجاح.",
+            }
         except Exception as exc:
             logger.exception("Gemini TTS generation failed")
             return {"success": False, "engine": self.name, "message": f"تعذر إنشاء صوت Gemini: {exc}"}
