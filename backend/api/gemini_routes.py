@@ -1,12 +1,12 @@
-"""Gemini settings, guided links, key diagnostics, and safe URL text import."""
+"""Gemini settings, multiple-key rotation, guided links, diagnostics, and safe URL import."""
 from __future__ import annotations
 
 import ipaddress
 import json
 import os
+import re
 import socket
 from html.parser import HTMLParser
-from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -29,13 +29,14 @@ LINKS = {
 
 class GeminiSettings(BaseModel):
     api_key: str = Field(default="", max_length=500)
+    api_keys: str = Field(default="", max_length=8000)
     model_id: str = Field(default="gemini-2.5-flash-preview-tts", max_length=100)
     voice_name: str = Field(default="Kore", max_length=50)
 
 
 class UrlImportRequest(BaseModel):
     url: HttpUrl
-    max_chars: int = Field(default=8000, ge=500, le=20000)
+    max_chars: int = Field(default=8000, ge=500, le=30000)
 
 
 class _TextExtractor(HTMLParser):
@@ -59,6 +60,10 @@ class _TextExtractor(HTMLParser):
                 self.parts.append(text)
 
 
+def _parse_keys(raw: str) -> list[str]:
+    return list(dict.fromkeys(k.strip() for k in re.split(r"[\n,;|]+", raw or "") if len(k.strip()) >= 20))
+
+
 def _load() -> dict:
     if not SETTINGS_FILE.exists():
         return {}
@@ -70,10 +75,12 @@ def _load() -> dict:
 
 def apply_saved_settings() -> None:
     data = _load()
-    key = str(data.get("api_key", "")).strip()
+    keys = data.get("api_keys") or ([data.get("api_key")] if data.get("api_key") else [])
+    keys = [str(k).strip() for k in keys if str(k).strip()]
     model = str(data.get("model_id", "")).strip()
-    if key:
-        os.environ["GEMINI_API_KEY"] = key
+    if keys:
+        os.environ["GEMINI_API_KEYS"] = "||".join(keys)
+        os.environ["GEMINI_API_KEY"] = keys[0]
     if model:
         os.environ["GEMINI_TTS_MODEL"] = model
 
@@ -102,9 +109,10 @@ async def get_links():
 @router.get("/settings")
 async def get_settings():
     data = _load()
+    keys = data.get("api_keys") or ([data.get("api_key")] if data.get("api_key") else [])
     return {
-        "configured": bool(data.get("api_key")),
-        "api_key_set": bool(data.get("api_key")),
+        "configured": bool(keys),
+        "key_count": len(keys),
         "model_id": data.get("model_id", "gemini-2.5-flash-preview-tts"),
         "voice_name": data.get("voice_name", "Kore"),
         "links": LINKS,
@@ -114,45 +122,47 @@ async def get_settings():
 @router.post("/settings")
 async def save_settings(settings: GeminiSettings):
     previous = _load()
-    api_key = settings.api_key.strip() or str(previous.get("api_key", "")).strip()
-    if api_key and len(api_key) < 20:
-        raise HTTPException(status_code=400, detail="مفتاح Gemini قصير أو غير مكتمل.")
+    raw = settings.api_keys.strip() or settings.api_key.strip()
+    keys = _parse_keys(raw) if raw else list(previous.get("api_keys", []))
+    if not keys and previous.get("api_key"):
+        keys = [str(previous["api_key"]).strip()]
     allowed_models = {
         "gemini-3.1-flash-tts-preview",
         "gemini-2.5-flash-preview-tts",
         "gemini-2.5-pro-preview-tts",
     }
     model_id = settings.model_id if settings.model_id in allowed_models else "gemini-2.5-flash-preview-tts"
-    data = {"api_key": api_key, "model_id": model_id, "voice_name": settings.voice_name.strip() or "Kore"}
+    data = {"api_keys": keys, "model_id": model_id, "voice_name": settings.voice_name.strip() or "Kore"}
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     apply_saved_settings()
-    return {"success": True, "configured": bool(api_key), "message": "تم حفظ إعداد Gemini على هذا الجهاز."}
+    return {"success": True, "configured": bool(keys), "key_count": len(keys), "message": f"تم حفظ {len(keys)} مفتاح Gemini، والتبديل التلقائي جاهز."}
 
 
 @router.post("/test")
-async def test_key():
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        raise HTTPException(status_code=400, detail="احفظ مفتاح Gemini أولًا.")
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                "https://generativelanguage.googleapis.com/v1beta/models",
-                headers={"x-goog-api-key": api_key},
-            )
-        if response.status_code >= 400:
+async def test_keys():
+    data = _load()
+    keys = list(data.get("api_keys", []))
+    if not keys:
+        raise HTTPException(status_code=400, detail="احفظ مفتاح Gemini واحدًا على الأقل.")
+    results = []
+    visible_models = []
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for index, key in enumerate(keys, start=1):
             try:
-                detail = response.json().get("error", {}).get("message") or response.text[:500]
+                response = await client.get("https://generativelanguage.googleapis.com/v1beta/models", headers={"x-goog-api-key": key})
+                if response.status_code < 400:
+                    models = [item.get("name", "") for item in response.json().get("models", [])]
+                    visible_models = [m for m in models if "tts" in m.lower()]
+                    results.append({"number": index, "ok": True})
+                else:
+                    results.append({"number": index, "ok": False, "status": response.status_code})
             except Exception:
-                detail = response.text[:500]
-            raise HTTPException(status_code=response.status_code, detail=detail)
-        models = [item.get("name", "") for item in response.json().get("models", [])]
-        return {"success": True, "message": "مفتاح Gemini صالح ويعمل.", "tts_models_visible": [m for m in models if "tts" in m.lower()]}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"تعذر اختبار Gemini: {exc}")
+                results.append({"number": index, "ok": False, "status": "network"})
+    working = sum(1 for item in results if item["ok"])
+    if not working:
+        raise HTTPException(status_code=401, detail="لم يعمل أي مفتاح Gemini محفوظ.")
+    return {"success": True, "message": f"يعمل {working} من أصل {len(keys)} مفاتيح. التبديل التلقائي مفعّل.", "results": results, "tts_models_visible": visible_models}
 
 
 @router.post("/import-url")
@@ -162,11 +172,7 @@ async def import_url(request: UrlImportRequest):
         raise HTTPException(status_code=400, detail="استخدم رابط HTTP أو HTTPS صحيحًا.")
     _safe_public_host(parsed.hostname)
     try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(25.0, connect=10.0),
-            follow_redirects=True,
-            headers={"User-Agent": "VoiceAIStudioArabic/2.5"},
-        ) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=10.0), follow_redirects=True, headers={"User-Agent": "VoiceAIStudioArabic/2.6"}) as client:
             response = await client.get(str(request.url))
         response.raise_for_status()
         content_type = response.headers.get("content-type", "")
@@ -177,21 +183,17 @@ async def import_url(request: UrlImportRequest):
         if "text/plain" in content_type:
             text = response.text
         else:
-            parser = _TextExtractor()
-            parser.feed(response.text)
-            text = "\n".join(parser.parts)
-        lines = []
-        seen = set()
+            parser = _TextExtractor(); parser.feed(response.text); text = "\n".join(parser.parts)
+        lines, seen = [], set()
         for raw in text.splitlines():
             line = " ".join(raw.split()).strip()
             if len(line) < 3 or line in seen:
                 continue
-            seen.add(line)
-            lines.append(line)
+            seen.add(line); lines.append(line)
         clean = "\n".join(lines)[: request.max_chars]
         if not clean:
             raise HTTPException(status_code=422, detail="لم أجد نصًا واضحًا داخل الرابط.")
-        return {"success": True, "text": clean, "chars": len(clean), "source": str(response.url), "message": "تم جلب النص من الرابط. راجعه قبل إنشاء الصوت."}
+        return {"success": True, "text": clean, "chars": len(clean), "source": str(response.url), "message": "تم جلب النص من الرابط. اضغط الآن فهم وترتيب النص."}
     except HTTPException:
         raise
     except httpx.HTTPStatusError as exc:
