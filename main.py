@@ -26,6 +26,7 @@ from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runt
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
 from backend.api import gemini_cloud_control_patch as _gemini_cloud_control_patch
 from backend.api import gemini_session_runtime as _gemini_session_runtime
+from backend.api import gemini_session_patch as _gemini_session_patch
 from backend.api.gemini_session_runtime import router as gemini_session_router
 from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
