@@ -28,6 +28,8 @@ from backend.api.yemeni_creative_hotfix import router as yemeni_creative_safe_ro
 from backend.api.voice_clone_routes import router as voice_clone_router
 from backend.api import voice_clone_repair_runtime as _voice_clone_repair_runtime
 from backend.api.voice_clone_fast_routes import router as voice_clone_fast_router
+from backend.api.voice_clone_xtts_runtime import router as voice_clone_runtime_router
+from backend.api import voice_clone_fast_runtime_patch as _voice_clone_fast_runtime_patch
 from backend.api.voice_clone_ui_runtime import router as voice_clone_ui_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
@@ -101,6 +103,7 @@ app.include_router(yemeni_creative_router)
 app.include_router(yemeni_creative_safe_router)
 app.include_router(voice_clone_router)
 app.include_router(voice_clone_fast_router)
+app.include_router(voice_clone_runtime_router)
 # This explicit route is registered before StaticFiles. It serves the saved 6.2.0
 # HTML unchanged and injects only the fast-clone JavaScript patch at runtime.
 app.include_router(voice_clone_ui_router)
