@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-title Voice AI Studio - Build Windows Setup
+title Ibn Al-Waqadi Studio - Unified Windows Setup Builder
 
 echo =====================================================
-echo   Voice AI Studio Arabic Pro - Windows Setup Builder
+echo   Ibn Al-Waqadi Studio 5.0 - Unified Stable Builder
 echo =====================================================
 echo.
 
@@ -28,22 +28,28 @@ if errorlevel 1 (
   )
 )
 
-echo [1/4] Installing build dependencies...
+echo [1/5] Installing build dependencies...
 %PY% -m pip install --upgrade pip wheel
 if errorlevel 1 goto :failed
 %PY% -m pip install -r requirements.txt -r requirements-desktop.txt
 if errorlevel 1 goto :failed
 
-echo [2/4] Validating source files...
-%PY% -m compileall -q main.py desktop_app.py backend
+echo [2/5] Compiling source files...
+%PY% -m compileall -q main.py desktop_app.py backend scripts
 if errorlevel 1 goto :failed
 
-echo [3/4] Building standalone desktop application...
+echo [3/5] Validating the unified API, Cloud-Only policy, and route contracts...
+%PY% scripts\validate_unified_release.py
+if errorlevel 1 goto :failed
+
+echo [4/5] Building standalone desktop application...
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
 %PY% -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
 if errorlevel 1 goto :failed
 if not exist "dist\VoiceAIStudioArabic\VoiceAIStudioArabic.exe" goto :failed
 
-echo [4/4] Building Setup.exe...
+echo [5/5] Building Setup.exe...
 call :find_iscc
 if not defined ISCC (
   where winget >nul 2>&1
@@ -61,13 +67,14 @@ if not defined ISCC (
   exit /b 1
 )
 
+if exist dist-installer rmdir /s /q dist-installer
 echo Using Inno Setup: %ISCC%
 "%ISCC%" "installer\VoiceAIStudio.iss"
 if errorlevel 1 goto :failed
 if not exist "dist-installer\VoiceAIStudioSetup.exe" goto :failed
 
 echo.
-echo [SUCCESS] Installer created:
+echo [SUCCESS] Unified Studio 5.0 installer created:
 echo %CD%\dist-installer\VoiceAIStudioSetup.exe
 start "" explorer.exe "%CD%\dist-installer"
 pause
@@ -89,6 +96,6 @@ exit /b 0
 
 :failed
 echo.
-echo [ERROR] The build failed. Review the messages above.
+echo [ERROR] Unified build validation or packaging failed. Review the message above.
 pause
 exit /b 1
