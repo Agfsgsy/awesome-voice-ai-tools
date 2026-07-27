@@ -3,7 +3,7 @@ name: Build Windows Installer
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, agent/professional-tts-engine]
     paths:
       - "backend/**"
       - "frontend/**"
@@ -75,7 +75,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: IbnWaqadiStudio-5.0-Windows-Setup
+          name: IbnWaqadiStudio-5.1-Windows-Setup
           path: dist-installer/VoiceAIStudioSetup.exe
           if-no-files-found: error
           retention-days: 30
@@ -83,7 +83,7 @@ jobs:
       - name: Upload portable folder
         uses: actions/upload-artifact@v4
         with:
-          name: IbnWaqadiStudio-5.0-Windows-Portable
+          name: IbnWaqadiStudio-5.1-Windows-Portable
           path: dist/VoiceAIStudioArabic
           if-no-files-found: error
           retention-days: 14
