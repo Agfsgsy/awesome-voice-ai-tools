@@ -41,8 +41,8 @@ for directory in [DATA_DIR, MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, 
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "استوديو ابن الواقدي"
-APP_VERSION = "6.1.0"
-APP_RELEASE = "Yemeni Creative"
+APP_VERSION = "6.2.0"
+APP_RELEASE = "Voice Clone Pro"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
