@@ -6,7 +6,9 @@
   if (!provider || !generateButton) return;
 
   let fastState = null;
+  let runtimeState = null;
   let runningTimer = null;
+  let warmRequested = false;
 
   function plainFast(value) {
     if (value == null) return '';
@@ -76,7 +78,7 @@
       auto: 'يوصى به: يستخدم أسرع محرك استنساخ حقيقي متاح، ولا يستبدل صوت العينة بصوت جاهز.',
       elevenlabs: 'يتطلب مفتاحًا وخطة تسمح بـ Instant Voice Cloning.',
       gemini_vertex: 'يتطلب Google Cloud Project وقبول المشروع في Gemini Voice Replication Allowlist؛ مفتاح Gemini AI Studio العادي لا يكفي.',
-      local: 'يعمل على جهازك. يجب أن يظهر XTTS والنموذج الكامل «جاهز» قبل الإنتاج.',
+      local: 'يعمل على جهازك. تُحمّل الأداة نموذج XTTS في الذاكرة بالخلفية ثم تعيد استخدامه.',
     };
     hint.textContent = messages[provider.value] || '';
   }
@@ -96,17 +98,47 @@
     cloudEngine.insertAdjacentElement('afterend', card);
   }
 
+  async function requestWarmIfNeeded(data, runtime) {
+    if (!data.xtts_model_warmed || runtime?.state === 'ready' || runtime?.state === 'warming' || warmRequested) return;
+    warmRequested = true;
+    try {
+      await fastApi('/api/voice-clone-runtime/warm', {method: 'POST'}, 20000);
+    } catch (error) {
+      warmRequested = false;
+      console.warn('XTTS warm request:', error);
+    }
+  }
+
   async function refreshFastState() {
     try {
-      const data = await fastApi('/api/voice-clone-fast/status', {}, 20000);
+      const [data, runtime] = await Promise.all([
+        fastApi('/api/voice-clone-fast/status', {}, 20000),
+        fastApi('/api/voice-clone-runtime/status', {}, 20000).catch(() => null),
+      ]);
       fastState = data;
-      const localReady = !!data.local_engine_ready && !!data.xtts_model_warmed;
-      $('localChip').textContent = localReady ? 'النموذج جاهز' : (data.local_engine_ready ? 'يحتاج تنزيل النموذج' : 'غير جاهز');
-      $('localChip').className = 'chip ' + (localReady ? 'ok' : 'bad');
-      if (!localReady && data.local_setup?.state === 'needs_model') {
+      runtimeState = runtime;
+      const modelReady = !!data.local_engine_ready && !!data.xtts_model_warmed;
+      const memoryReady = runtime?.state === 'ready';
+      const warming = runtime?.state === 'warming';
+      $('localChip').textContent = memoryReady
+        ? 'جاهز في الذاكرة'
+        : warming
+          ? 'تحميل في الذاكرة...'
+          : modelReady
+            ? 'النموذج جاهز'
+            : data.local_engine_ready
+              ? 'يحتاج تنزيل النموذج'
+              : 'غير جاهز';
+      $('localChip').className = 'chip ' + (memoryReady || modelReady ? 'ok' : 'bad');
+      if (!modelReady && data.local_setup?.state === 'needs_model') {
         $('setupLocal').textContent = 'تنزيل وتجهيز نموذج XTTS الكامل';
-      } else if (localReady) {
-        $('setupLocal').textContent = 'XTTS والنموذج جاهزان';
+      } else if (memoryReady) {
+        $('setupLocal').textContent = 'XTTS جاهز في الذاكرة';
+      } else if (modelReady) {
+        $('setupLocal').textContent = warming ? 'جاري تحميل XTTS في الذاكرة...' : 'XTTS والنموذج جاهزان';
+      }
+      if (runtime?.state === 'failed' && runtime.error) {
+        status('setupStatus', `${runtime.message || 'فشل تشغيل XTTS.'} ${runtime.error}`, 'err');
       }
       const geminiChip = $('geminiCloneChip');
       if (geminiChip) {
@@ -115,6 +147,7 @@
       }
       const reason = $('geminiCloneReason');
       if (reason) reason.textContent = data.gemini_vertex_reason || '';
+      await requestWarmIfNeeded(data, runtime);
     } catch (error) {
       console.warn('Fast clone status:', error);
     }
@@ -154,7 +187,8 @@
       busy('generate', true);
       $('result').classList.remove('show');
       const label = provider.options[provider.selectedIndex]?.textContent || provider.value;
-      status('generateStatus', `بدأ الإنتاج عبر ${label}. يتم استخدام عينة مختصرة محسنة بدل معالجة الملف الطويل كاملًا...`, 'wait');
+      const referenceMessage = 'سيستخدم البرنامج أفضل 10–30 ثانية من العينة بدل معالجة التسجيل الطويل كاملًا.';
+      status('generateStatus', `بدأ الإنتاج عبر ${label}. ${referenceMessage}`, 'wait');
       beginElapsed(label);
       const data = await fastApi('/api/voice-clone-fast/generate', {
         method: 'POST',
