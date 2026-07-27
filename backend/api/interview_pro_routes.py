@@ -1,12 +1,15 @@
-"""Additive professional multi-speaker interview production for Ibn Al-Waqadi Studio."""
+"""Professional multi-speaker interview production with resumable Cloud-Only jobs."""
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import shutil
 import subprocess
-import uuid
+import time
 import wave
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -41,6 +44,12 @@ FORMATS = {
     "host_female_guest": ["المذيعة_امرأة", "الضيف_رجل"],
     "host_two_guests": ["المذيع_رجل", "الضيف_رجل", "الضيفة_امرأة"],
     "panel_four": ["المذيع_رجل", "الضيف_رجل", "الضيفة_امرأة", "الخبير_رجل"],
+}
+
+ENGINE_LABELS = {
+    "gemini": "Gemini TTS السحابي",
+    "elevenlabs": "ElevenLabs المدفوع",
+    "edge": "الصوت المجاني المختار يدويًا",
 }
 
 
@@ -109,7 +118,7 @@ async def create_scenario(req: ScenarioRequest):
         return {"success": True, "script": script, "roles": roles, "source": "gemini", "message": "تم إنشاء سيناريو مقابلة بودكاست احترافي."}
     except Exception:
         script = _local_scenario(req.topic, roles)
-        return {"success": True, "script": script, "roles": roles, "source": "local_fallback", "message": "حصة محرر Gemini غير متاحة حاليًا؛ تم إنشاء سيناريو احتياطي مرتب داخل الاستوديو ويمكنك تعديله."}
+        return {"success": True, "script": script, "roles": roles, "source": "local_fallback", "message": "تعذر محرر Gemini مؤقتًا؛ تم إنشاء سيناريو محلي مرتب ويمكنك تعديله."}
 
 
 def _parse(script: str) -> list[tuple[str, str]]:
@@ -153,7 +162,7 @@ def _voice(role: str, engine: str) -> tuple[str, float]:
 
 
 def _silence(path: Path, milliseconds: int) -> None:
-    rate = 24000
+    rate = 48000
     with wave.open(str(path), "wb") as output:
         output.setnchannels(1)
         output.setsampwidth(2)
@@ -161,82 +170,154 @@ def _silence(path: Path, milliseconds: int) -> None:
         output.writeframes(b"\x00\x00" * int(rate * milliseconds / 1000))
 
 
-async def _generate_segments(segments: list[tuple[str, str]], engine: str, base_speed: float) -> tuple[list[Path], list[str]]:
+def _plain_message(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, dict):
+        for key in ("message", "detail", "error", "reason", "status"):
+            if key in value:
+                nested = _plain_message(value.get(key))
+                if nested:
+                    return nested
+        try:
+            return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        except Exception:
+            return repr(value)
+    if isinstance(value, (list, tuple, set)):
+        parts = [_plain_message(item) for item in value]
+        return " | ".join(part for part in parts if part)
+    return str(value)
+
+
+def _retry_after_seconds(message: str) -> int:
+    patterns = (
+        r"retry(?:\s+in|\s+after)?\s*([0-9]+(?:\.[0-9]+)?)\s*s",
+        r"بعد\s*(\d+)\s*ث",
+        r"(\d+)\s*seconds?",
+        r"(\d+)\s*ثانية",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, message, re.IGNORECASE)
+        if match:
+            return max(1, min(600, int(float(match.group(1)) + 1)))
+    return 0
+
+
+def _is_temporary(message: str) -> bool:
+    low = message.lower()
+    return any(token in low for token in ("429", "rate limit", "resource_exhausted", "temporar", "timeout", "timed out", "connection", "حد مؤقت", "انتظار", "أعد المحاولة", "retry"))
+
+
+def _job_id(req: RenderRequest) -> str:
+    normalized = {
+        "script": "\n".join(line.strip() for line in req.script.splitlines() if line.strip()),
+        "engine": req.engine,
+        "master": req.master,
+        "base_speed": round(req.base_speed, 4),
+        "pause_ms": req.pause_ms,
+    }
+    raw = json.dumps(normalized, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:18]
+
+
+def _write_manifest(work: Path, payload: dict[str, Any]) -> None:
+    payload = dict(payload)
+    payload["updated_at"] = int(time.time())
+    path = work / "progress.json"
+    temp = path.with_suffix(".tmp")
+    temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp.replace(path)
+
+
+def _normalize_audio(source: Path, target: Path, ffmpeg: str) -> None:
+    command = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-vn", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1", str(target)]
+    process = subprocess.run(command, capture_output=True, text=True, timeout=600, check=False)
+    if process.returncode != 0 or not target.exists() or target.stat().st_size <= 44:
+        target.unlink(missing_ok=True)
+        raise RuntimeError((process.stderr or "فشل تجهيز ملف المشهد الصوتي")[-1200:])
+
+
+async def _generate_segments(segments: list[tuple[str, str]], engine: str, base_speed: float, work: Path, ffmpeg: str) -> tuple[list[Path], int]:
     plugin = tts_registry.get_plugin(engine)
     if not plugin:
-        raise HTTPException(status_code=503, detail=f"محرك {engine} غير متاح.")
+        raise HTTPException(status_code=503, detail={"message": f"محرك {engine} غير متاح.", "engine": engine})
     files: list[Path] = []
-    errors: list[str] = []
+    resumed = 0
+    total = len(segments)
     for index, (role, text) in enumerate(segments):
+        target = work / f"part_{index:04d}.wav"
+        if target.exists() and target.stat().st_size > 44:
+            files.append(target)
+            resumed += 1
+            continue
         voice, role_speed = _voice(role, engine)
         natural_variation = (0.992, 1.0, 1.008, 0.997, 1.004)[index % 5]
         speed = max(0.75, min(1.20, base_speed * role_speed * natural_variation))
-        result = await plugin.generate(text=text, voice=voice, language="ar", speed=speed)
-        if not result or not result.get("success"):
-            errors.append((result or {}).get("message", f"فشل صوت {role}"))
-            raise HTTPException(status_code=502, detail=errors[-1])
-        source = Path(result.get("file", ""))
-        if not source.exists():
-            raise HTTPException(status_code=500, detail=f"لم يتم العثور على ملف صوت {role}.")
-        files.append(source)
-    return files, errors
+        try:
+            result = await plugin.generate(text=text, voice=voice, language="ar", speed=speed)
+        except Exception as exc:
+            result = {"success": False, "message": f"{type(exc).__name__}: {exc}"}
+        if not isinstance(result, dict) or not result.get("success"):
+            message = _plain_message(result.get("message") if isinstance(result, dict) else result) or f"تعذر إنشاء صوت المتحدث {role}."
+            retry_after = _retry_after_seconds(message)
+            temporary = _is_temporary(message) or retry_after > 0
+            _write_manifest(work, {"status": "waiting" if temporary else "failed", "engine": engine, "completed": len(files), "total": total, "failed_segment": index + 1, "failed_role": role, "retry_after_seconds": retry_after, "message": message})
+            raise HTTPException(status_code=429 if temporary else 502, detail={"message": message, "engine": engine, "engine_label": ENGINE_LABELS.get(engine, engine), "completed": len(files), "total": total, "failed_segment": index + 1, "failed_role": role, "retry_after_seconds": retry_after, "temporary": temporary, "resume_supported": True})
+        source_text = _plain_message(result.get("file"))
+        source = Path(source_text) if source_text else Path()
+        if not source_text or not source.exists():
+            raise HTTPException(status_code=500, detail={"message": f"المحرك نجح لكن ملف صوت المتحدث {role} غير موجود.", "completed": len(files), "total": total, "failed_segment": index + 1, "failed_role": role, "resume_supported": True})
+        try:
+            _normalize_audio(source, target, ffmpeg)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail={"message": _plain_message(exc), "completed": len(files), "total": total, "failed_segment": index + 1, "failed_role": role, "resume_supported": True}) from exc
+        files.append(target)
+        _write_manifest(work, {"status": "generating", "engine": engine, "completed": len(files), "total": total, "current_segment": index + 1, "current_role": role, "message": f"تم حفظ المشهد {index + 1} من {total}."})
+    return files, resumed
 
 
 @router.post("/render")
 async def render(req: RenderRequest):
     segments = _parse(req.script)
     if not segments:
-        raise HTTPException(status_code=400, detail="اكتب الحوار بصيغة اسم المتحدث: النص")
-
+        raise HTTPException(status_code=400, detail={"message": "اكتب الحوار بصيغة اسم المتحدث: النص"})
     requested = req.engine if req.engine in {"gemini", "edge", "elevenlabs"} else "gemini"
-    candidates = [requested]
-    if requested == "gemini":
-        candidates.append("edge")
-    elif requested == "elevenlabs":
-        candidates.extend(["gemini", "edge"])
-
-    generated: list[Path] = []
-    used_engine = requested
-    failures: list[str] = []
-    for candidate in list(dict.fromkeys(candidates)):
-        try:
-            generated, _ = await _generate_segments(segments, candidate, req.base_speed)
-            used_engine = candidate
-            break
-        except HTTPException as exc:
-            failures.append(f"{candidate}: {exc.detail}")
-            generated = []
-            continue
-    if not generated:
-        raise HTTPException(status_code=502, detail="تعذر الإنتاج بالمحركات المتاحة. " + " | ".join(failures[-3:]))
-
-    token = uuid.uuid4().hex[:10]
-    work = OUTPUTS_DIR / f"ibn_alwaqadi_interview_{token}_parts"
+    engine_label = ENGINE_LABELS.get(requested, requested)
+    ffmpeg = _ffmpeg_executable()
+    if not ffmpeg:
+        raise HTTPException(status_code=500, detail={"message": "FFmpeg غير متاح داخل البرنامج."})
+    job_id = _job_id(req)
+    work = OUTPUTS_DIR / "interview_jobs" / job_id
     work.mkdir(parents=True, exist_ok=True)
-    pause = work / "pause.wav"
-    _silence(pause, req.pause_ms)
+    final = OUTPUTS_DIR / f"ibn_alwaqadi_podcast_{job_id}.mp3"
+    raw = OUTPUTS_DIR / f"ibn_alwaqadi_interview_{job_id}.wav"
+    if final.exists() and final.stat().st_size > 256:
+        target = _desktop_exports() / final.name
+        if not target.exists() or target.stat().st_size != final.stat().st_size:
+            shutil.copy2(final, target)
+        return {"success": True, "url": f"/api/downloads/{final.name}", "desktop_path": str(target), "segments": len(segments), "speakers": len({role for role, _ in segments}), "engine_requested": requested, "engine_used": requested, "fallback": False, "cached": True, "job_id": job_id, "message": "المقابلة جاهزة من الجلسة المحفوظة، ولم تُرسل طلبات صوت جديدة."}
+    generated, resumed = await _generate_segments(segments, requested, req.base_speed, work, ffmpeg)
+    pause = work / f"pause_{req.pause_ms}.wav"
+    if not pause.exists() or pause.stat().st_size <= 44:
+        _silence(pause, req.pause_ms)
     files: list[Path] = []
     for index, source in enumerate(generated):
         files.append(source)
         if index < len(generated) - 1:
             files.append(pause)
-
-    ffmpeg = _ffmpeg_executable()
-    if not ffmpeg:
-        raise HTTPException(status_code=500, detail="FFmpeg غير متاح داخل البرنامج.")
     concat = work / "concat.txt"
     concat.write_text("\n".join("file '" + str(path).replace("'", "'\\''") + "'" for path in files), encoding="utf-8")
-    raw = OUTPUTS_DIR / f"ibn_alwaqadi_interview_{token}.wav"
     command = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(concat), "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "1", str(raw)]
     process = subprocess.run(command, capture_output=True, text=True, timeout=1200, check=False)
-    if process.returncode != 0 or not raw.exists():
-        raise HTTPException(status_code=500, detail=(process.stderr or "فشل دمج المقابلة")[-1200:])
-    final = OUTPUTS_DIR / f"ibn_alwaqadi_podcast_{token}.mp3"
+    if process.returncode != 0 or not raw.exists() or raw.stat().st_size <= 44:
+        raise HTTPException(status_code=500, detail={"message": (process.stderr or "فشل دمج المقابلة")[-1200:], "completed": len(generated), "total": len(segments), "resume_supported": True})
     output = final if process_audio(str(raw), str(final), req.master) else raw
     target = _desktop_exports() / output.name
     shutil.copy2(output, target)
-    fallback = used_engine != requested
-    message = "تم إنتاج مقابلة بشرية بأسلوب بودكاست وحفظها على سطح المكتب."
-    if fallback:
-        message += " انتهت حصة المحرك المطلوب، فانتقل الاستوديو تلقائيًا إلى الأصوات العربية المجانية دون إيقاف الإنتاج."
-    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target), "segments": len(segments), "speakers": len({role for role, _ in segments}), "engine_requested": requested, "engine_used": used_engine, "fallback": fallback, "message": message}
+    _write_manifest(work, {"status": "completed", "engine": requested, "completed": len(segments), "total": len(segments), "output": str(output), "desktop_path": str(target)})
+    resume_note = f" تم استعادة {resumed} مشهد محفوظ." if resumed else ""
+    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target), "segments": len(segments), "speakers": len({role for role, _ in segments}), "engine_requested": requested, "engine_used": requested, "fallback": False, "cached": False, "resumed_segments": resumed, "job_id": job_id, "message": f"تم إنتاج المقابلة باستخدام {engine_label} فقط وحفظها على سطح المكتب.{resume_note}"}
