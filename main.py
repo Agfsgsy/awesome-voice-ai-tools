@@ -35,6 +35,7 @@ from backend.api.unified_studio_routes import (
     interview_router as unified_interview_router,
     studio_router as unified_studio_router,
 )
+from backend.api.download_export_runtime import install_download_export_runtime
 from backend.core.config import (
     APP_DEBUG,
     APP_HOST,
@@ -93,6 +94,10 @@ app.include_router(dialogue_ultra_router)
 app.include_router(dialogue_safe_router)
 app.include_router(dashboard_router)
 app.include_router(ultimate_studio_router)
+
+# Replace only the existing GET audio-download handler. No generated file is
+# deleted, moved, renamed, or overwritten; a verified copy is added to Desktop.
+install_download_export_runtime(app)
 
 
 def _validate_api_contracts() -> None:
