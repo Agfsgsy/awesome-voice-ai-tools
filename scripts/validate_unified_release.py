@@ -47,10 +47,14 @@ def _validate_versions() -> None:
         "installer/VoiceAIStudio.iss": f'#define MyAppVersion "{EXPECTED_VERSION}"',
         "frontend/static/studio_shell.html": f"VERSION='{EXPECTED_VERSION}'",
         "frontend/static/ultimate_studio.html": "Ultimate Voice 6.0",
+        ".github/workflows/build-windows-installer.yml": "IbnWaqadiStudio-6.0-Windows-Setup",
     }
     for path, marker in version_contracts.items():
         if marker not in _text(path):
             fail(f"{path} does not use version {EXPECTED_VERSION}")
+    workflow = _text(".github/workflows/build-windows-installer.yml")
+    if "IbnWaqadiStudio-6.0-Windows-Portable" not in workflow:
+        fail("Windows portable artifact does not use the unified version")
 
 
 def _validate_free_first_policy() -> None:
