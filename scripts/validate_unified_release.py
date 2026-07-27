@@ -1,4 +1,4 @@
-"""Build-time validation for Voice Clone Pro 6.2.0."""
+"""Build-time validation for Voice Clone Pro 6.2.0 and the additive Yemeni repair."""
 from __future__ import annotations
 
 import json
@@ -73,6 +73,8 @@ def _validate_api_contracts() -> None:
         ("/api/ultimate/dialogue", "POST"),
         ("/api/yemeni-creative/write", "POST"),
         ("/api/yemeni-creative/produce", "POST"),
+        ("/api/yemeni-creative-safe/write", "POST"),
+        ("/api/yemeni-creative-safe/produce", "POST"),
         ("/api/voice-clone/generate", "POST"),
     }
     required_routes = required_bodies | {
@@ -81,6 +83,7 @@ def _validate_api_contracts() -> None:
         ("/api/voice-clone/profiles", "POST"),
         ("/api/voice-clone/profiles", "GET"),
         ("/api/studio-pro/clone", "POST"),
+        ("/api/yemeni-creative-safe/health", "GET"),
     }
     found: set[tuple[str, str]] = set()
     duplicates: dict[tuple[str, str], list[str]] = defaultdict(list)
@@ -118,7 +121,7 @@ def _validate_voice_clone() -> None:
     coqui = _text("backend/plugins/coqui_plugin.py")
     main = _text("main.py")
 
-    backend_markers = (
+    for marker in (
         "consent_confirmed",
         "speaker_wav",
         "coqui-tts==0.27.5",
@@ -128,20 +131,18 @@ def _validate_voice_clone() -> None:
         "48000",
         "synthetic_voice",
         "استنساخ الصوت",
-    )
-    for marker in backend_markers:
+    ):
         if marker not in backend:
             fail(f"Voice Clone backend is missing: {marker}")
 
-    frontend_markers = (
+    for marker in (
         "/api/voice-clone/status",
         "/api/voice-clone/setup-local",
         "/api/voice-clone/profiles",
         "/api/voice-clone/generate",
         "أؤكد أنني صاحب الصوت",
         "لا يوجد محرك يضمن تطابقًا صوتيًا 100%",
-    )
-    for marker in frontend_markers:
+    ):
         if marker not in frontend:
             fail(f"Voice Clone frontend is missing: {marker}")
 
@@ -157,17 +158,41 @@ def _validate_voice_clone() -> None:
         fail("Coqui plugin does not expose a real clone method")
 
 
-def _validate_existing_features() -> None:
-    yemeni_backend = _text("backend/api/yemeni_creative_routes.py")
-    yemeni_frontend = _text("frontend/static/yemeni_creative.html")
+def _validate_yemeni_features() -> None:
+    original_backend = _text("backend/api/yemeni_creative_routes.py")
+    original_frontend = _text("frontend/static/yemeni_creative.html")
+    repaired_backend = _text("backend/api/yemeni_creative_hotfix.py")
+    repaired_frontend = _text("frontend/static/yemeni_creative_pro.html")
     shell = _text("frontend/static/studio_shell.html")
+    main = _text("main.py")
+
     for marker in ("zamil", "shila", "success_cinematic", "320k", "الأعمال اليمنية"):
-        if marker not in yemeni_backend:
+        if marker not in original_backend:
             fail(f"Existing Yemeni Creative feature is missing: {marker}")
-    if "/api/yemeni-creative/produce" not in yemeni_frontend:
-        fail("Existing Yemeni Creative frontend is incomplete")
-    if "/static/yemeni_creative.html" not in shell:
-        fail("Existing Yemeni Creative navigation was removed")
+    if "/api/yemeni-creative/produce" not in original_frontend:
+        fail("The original Yemeni Creative frontend was removed")
+
+    for marker in (
+        "/api/yemeni-creative-safe/health",
+        "/api/yemeni-creative-safe/write",
+        "/api/yemeni-creative-safe/produce",
+        "quickShila",
+        "quickZamil",
+        "إنشاء شيلة الآن",
+        "إنتاج الشيلة أو العمل الآن",
+    ):
+        if marker not in repaired_frontend:
+            fail(f"The repaired Yemeni frontend is missing: {marker}")
+
+    for marker in ("asyncio.wait_for", "_write_local", "_simple_mix", "12, token", "safe_hotfix"):
+        if marker not in repaired_backend:
+            fail(f"The repaired Yemeni backend is missing: {marker}")
+
+    if "/static/yemeni_creative_pro.html" not in shell:
+        fail("The 6.2 interface does not open the repaired Yemeni page")
+    if "yemeni_creative_router" not in main or "yemeni_creative_safe_router" not in main:
+        fail("The original and repaired Yemeni routers are not both mounted")
+
     runtime = _text("backend/api/download_export_runtime.py")
     if "shutil.copy2" not in runtime or "OUTPUTS_DIR" not in runtime:
         fail("Reliable Desktop audio export runtime is missing")
@@ -178,9 +203,9 @@ def main() -> None:
     _validate_engine_policy()
     _validate_api_contracts()
     _validate_voice_clone()
-    _validate_existing_features()
-    print("[SUCCESS] Voice Clone Pro 6.2.0 contracts validated.")
-    print("[SUCCESS] Consent profiles, XTTS speaker_wav, ElevenLabs IVC, legacy cloning and Desktop exports are connected.")
+    _validate_yemeni_features()
+    print("[SUCCESS] Voice Clone Pro 6.2.0 interface and tools are preserved.")
+    print("[SUCCESS] The additive Yemeni shila/zamil repair is connected without deleting the original feature.")
 
 
 if __name__ == "__main__":
