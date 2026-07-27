@@ -1,7 +1,7 @@
 # Ibn Al-Waqadi Studio - Yemeni Creative 6.1 add-on installer.
 # ASCII-only for Windows PowerShell 5.1.
-# Builds in a temporary staging folder first. The original source is updated only
-# after the staged application has compiled, passed a route smoke test, built, and installed.
+# The original source is not changed until a staged copy compiles, passes its
+# route smoke test, builds a complete installer, and installs successfully.
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -9,7 +9,10 @@ $ProgressPreference = "SilentlyContinue"
 $FeatureCommit = "65b565cd947af1edb8204cb22752c9db080d888f"
 $RawRoot = "https://raw.githubusercontent.com/Agfsgsy/awesome-voice-ai-tools/$FeatureCommit"
 $TargetVersion = "6.1.0"
-$NavBase64 = "ICAgICAgPGRpdiBjbGFzcz0iZ3JvdXAiPtin2YTYpdio2K/Yp9i5INin2YTZitmF2YbZijwvZGl2PgogICAgICA8YnV0dG9uIGNsYXNzPSJuYXZJdGVtIHllbWVuaSIgZGF0YS1wYWdlPSIvc3RhdGljL3llbWVuaV9jcmVhdGl2ZS5odG1sIiBkYXRhLXRpdGxlPSLYp9mE2KXZh9iv2KfYodin2Kog2YjYp9mE2KPYtNi52KfYsSDYp9mE2YrZhdmG2YrYqSIgZGF0YS1kZXNjPSLYstin2YXZhCDZiNi2YrZhNipINmI2YLYtdmK2K/YqSDZiNmG2KzYp9itINmI2YXZiNiz2YrZgtmJINij2LXZhNmK2KkiPjxzcGFuIGNsYXNzPSJuYXZJY29uIj7wn4e+8J+Hqjwvc3Bhbj48c3BhbiBjbGFzcz0ibmF2Q29weSI+PHNwYW4gY2xhc3M9Im5hdlRpdGxlIj7Yp9mE2KXZh9iv2KfYodin2Kog2YjYp9mE2KPYtNi52KfYsSDYp9mE2YrZhdmG2YrYqTwvc3Bhbj48c3BhbiBjbGFzcz0ibmF2RGVzYyI+2YbYrNin2K0g4oCiINiq2YHZiNmCIOKAoiDYstin2YXZhCDigKIg2LTZitmE2Kkg4oCiINil2YfYr9in2KE8L3NwYW4+PC9zcGFuPjwvYnV0dG9uPgo="
+$NavHtml = @'
+      <div class="group">&#1575;&#1604;&#1573;&#1576;&#1583;&#1575;&#1593; &#1575;&#1604;&#1610;&#1605;&#1606;&#1610;</div>
+      <button class="navItem yemeni" data-page="/static/yemeni_creative.html" data-title="&#1575;&#1604;&#1573;&#1607;&#1583;&#1575;&#1569;&#1575;&#1578; &#1608;&#1575;&#1604;&#1571;&#1588;&#1593;&#1575;&#1585; &#1575;&#1604;&#1610;&#1605;&#1606;&#1610;&#1577;" data-desc="&#1586;&#1575;&#1605;&#1604; &#1608;&#1588;&#1610;&#1604;&#1577; &#1608;&#1602;&#1589;&#1610;&#1583;&#1577; &#1608;&#1606;&#1580;&#1575;&#1581; &#1608;&#1605;&#1608;&#1587;&#1610;&#1602;&#1609; &#1571;&#1589;&#1604;&#1610;&#1577;"><span class="navIcon">&#127486;&#127466;</span><span class="navCopy"><span class="navTitle">&#1575;&#1604;&#1573;&#1607;&#1583;&#1575;&#1569;&#1575;&#1578; &#1608;&#1575;&#1604;&#1571;&#1588;&#1593;&#1575;&#1585; &#1575;&#1604;&#1610;&#1605;&#1606;&#1610;&#1577;</span><span class="navDesc">&#1606;&#1580;&#1575;&#1581; &#8226; &#1578;&#1601;&#1608;&#1602; &#8226; &#1586;&#1575;&#1605;&#1604; &#8226; &#1588;&#1610;&#1604;&#1577; &#8226; &#1573;&#1607;&#1583;&#1575;&#1569;</span></span></button>
+'@
 
 function Write-Step {
     param([string]$Text)
@@ -45,7 +48,7 @@ function Read-Utf8 {
 
 function Write-Utf8 {
     param([string]$Path, [string]$Text)
-    $Encoding = New-Object System.Text.UTF8Encoding($false)
+    $Encoding = New-Object System.Text.UTF8Encoding -ArgumentList $false
     [System.IO.File]::WriteAllText($Path, $Text, $Encoding)
 }
 
@@ -56,26 +59,44 @@ function Replace-Required {
         [string]$Replacement,
         [string]$Description
     )
-    $Regex = New-Object System.Text.RegularExpressions.Regex(
-        $Pattern,
-        [System.Text.RegularExpressions.RegexOptions]::Multiline
-    )
+    $Options = [System.Text.RegularExpressions.RegexOptions]::Multiline
+    $Regex = New-Object System.Text.RegularExpressions.Regex -ArgumentList @($Pattern, $Options)
     if (-not $Regex.IsMatch($Text)) {
         throw "Patch marker was not found: $Description"
     }
     return $Regex.Replace($Text, $Replacement, 1)
 }
 
+function Ensure-Python311 {
+    & py -3.11 -V *> $null
+    if ($LASTEXITCODE -eq 0) { return }
+
+    $Winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+    if (-not $Winget) {
+        throw "Python 3.11 is missing and winget is unavailable."
+    }
+
+    Write-Host "Installing Python 3.11..." -ForegroundColor Yellow
+    & winget install --id Python.Python.3.11 --exact --silent --accept-package-agreements --accept-source-agreements
+    & py -3.11 -V *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Python 3.11 installation did not complete. Restart Windows and run this installer again."
+    }
+}
+
 function Find-Iscc {
-    $Candidates = @(
-        (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
-        (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"),
-        (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
-    )
+    $Candidates = @()
+    if (${env:ProgramFiles(x86)}) {
+        $Candidates += (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe")
+    }
+    if ($env:ProgramFiles) {
+        $Candidates += (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe")
+    }
+    if ($env:LOCALAPPDATA) {
+        $Candidates += (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
+    }
     foreach ($Candidate in $Candidates) {
-        if ($Candidate -and (Test-Path -LiteralPath $Candidate -PathType Leaf)) {
-            return $Candidate
-        }
+        if (Test-Path -LiteralPath $Candidate -PathType Leaf) { return $Candidate }
     }
     $Command = Get-Command ISCC.exe -ErrorAction SilentlyContinue
     if ($Command) { return $Command.Source }
@@ -93,10 +114,10 @@ function Patch-StagingProject {
     $Main = Read-Utf8 $MainPath
     if ($Main -notmatch "yemeni_creative_routes") {
         if ($Main -match "(?m)^from backend\.api\.ultimate_studio_routes import router as ultimate_studio_router\r?$") {
-            $Main = Replace-Required $Main "(?m)^(from backend\.api\.ultimate_studio_routes import router as ultimate_studio_router\r?)$" ('$1' + "`nfrom backend.api.yemeni_creative_routes import router as yemeni_creative_router") "main import after ultimate studio"
+            $Main = Replace-Required -Text $Main -Pattern "(?m)^(from backend\.api\.ultimate_studio_routes import router as ultimate_studio_router\r?)$" -Replacement ('$1' + "`nfrom backend.api.yemeni_creative_routes import router as yemeni_creative_router") -Description "main import after ultimate studio"
         }
         elseif ($Main -match "(?m)^from backend\.api\.dashboard_routes import router as dashboard_router\r?$") {
-            $Main = Replace-Required $Main "(?m)^(from backend\.api\.dashboard_routes import router as dashboard_router\r?)$" ('$1' + "`nfrom backend.api.yemeni_creative_routes import router as yemeni_creative_router") "main import after dashboard"
+            $Main = Replace-Required -Text $Main -Pattern "(?m)^(from backend\.api\.dashboard_routes import router as dashboard_router\r?)$" -Replacement ('$1' + "`nfrom backend.api.yemeni_creative_routes import router as yemeni_creative_router") -Description "main import after dashboard"
         }
         else {
             throw "No safe import position was found in main.py."
@@ -105,41 +126,40 @@ function Patch-StagingProject {
 
     if ($Main -notmatch "app\.include_router\(yemeni_creative_router\)") {
         if ($Main -match "(?m)^app\.include_router\(ultimate_studio_router\)\r?$") {
-            $Main = Replace-Required $Main "(?m)^(app\.include_router\(ultimate_studio_router\)\r?)$" ('$1' + "`napp.include_router(yemeni_creative_router)") "router registration after ultimate studio"
+            $Main = Replace-Required -Text $Main -Pattern "(?m)^(app\.include_router\(ultimate_studio_router\)\r?)$" -Replacement ('$1' + "`napp.include_router(yemeni_creative_router)") -Description "router registration after ultimate studio"
         }
         elseif ($Main -match "(?m)^app\.include_router\(dashboard_router\)\r?$") {
-            $Main = Replace-Required $Main "(?m)^(app\.include_router\(dashboard_router\)\r?)$" ('$1' + "`napp.include_router(yemeni_creative_router)") "router registration after dashboard"
+            $Main = Replace-Required -Text $Main -Pattern "(?m)^(app\.include_router\(dashboard_router\)\r?)$" -Replacement ('$1' + "`napp.include_router(yemeni_creative_router)") -Description "router registration after dashboard"
         }
         else {
             throw "No safe router position was found in main.py."
         }
     }
-    Write-Utf8 $MainPath $Main
+    Write-Utf8 -Path $MainPath -Text $Main
 
     $Shell = Read-Utf8 $ShellPath
     if ($Shell -notmatch "/static/yemeni_creative\.html") {
         $ProducerPattern = '(?m)^[ \t]*<button[^>]+data-page="/static/producer\.html"'
-        $Match = [regex]::Match($Shell, $ProducerPattern)
+        $Match = [System.Text.RegularExpressions.Regex]::Match($Shell, $ProducerPattern)
         if (-not $Match.Success) {
             throw "The producer navigation marker was not found in studio_shell.html."
         }
-        $Nav = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($NavBase64))
-        $Shell = $Shell.Insert($Match.Index, $Nav)
+        $Shell = $Shell.Insert($Match.Index, $NavHtml)
     }
-    $Shell = [regex]::Replace($Shell, "Professional Studio\s+[0-9]+\.[0-9]+(?:\.[0-9]+)?", "Professional Studio 6.1.0", 1)
-    $Shell = [regex]::Replace($Shell, "VERSION='[0-9]+\.[0-9]+(?:\.[0-9]+)?'", "VERSION='6.1.0'", 1)
-    Write-Utf8 $ShellPath $Shell
+    $Shell = [System.Text.RegularExpressions.Regex]::Replace($Shell, "Professional Studio\s+[0-9]+\.[0-9]+(?:\.[0-9]+)?", "Professional Studio 6.1.0")
+    $Shell = [System.Text.RegularExpressions.Regex]::Replace($Shell, "VERSION='[0-9]+\.[0-9]+(?:\.[0-9]+)?'", "VERSION='6.1.0'")
+    Write-Utf8 -Path $ShellPath -Text $Shell
 
     $Config = Read-Utf8 $ConfigPath
-    $Config = Replace-Required $Config '(?m)^APP_VERSION\s*=\s*"[^"]+"\s*$' 'APP_VERSION = "6.1.0"' "APP_VERSION"
+    $Config = Replace-Required -Text $Config -Pattern '(?m)^APP_VERSION\s*=\s*"[^"]+"\s*$' -Replacement 'APP_VERSION = "6.1.0"' -Description "APP_VERSION"
     if ($Config -match '(?m)^APP_RELEASE\s*=') {
-        $Config = [regex]::Replace($Config, '(?m)^APP_RELEASE\s*=\s*"[^"]*"\s*$', 'APP_RELEASE = "Yemeni Creative Add-on"', 1)
+        $Config = [System.Text.RegularExpressions.Regex]::Replace($Config, '(?m)^APP_RELEASE\s*=\s*"[^"]*"\s*$', 'APP_RELEASE = "Yemeni Creative Add-on"')
     }
-    Write-Utf8 $ConfigPath $Config
+    Write-Utf8 -Path $ConfigPath -Text $Config
 
     $Installer = Read-Utf8 $InstallerPath
-    $Installer = Replace-Required $Installer '(?m)^#define MyAppVersion\s+"[^"]+"\s*$' '#define MyAppVersion "6.1.0"' "installer version"
-    Write-Utf8 $InstallerPath $Installer
+    $Installer = Replace-Required -Text $Installer -Pattern '(?m)^#define MyAppVersion\s+"[^"]+"\s*$' -Replacement '#define MyAppVersion "6.1.0"' -Description "installer version"
+    Write-Utf8 -Path $InstallerPath -Text $Installer
 }
 
 $Project = Find-ProjectRoot
@@ -153,12 +173,14 @@ if ([string]::IsNullOrWhiteSpace($Project)) {
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $Stage = Join-Path $env:TEMP ("IbnWaqadi-YemeniAddon-" + [guid]::NewGuid().ToString("N"))
 $Backup = Join-Path $Project ("Backups\YemeniAddon-6.1-" + $Stamp)
-$StageReady = $false
+$SourceSaved = $false
 
 try {
     Write-Step "Ibn Al-Waqadi Studio 6.1 - feature-only safe installer"
     Write-Host "Original project: $Project" -ForegroundColor Green
-    Write-Host "The existing project will not be changed until the staged build is installed successfully." -ForegroundColor Yellow
+    Write-Host "The original project stays untouched until the staged installer succeeds." -ForegroundColor Yellow
+
+    Ensure-Python311
 
     $DriveName = ([System.IO.Path]::GetPathRoot($Project)).TrimEnd("\").TrimEnd(":")
     $Drive = Get-PSDrive -Name $DriveName -ErrorAction Stop
@@ -208,16 +230,16 @@ try {
         }
     }
 
-    Write-Step "3/7 - Add the feature links without replacing the studio"
+    Write-Step "3/7 - Add only the feature links to the staged copy"
     Patch-StagingProject -Root $Stage
 
-    Write-Step "4/7 - Install build requirements and compile the staged copy"
+    Write-Step "4/7 - Compile and smoke-test the staged copy"
     Push-Location $Stage
     try {
-        py -3.11 -m pip install -r requirements.txt -r requirements-desktop.txt
+        & py -3.11 -m pip install -r requirements.txt -r requirements-desktop.txt
         if ($LASTEXITCODE -ne 0) { throw "Python dependency installation failed." }
 
-        py -3.11 -m compileall -q main.py desktop_app.py backend
+        & py -3.11 -m compileall -q main.py desktop_app.py backend
         if ($LASTEXITCODE -ne 0) { throw "Python compilation failed." }
 
         $Smoke = @'
@@ -230,8 +252,8 @@ assert not missing, f"Missing Yemeni Creative routes: {sorted(missing)}"
 print("YEMENI_ADDON_SMOKE_OK")
 '@
         $SmokeFile = Join-Path $Stage "yemeni_addon_smoke.py"
-        Write-Utf8 $SmokeFile $Smoke
-        py -3.11 $SmokeFile
+        Write-Utf8 -Path $SmokeFile -Text $Smoke
+        & py -3.11 $SmokeFile
         if ($LASTEXITCODE -ne 0) { throw "Feature route smoke test failed." }
         Remove-Item -LiteralPath $SmokeFile -Force -ErrorAction SilentlyContinue
     }
@@ -243,11 +265,11 @@ print("YEMENI_ADDON_SMOKE_OK")
     Push-Location $Stage
     try {
         Remove-Item -LiteralPath (Join-Path $Stage "build"), (Join-Path $Stage "dist"), (Join-Path $Stage "dist-installer") -Recurse -Force -ErrorAction SilentlyContinue
-        py -3.11 -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
+        & py -3.11 -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
         if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
 
-        $Exe = Join-Path $Stage "dist\VoiceAIStudioArabic\VoiceAIStudioArabic.exe"
-        if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
+        $StagedExe = Join-Path $Stage "dist\VoiceAIStudioArabic\VoiceAIStudioArabic.exe"
+        if (-not (Test-Path -LiteralPath $StagedExe -PathType Leaf)) {
             throw "The staged application executable was not created."
         }
 
@@ -272,7 +294,6 @@ print("YEMENI_ADDON_SMOKE_OK")
     if (-not (Test-Path -LiteralPath $Setup -PathType Leaf) -or (Get-Item -LiteralPath $Setup).Length -lt 1048576) {
         throw "The staged installer is missing or incomplete."
     }
-    $StageReady = $true
 
     Write-Step "6/7 - Install the verified staged application"
     Stop-Process -Name "VoiceAIStudioArabic" -Force -ErrorAction SilentlyContinue
@@ -311,18 +332,19 @@ print("YEMENI_ADDON_SMOKE_OK")
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Original) | Out-Null
         Copy-Item -LiteralPath $StagedFile -Destination $Original -Force
     }
+    $SourceSaved = $true
 
     Start-Process -FilePath $InstalledExe
     Write-Step "Yemeni Creative add-on 6.1 installed successfully"
-    Write-Host "Only the requested feature and its two integration links were added." -ForegroundColor Green
+    Write-Host "Only the requested feature and its integration links were added." -ForegroundColor Green
     Write-Host "Keys, sessions, old tools, generated audio, and user data were not deleted." -ForegroundColor Green
     Write-Host "Source backup: $Backup" -ForegroundColor DarkGray
 }
 catch {
     Write-Host ""
     Write-Host ("ADD-ON ERROR: " + $_.Exception.Message) -ForegroundColor Red
-    if (-not $StageReady) {
-        Write-Host "The original project was not changed because the isolated build did not pass." -ForegroundColor Yellow
+    if (-not $SourceSaved) {
+        Write-Host "The original source project was not changed." -ForegroundColor Yellow
     }
     Write-Host "Keys, sessions, voices, old tools, and generated audio were not deleted." -ForegroundColor Yellow
     Read-Host "Press Enter to close"
