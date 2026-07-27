@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.api.studio_pro_routes import _ask_gemini, _desktop_exports
+from backend.api.studio_pro_routes import _ask_gemini, _copy_to_desktop, _desktop_note
 from backend.core.config import OUTPUTS_DIR
 from backend.core.tts_registry import tts_registry
 from backend.plugins.builtin.audio_effects import _ffmpeg_executable, process_audio
@@ -37,7 +37,7 @@ class InterviewRequest(BaseModel):
 
 class DialogueRenderRequest(BaseModel):
     script: str = Field(min_length=2, max_length=30000)
-    engine: str = Field(default="gemini", max_length=30)
+    engine: str = Field(default="edge", max_length=30)
     effect: str = Field(default="podcast", max_length=50)
     speed: float = Field(default=1.0, ge=0.7, le=1.25)
 
@@ -101,14 +101,14 @@ async def generate_ambient(req: AmbientRequest):
     mood = _infer_mood(req.text, req.mood)
     output = OUTPUTS_DIR / f"ambient_{mood}_{uuid.uuid4().hex[:10]}.wav"
     _write_ambient(output, mood, req.duration_seconds)
-    target = _desktop_exports() / output.name
-    shutil.copy2(output, target)
+    target = _copy_to_desktop(output)
     return {
         "success": True,
         "mood": mood,
         "url": f"/api/downloads/{output.name}",
-        "desktop_path": str(target),
-        "message": "تم إنشاء خلفية موسيقية هادئة داخل البرنامج وحفظها على سطح المكتب.",
+        "desktop_path": str(target) if target else None,
+        "desktop_exported": bool(target),
+        "message": "تم إنشاء خلفية موسيقية هادئة داخل البرنامج." + _desktop_note(target),
     }
 
 
@@ -329,10 +329,9 @@ async def render_dialogue(req: DialogueRenderRequest):
         output = final
     else:
         output = raw
-    target = _desktop_exports() / output.name
-    shutil.copy2(output, target)
+    target = _copy_to_desktop(output)
     fallback = engine_used != req.engine
-    message = "تم إنتاج المقابلة بأصوات مختلفة وحفظها على سطح المكتب."
+    message = "تم إنتاج المقابلة بأصوات مختلفة." + _desktop_note(target)
     if fallback and engine_used == "edge":
         message += " انتهت حصة Gemini، لذلك انتقل الاستوديو فورًا إلى الأصوات العربية المجانية وأكمل الملف بالكامل."
     elif fallback:
@@ -340,7 +339,8 @@ async def render_dialogue(req: DialogueRenderRequest):
     return {
         "success": True,
         "url": f"/api/downloads/{output.name}",
-        "desktop_path": str(target),
+        "desktop_path": str(target) if target else None,
+        "desktop_exported": bool(target),
         "speakers": len({r for r, _ in segments}),
         "segments": len(segments),
         "engine_requested": req.engine,
