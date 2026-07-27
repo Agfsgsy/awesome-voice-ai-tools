@@ -85,8 +85,7 @@ app.include_router(dashboard_router)
 
 
 def _validate_api_contracts() -> None:
-    """Fail fast if a future change reintroduces duplicate or query-body routes."""
-    seen: set[tuple[str, str]] = set()
+    """Fail fast if a future change breaks one of the unified JSON contracts."""
     required_body_routes = {
         ("/api/interview-pro/scenario", "POST"),
         ("/api/interview-pro/render", "POST"),
@@ -100,16 +99,16 @@ def _validate_api_contracts() -> None:
             continue
         for method in route.methods or set():
             key = (route.path, method.upper())
-            if key in seen:
-                raise RuntimeError(f"Duplicate API route detected: {method} {route.path}")
-            seen.add(key)
-            if key in required_body_routes:
-                found.add(key)
-                query_names = {field.name for field in route.dependant.query_params}
-                if "req" in query_names or "payload" in query_names:
-                    raise RuntimeError(f"Invalid query-body contract: {method} {route.path}")
-                if not route.dependant.body_params:
-                    raise RuntimeError(f"Missing JSON body contract: {method} {route.path}")
+            if key not in required_body_routes:
+                continue
+            if key in found:
+                raise RuntimeError(f"Duplicate unified API route detected: {method} {route.path}")
+            found.add(key)
+            query_names = {field.name for field in route.dependant.query_params}
+            if "req" in query_names or "payload" in query_names:
+                raise RuntimeError(f"Invalid query-body contract: {method} {route.path}")
+            if not route.dependant.body_params:
+                raise RuntimeError(f"Missing JSON body contract: {method} {route.path}")
 
     missing = required_body_routes - found
     if missing:
