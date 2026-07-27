@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>استوديو الإهداءات والأشعار اليمنية</title>
+  <style>
+    :root{--bg:#07111e;--panel:#0c1b2e;--panel2:#0a1727;--line:#213b58;--text:#f4f8ff;--muted:#91a6bd;--green:#20c7a4;--blue:#2595ff;--gold:#e0af3c;--danger:#ef6c74}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 88% 0,#173e64 0,#081522 34%,#050b13 100%);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+    body{padding:18px}.wrap{max-width:1500px;margin:auto}.hero{border:1px solid #2a5371;background:linear-gradient(135deg,#11344c,#10243a 48%,#2e2814);border-radius:20px;padding:20px 22px;display:flex;justify-content:space-between;gap:16px;align-items:center;box-shadow:0 18px 44px #0004}.hero h1{margin:0;font-size:27px}.hero p{margin:8px 0 0;color:#a8bed4;line-height:1.8}.badge{background:#2d260f;border:1px solid #7a6224;color:#ffe28f;border-radius:999px;padding:10px 14px;font-weight:900;white-space:nowrap}
+    .grid{display:grid;grid-template-columns:minmax(360px,.85fr) minmax(480px,1.15fr);gap:16px;margin-top:16px}.card{background:linear-gradient(180deg,#0c1b2e,#091523);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:0 14px 36px #0002}.card h2{margin:0 0 14px;font-size:20px}.sectionTitle{display:flex;align-items:center;justify-content:space-between;gap:10px}.hint{color:var(--muted);font-size:12px;line-height:1.7}
+    .fields{display:grid;grid-template-columns:1fr 1fr;gap:11px}.full{grid-column:1/-1}label{display:block;color:#dbe8f5;font-weight:800;font-size:13px;margin-bottom:6px}input,select,textarea{width:100%;border:1px solid #294765;background:#071421;color:#f7fbff;border-radius:12px;padding:11px 12px;outline:none;font:inherit}input:focus,select:focus,textarea:focus{border-color:#2baea1;box-shadow:0 0 0 3px #20c7a41b}textarea{min-height:132px;resize:vertical;line-height:1.95}.lyrics{min-height:460px;font-size:16px}
+    .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.btn{border:1px solid #31516e;background:#15304d;color:#fff;border-radius:12px;padding:11px 16px;font-weight:900;cursor:pointer}.btn:hover{filter:brightness(1.08)}.primary{background:linear-gradient(135deg,var(--green),var(--blue));border:0}.gold{background:linear-gradient(135deg,#8a6415,#d0a22d);border:0}.danger{background:#55252d;border-color:#8b3c48}.btn:disabled{opacity:.45;cursor:not-allowed}.check{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #294765;border-radius:12px;background:#081725}.check input{width:auto}
+    .rangeRow{display:grid;grid-template-columns:1fr 74px;gap:10px;align-items:center}.rangeRow input[type=range]{padding:0}.value{background:#10243b;border:1px solid #294765;border-radius:10px;padding:8px;text-align:center;font-weight:900;color:#85e8d5}
+    .status{margin-top:13px;border:1px solid #31506f;background:#081523;border-radius:13px;padding:12px 14px;line-height:1.75;color:#b8cce0;display:none}.status.show{display:block}.status.ok{border-color:#267864;background:#092720;color:#91f1d8}.status.error{border-color:#873d48;background:#2c151b;color:#ffc2c7}.progress{height:8px;background:#08111c;border-radius:999px;overflow:hidden;margin-top:10px;display:none}.progress.show{display:block}.bar{height:100%;width:35%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:999px;animation:move 1.1s ease-in-out infinite alternate}@keyframes move{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+    .result{display:none;margin-top:15px;border:1px solid #2b745f;background:linear-gradient(180deg,#0b2a24,#091d1d);border-radius:16px;padding:15px}.result.show{display:block}.result h3{margin:0 0 10px}.result audio{width:100%;margin:8px 0}.resultGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.download{display:block;text-decoration:none;text-align:center;background:#153756;color:#fff;border:1px solid #326188;border-radius:11px;padding:10px;font-weight:900}.path{direction:ltr;text-align:left;word-break:break-all;background:#06131e;border:1px solid #21415d;border-radius:10px;padding:9px;color:#90cbbf;font-size:12px;margin-top:9px}
+    .original{margin-top:14px;background:#332b12;border:1px solid #776222;color:#f5dc91;border-radius:13px;padding:11px 13px;font-size:12px;line-height:1.8}.mini{font-size:11px;color:#829bb3}.footer{text-align:center;color:#748aa2;font-size:11px;padding:18px}
+    @media(max-width:1050px){body{padding:10px}.grid{grid-template-columns:1fr}.hero{align-items:flex-start}.fields{grid-template-columns:1fr}.full{grid-column:auto}.lyrics{min-height:350px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div><h1>🇾🇪 استوديو الإهداءات والأشعار اليمنية</h1><p>زامل وشيلة وقصيدة وأغنية أصلية، إهداءات النجاح والتفوق والتخرج والفرح، مع صوت واضح وموسيقى أصلية وماستر احترافي.</p></div>
+    <div class="badge">الإصدار 6.1.0 • Yemeni Creative</div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <section class="card">
+        <div class="sectionTitle"><h2>✍️ إعداد النص الأصلي</h2><span class="mini">يحفظ آخر مشروع تلقائيًا</span></div>
+        <div class="fields">
+          <div><label>نوع العمل</label><select id="contentType"></select></div>
+          <div><label>اللهجة والأسلوب</label><select id="dialect"></select></div>
+          <div><label>اسم المهدى إليه</label><input id="recipient" placeholder="مثال: محمد، أمي، فريق النجاح"></div>
+          <div><label>المناسبة</label><input id="occasion" value="نجاح وتفوق" placeholder="نجاح، تخرج، زفاف، تكريم..."></div>
+          <div class="full"><label>عنوان العمل</label><input id="title" placeholder="يُنشأ تلقائيًا أو اكتبه بنفسك"></div>
+          <div class="full"><label>الفكرة والتفاصيل</label><textarea id="subject" placeholder="اكتب قصة الشخص وصفاته والرسالة التي تريد إيصالها..."></textarea></div>
+          <div class="full"><label>كلمات أو معانٍ مهمة</label><input id="keywords" placeholder="العزيمة، الوفاء، النجاح، اليمن، الأسرة..."></div>
+          <div><label>المزاج</label><select id="mood"><option value="proud">فخر واعتزاز</option><option value="warm">دافئ وقريب</option><option value="emotional">عاطفي مؤثر</option><option value="joyful">فرائحي مبهج</option><option value="powerful">قوي وحماسي</option></select></div>
+          <div><label>عدد الأسطر</label><select id="verses"><option>8</option><option selected>12</option><option>16</option><option>20</option><option>24</option><option>30</option></select></div>
+          <div><label>كاتب النص</label><select id="writer"><option value="auto">ذكي: Gemini ثم كاتب محلي</option><option value="gemini">Gemini فقط</option><option value="local">كاتب محلي أصلي</option></select></div>
+          <label class="check"><input type="checkbox" id="includeRecipient" checked> ذكر اسم المهدى إليه داخل النص</label>
+        </div>
+        <div class="row"><button class="btn primary" id="writeBtn">إنشاء النص الأصلي</button><button class="btn" id="sampleBtn">تعبئة مثال نجاح</button><button class="btn danger" id="clearBtn">مشروع جديد</button></div>
+        <div class="progress" id="writeProgress"><div class="bar"></div></div><div class="status" id="writeStatus"></div>
+        <div class="original">جميع النصوص والألحان في هذه الأداة تُنشأ كأعمال أصلية. لا تطلب تقليد فنان أو نسخ كلمات أغنية منشورة.</div>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <h2>🎚️ إعداد الصوت والموسيقى</h2>
+        <div class="fields">
+          <div><label>محرك الصوت</label><select id="provider"></select></div>
+          <div><label>صوت رجل أو امرأة</label><select id="gender"><option value="male">رجل</option><option value="female">امرأة</option></select></div>
+          <div class="full"><label>الصوت</label><select id="voice"></select></div>
+          <div><label>أسلوب الأداء</label><select id="tone"><option value="energetic">حماسي ملهم</option><option value="emotional">عاطفي مؤثر</option><option value="broadcast">إذاعي قوي</option><option value="podcast">قريب ودافئ</option><option value="natural">طبيعي واضح</option></select></div>
+          <div><label>الموسيقى الأصلية</label><select id="musicStyle"></select></div>
+          <label class="check full"><input type="checkbox" id="includeMusic" checked> إضافة الموسيقى الأصلية وخفضها تلقائيًا تحت الصوت</label>
+          <div class="full"><label>مستوى الموسيقى</label><div class="rangeRow"><input type="range" id="musicVolume" min="0" max="0.45" step="0.01" value="0.18"><div class="value" id="musicValue">18%</div></div></div>
+          <div class="full"><label>سرعة الأداء</label><div class="rangeRow"><input type="range" id="speed" min="0.75" max="1.20" step="0.01" value="0.96"><div class="value" id="speedValue">×0.96</div></div></div>
+          <div class="full"><label>قوة الماستر</label><div class="rangeRow"><input type="range" id="loudness" min="-18" max="-11" step="0.5" value="-14"><div class="value" id="loudnessValue">-14 LUFS</div></div></div>
+        </div>
+        <div class="row"><button class="btn primary" id="produceBtn">إنتاج العمل بدقة عالية</button><button class="btn" id="refreshVoices">تحديث الأصوات</button></div>
+        <div class="progress" id="produceProgress"><div class="bar"></div></div><div class="status" id="produceStatus"></div>
+        <div class="result" id="result"><h3 id="resultTitle">العمل جاهز</h3><audio id="player" controls></audio><div class="resultGrid"><a class="download" id="downloadFinal">تحميل الماستر النهائي</a><a class="download" id="downloadMusic">تحميل الموسيقى فقط</a><a class="download" id="downloadVoice">تحميل الصوت فقط</a><button class="btn gold" id="openFolder">فتح حزمة المشروع</button></div><div class="path" id="projectPath"></div></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="sectionTitle"><h2>📝 الكلمات الجاهزة للإنتاج</h2><button class="btn" id="copyText">نسخ النص</button></div>
+      <textarea class="lyrics" id="lyrics" placeholder="أنشئ النص، أو الصق قصيدتك أو إهداءك الأصلي هنا..."></textarea>
+      <div class="hint">راجع الأسماء والكلمات قبل الإنتاج. الأداة تنشئ أداءً صوتيًا لحنيًا مع موسيقى أصلية، ولا تدّعي استنساخ غناء فنان حقيقي.</div>
+    </section>
+  </div>
+  <div class="footer">استوديو ابن الواقدي • +967771550103 • الأعمال الأصلية اليمنية</div>
+</div>
+<script>
+  const $=id=>document.getElementById(id),stateKey='ibn_yemeni_creative_610';
+  function plain(v){if(v==null)return'';if(typeof v==='string')return v;if(Array.isArray(v))return v.map(plain).join(' | ');if(typeof v==='object'){for(const k of ['message','detail','error','reason'])if(v[k])return plain(v[k]);try{return JSON.stringify(v)}catch{return String(v)}}return String(v)}
+  function status(id,text,type=''){const el=$(id);el.textContent=text;el.className='status show '+type}
+  function busy(prefix,on){$(prefix+'Progress').classList.toggle('show',on);$(prefix==='write'?'writeBtn':'produceBtn').disabled=on}
+  async function api(url,options={}){const r=await fetch(url,options);let d={};try{d=await r.json()}catch{d={detail:await r.text()}}if(!r.ok)throw new Error(plain(d.detail||d.message||d));return d}
+  async function loadCatalog(){const d=await api('/api/yemeni-creative/catalog');$('contentType').innerHTML=d.content_types.map(x=>`<option value="${x.id}">${x.label}</option>`).join('');$('dialect').innerHTML=d.dialects.map(x=>`<option value="${x.id}">${x.label}</option>`).join('');$('musicStyle').innerHTML=d.music_styles.map(x=>`<option value="${x.id}">${x.label} — ${x.bpm} BPM</option>`).join('');$('contentType').value='success';$('dialect').value='yemeni_white';$('musicStyle').value='success_cinematic'}
+  async function loadProviders(){const d=await api('/api/ultimate/providers');const allowed=['edge','gemini','elevenlabs','azure','google_cloud','openai','piper'];const items=(d.providers||[]).filter(x=>allowed.includes(x.id)&&x.available);$('provider').innerHTML=items.map(x=>`<option value="${x.id}">${x.name_ar} — ${x.cost_ar}</option>`).join('');if(items.some(x=>x.id==='edge'))$('provider').value='edge';await loadVoices()}
+  async function loadVoices(){const p=$('provider').value,g=$('gender').value;if(!p)return;try{const d=await api(`/api/ultimate/voices?provider=${encodeURIComponent(p)}&language=ar&gender=${g}${p==='edge'?'&locale=ar-YE':''}`);$('voice').innerHTML=(d.voices||[]).map(v=>`<option value="${v.id}">${v.name_ar||v.id}</option>`).join('')||'<option value="auto">اختيار تلقائي</option>'}catch(e){$('voice').innerHTML='<option value="auto">اختيار تلقائي</option>';status('produceStatus',e.message,'error')}}
+  function snapshot(){return{contentType:$('contentType').value,dialect:$('dialect').value,recipient:$('recipient').value,occasion:$('occasion').value,title:$('title').value,subject:$('subject').value,keywords:$('keywords').value,mood:$('mood').value,verses:$('verses').value,writer:$('writer').value,includeRecipient:$('includeRecipient').checked,lyrics:$('lyrics').value,provider:$('provider').value,gender:$('gender').value,voice:$('voice').value,tone:$('tone').value,musicStyle:$('musicStyle').value,includeMusic:$('includeMusic').checked,musicVolume:$('musicVolume').value,speed:$('speed').value,loudness:$('loudness').value}}
+  function save(){localStorage.setItem(stateKey,JSON.stringify(snapshot()))}
+  function restore(){try{const s=JSON.parse(localStorage.getItem(stateKey)||'{}');for(const [k,v] of Object.entries(s)){const el=$(k);if(!el)continue;if(el.type==='checkbox')el.checked=!!v;else if([...el.options||[]].some(o=>o.value==v)||!el.options)el.value=v}}catch{}updateValues()}
+  function updateValues(){$('musicValue').textContent=Math.round(Number($('musicVolume').value)*100)+'%';$('speedValue').textContent='×'+Number($('speed').value).toFixed(2);$('loudnessValue').textContent=Number($('loudness').value).toFixed(1)+' LUFS'}
+  $('writeBtn').onclick=async()=>{busy('write',true);status('writeStatus','جاري كتابة عمل أصلي وترتيبه للإلقاء...');try{const d=await api('/api/yemeni-creative/write',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content_type:$('contentType').value,title:$('title').value,recipient:$('recipient').value,occasion:$('occasion').value,subject:$('subject').value,keywords:$('keywords').value,dialect:$('dialect').value,mood:$('mood').value,verses:Number($('verses').value),writer_provider:$('writer').value,include_recipient:$('includeRecipient').checked})});$('title').value=d.title;$('lyrics').value=d.text;status('writeStatus',d.message+` الكاتب المستخدم: ${d.writer_used==='gemini'?'Gemini':'الكاتب المحلي الأصلي'}.`,'ok');save()}catch(e){status('writeStatus',e.message,'error')}finally{busy('write',false)}};
+  $('produceBtn').onclick=async()=>{const text=$('lyrics').value.trim(),title=$('title').value.trim();if(text.length<2)return status('produceStatus','اكتب الكلمات أو أنشئها أولًا.','error');if(title.length<2)return status('produceStatus','اكتب عنوان العمل.','error');busy('produce',true);$('result').classList.remove('show');status('produceStatus','جاري إنشاء الصوت والموسيقى الأصلية ثم الماستر 320kbps... قد تستغرق العملية عدة دقائق.');try{const d=await api('/api/yemeni-creative/produce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,text,content_type:$('contentType').value,provider:$('provider').value,gender:$('gender').value,voice_id:$('voice').value||'auto',tone:$('tone').value,speed:Number($('speed').value),music_style:$('musicStyle').value,music_volume:Number($('musicVolume').value),include_music:$('includeMusic').checked,master_loudness:Number($('loudness').value)})});$('resultTitle').textContent=d.title+' — جاهز';$('player').src=d.url+'?t='+Date.now();$('downloadFinal').href=d.url;$('downloadFinal').download='';$('downloadVoice').href=d.voice_url;$('downloadVoice').download='';$('downloadMusic').style.display=d.instrumental_url?'block':'none';if(d.instrumental_url){$('downloadMusic').href=d.instrumental_url;$('downloadMusic').download=''}$('projectPath').textContent=d.desktop_project;$('openFolder').dataset.path=d.desktop_project;$('result').classList.add('show');status('produceStatus',d.message+' الجودة: '+d.quality,'ok');save()}catch(e){status('produceStatus',e.message,'error')}finally{busy('produce',false)}};
+  $('openFolder').onclick=async()=>{const path=$('openFolder').dataset.path;if(!path)return;try{await api('/api/yemeni-creative/open-project?path='+encodeURIComponent(path),{method:'POST'})}catch(e){status('produceStatus',e.message,'error')}};
+  $('copyText').onclick=async()=>{await navigator.clipboard.writeText($('lyrics').value);status('writeStatus','تم نسخ النص.','ok')};
+  $('sampleBtn').onclick=()=>{$('contentType').value='success';$('recipient').value='علي';$('occasion').value='تحقيق هدف كبير';$('title').value='خطوة إلى القمة';$('subject').value='إهداء لشخص اجتهد وصبر حتى حقق هدفه، مع رسالة أمل للاستمرار وعدم التوقف.';$('keywords').value='العزيمة، اليمن، الجبل، النجاح، الوفاء';$('mood').value='proud';$('musicStyle').value='success_cinematic';save()};
+  $('clearBtn').onclick=()=>{if(!confirm('بدء مشروع جديد؟ لن تُحذف أي ملفات صوتية محفوظة.'))return;localStorage.removeItem(stateKey);location.reload()};
+  $('provider').onchange=async()=>{await loadVoices();save()};$('gender').onchange=async()=>{await loadVoices();save()};$('refreshVoices').onclick=loadVoices;
+  ['musicVolume','speed','loudness'].forEach(id=>$(id).oninput=()=>{updateValues();save()});document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',save));
+  (async()=>{try{await loadCatalog();await loadProviders();restore();await loadVoices();status('writeStatus','الأداة جاهزة. أنشئ نصًا أصليًا أو الصق عملك ثم ابدأ الإنتاج.','ok')}catch(e){status('writeStatus',e.message,'error')}})();
+</script>
+</body>
+</html>
