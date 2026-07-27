@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-title Ibn Al-Waqadi Studio - Yemeni Creative Windows Setup Builder
+title Ibn Al-Waqadi Studio - Voice Clone Pro Windows Setup Builder
 
 echo =====================================================
-echo   Ibn Al-Waqadi Studio 6.1 - Yemeni Creative Builder
+echo   Ibn Al-Waqadi Studio 6.2 - Voice Clone Pro Builder
 echo =====================================================
 echo.
 
@@ -38,7 +38,7 @@ echo [2/5] Compiling source files...
 %PY% -m compileall -q main.py desktop_app.py backend scripts
 if errorlevel 1 goto :failed
 
-echo [3/5] Validating versions, Yemeni Creative tools, Desktop project packs, and API contracts...
+echo [3/5] Validating Voice Clone Pro, existing tools, Desktop exports, and API contracts...
 %PY% scripts\validate_unified_release.py
 if errorlevel 1 goto :failed
 
@@ -74,7 +74,7 @@ if errorlevel 1 goto :failed
 if not exist "dist-installer\VoiceAIStudioSetup.exe" goto :failed
 
 echo.
-echo [SUCCESS] Yemeni Creative 6.1 installer created:
+echo [SUCCESS] Voice Clone Pro 6.2 installer created:
 echo %CD%\dist-installer\VoiceAIStudioSetup.exe
 if not defined CI start "" explorer.exe "%CD%\dist-installer"
 if not defined CI pause
