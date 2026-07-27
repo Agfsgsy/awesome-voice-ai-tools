@@ -185,10 +185,10 @@ def _voice_for_role(role: str, engine: str) -> str:
     if female:
         return "Sulafat|podcast_natural" if "ضيفة" in role else "Achernar|podcast_natural"
     if "ضيف" in role:
-        return "Gacrux|podcast_natural"
+        return "Iapetus|podcast_natural"
     if "خبير" in role:
         return "Charon|documentary"
-    return "Kore|broadcast_power"
+    return "Algieba|broadcast_power"
 
 
 def _parse_dialogue(script: str) -> list[tuple[str, str]]:
