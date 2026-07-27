@@ -22,7 +22,7 @@
     </div>
   </div>
   <div class="heroSide">
-    <div class="version"><span class="versionBadge">الإصدار 3.4</span><span>🎙️</span></div>
+    <div class="version"><span class="versionBadge" id="versionBadge">الإصدار 5.1</span><span>🎙️</span></div>
     <div><div class="phone">+967771550103</div><div class="statusLine"><span class="dot"></span><span id="systemText">جاري فحص النظام...</span></div></div>
   </div>
 </section>
@@ -38,7 +38,7 @@
 <section class="modules">
   <article class="card module" onclick="go('/static/producer.html','المنتج الصوتي')"><div class="moduleIcon">🎚️</div><h3>المنتج الصوتي</h3><p>إنتاج صوت رجل أو امرأة، لهجات، مؤثرات، موسيقى، ونصوص الفيديو والبودكاست.</p><div class="moduleGo">فتح الأداة ←</div></article>
   <article class="card module" onclick="go('/static/interview_pro.html','المقابلات البشرية Pro')"><div class="moduleIcon">🎤</div><h3>المقابلات البشرية Pro</h3><p>سيناريو منظم، عدة متحدثين، أصوات مختلفة، وماستر بودكاست احترافي.</p><div class="moduleGo">فتح الأداة ←</div></article>
-  <article class="card module" onclick="go('/static/interview_ultra.html','الحوار الطبيعي Ultra')"><div class="moduleIcon">🧠</div><h3>الحوار الطبيعي Ultra</h3><p>أعلى وضع للمقابلات: سياق حواري، إخراج بشري، وتبديل تلقائي للمفاتيح والمحركات.</p><div class="moduleGo">فتح الأداة ←</div></article>
+  <article class="card module" onclick="go('/static/interview_ultra.html','الحوار الطبيعي Ultra')"><div class="moduleIcon">🧠</div><h3>الحوار الطبيعي Ultra</h3><p>أعلى وضع للمقابلات: سياق حواري، إخراج بشري، ومحرك مجاني افتراضي مع خيارات سحابية صريحة.</p><div class="moduleGo">فتح الأداة ←</div></article>
   <article class="card module" onclick="go('/static/pro.html','الاستوديو الكامل')"><div class="moduleIcon">🎛️</div><h3>الاستوديو الكامل</h3><p>جميع الأدوات المتقدمة: تحرير النص، المواعظ، الموسيقى، الاستنساخ المصرح، والتصدير.</p><div class="moduleGo">فتح الأداة ←</div></article>
 </section>
 
@@ -65,6 +65,8 @@
 <div class="footer">استوديو ابن الواقدي — واجهة إنتاج صوتي عربية احترافية</div>
 </div>
 <script>
+const $=id=>document.getElementById(id);
+const keyCount=$('keyCount'),keyNote=$('keyNote'),engineCount=$('engineCount'),engineNote=$('engineNote'),exportCount=$('exportCount'),humanState=$('humanState'),humanNote=$('humanNote'),systemText=$('systemText'),healthList=$('healthList'),recentList=$('recentList');
 const fmtTime=ts=>{try{return new Date(ts*1000).toLocaleString('ar')}catch{return ''}};
 function go(page,title){parent.postMessage({type:'studio:navigate',page,title},'*')}
 async function openExports(){try{const r=await fetch('/api/dashboard/open-exports',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'تعذر فتح المجلد')}catch(e){alert(e.message)}}
@@ -73,15 +75,16 @@ async function refreshStatus(){
   document.getElementById('systemText').textContent='جاري فحص النظام...';
   try{
     const r=await fetch('/api/dashboard/status');const d=await r.json();if(!r.ok)throw new Error(d.detail||'فشل الفحص');
-    const g=d.gemini||{};const e=d.engines||[];const x=d.exports||{};const h=d.elevenlabs||{};
+    const g=d.gemini||{};const e=d.engines||[];const x=d.exports||{};const h=d.elevenlabs||{};const a=d.app||{};
+    if(a.version)$('versionBadge').textContent='الإصدار '+a.version;
     keyCount.textContent=g.count??0;keyNote.textContent=`${g.working||0} يعمل، ${g.quota||0} حصة منتهية`;
     engineCount.textContent=e.length;engineNote.textContent=e.length?e.map(v=>v.label||v.name).slice(0,3).join('، '):'لا توجد محركات جاهزة';
     exportCount.textContent=x.count??0;humanState.textContent=h.configured?'جاهز':'غير معد';humanNote.textContent=h.configured?`${h.dialogue_voices||0} أصوات حوار محفوظة`:'يمكن إعداده لاحقًا';
     systemText.textContent='النظام جاهز للعمل';
     const rows=[];
     rows.push(healthRow('Gemini',g.count?`${g.count} مفتاح محفوظ`:'لم تتم إضافة مفاتيح',g.count?'good':'warn'));
-    rows.push(healthRow('التدوير التلقائي',g.count>1?'مفعّل بين عدة مفاتيح':'يحتاج مفتاحًا ثانيًا للتبديل',g.count>1?'good':'warn'));
-    rows.push(healthRow('الأصوات المجانية',e.some(v=>v.name==='edge')?'جاهزة كمحرك احتياطي':'غير متاحة حاليًا',e.some(v=>v.name==='edge')?'good':'bad'));
+    rows.push(healthRow('تدوير Gemini الاختياري',g.count>1?'مفعّل بين المفاتيح السحابية':'غير مطلوب للصوت المجاني',g.count>1?'good':'warn'));
+    rows.push(healthRow('الأصوات المجانية',e.some(v=>v.name==='edge')?'جاهزة كمحرك افتراضي عالي الجودة':'غير متاحة حاليًا',e.some(v=>v.name==='edge')?'good':'bad'));
     rows.push(healthRow('Human Pro',h.configured?'تم حفظ الإعدادات':'اختياري وغير معد',h.configured?'good':'warn'));
     healthList.innerHTML=rows.join('');
     const recent=x.recent||[];
