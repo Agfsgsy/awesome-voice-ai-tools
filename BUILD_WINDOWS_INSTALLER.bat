@@ -4,7 +4,7 @@ cd /d "%~dp0"
 title Ibn Al-Waqadi Studio - Unified Windows Setup Builder
 
 echo =====================================================
-echo   Ibn Al-Waqadi Studio 5.1 - Free First Builder
+echo   Ibn Al-Waqadi Studio 6.0 - Ultimate Voice Builder
 echo =====================================================
 echo.
 
@@ -38,7 +38,7 @@ echo [2/5] Compiling source files...
 %PY% -m compileall -q main.py desktop_app.py backend scripts
 if errorlevel 1 goto :failed
 
-echo [3/5] Validating versions, free-first audio, and API contracts...
+echo [3/5] Validating versions, strict voices, bilingual UI, and API contracts...
 %PY% scripts\validate_unified_release.py
 if errorlevel 1 goto :failed
 
@@ -74,7 +74,7 @@ if errorlevel 1 goto :failed
 if not exist "dist-installer\VoiceAIStudioSetup.exe" goto :failed
 
 echo.
-echo [SUCCESS] Unified Studio 5.1 installer created:
+echo [SUCCESS] Ultimate Voice 6.0 installer created:
 echo %CD%\dist-installer\VoiceAIStudioSetup.exe
 start "" explorer.exe "%CD%\dist-installer"
 pause
