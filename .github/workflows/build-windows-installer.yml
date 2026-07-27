@@ -7,6 +7,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "scripts/**"
       - "desktop_app.py"
       - "main.py"
       - "requirements*.txt"
@@ -43,9 +44,13 @@ jobs:
           python -m pip install --upgrade pip wheel
           python -m pip install -r requirements.txt -r requirements-desktop.txt
 
-      - name: Validate Python source
+      - name: Compile Python source
         shell: pwsh
-        run: python -m compileall -q main.py desktop_app.py backend
+        run: python -m compileall -q main.py desktop_app.py backend scripts
+
+      - name: Validate unified stable release
+        shell: pwsh
+        run: python scripts/validate_unified_release.py
 
       - name: Build desktop application
         shell: pwsh
@@ -70,7 +75,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: VoiceAIStudio-Windows-Setup
+          name: IbnWaqadiStudio-5.0-Windows-Setup
           path: dist-installer/VoiceAIStudioSetup.exe
           if-no-files-found: error
           retention-days: 30
@@ -78,7 +83,7 @@ jobs:
       - name: Upload portable folder
         uses: actions/upload-artifact@v4
         with:
-          name: VoiceAIStudio-Windows-Portable
+          name: IbnWaqadiStudio-5.0-Windows-Portable
           path: dist/VoiceAIStudioArabic
           if-no-files-found: error
           retention-days: 14
