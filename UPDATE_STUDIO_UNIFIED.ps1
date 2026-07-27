@@ -1,4 +1,4 @@
-# استوديو ابن الواقدي — محدث موحد لكل ملفات المشروع
+﻿# استوديو ابن الواقدي — محدث موحد لكل ملفات المشروع
 # يقوم بتنزيل الفرع الكامل، مزامنته، التحقق منه، بناء المثبت وتثبيته.
 # لا يحذف بيانات المستخدم أو المفاتيح أو المخرجات الموجودة في LocalAppData.
 
@@ -59,16 +59,33 @@ try {
     Write-Host "مجلد المشروع: $project" -ForegroundColor Green
 
     New-Item -ItemType Directory -Force -Path $tempRoot, $extract | Out-Null
-    $url = "https://github.com/Agfsgsy/awesome-voice-ai-tools/archive/refs/heads/agent/professional-tts-engine.zip"
+    $sourceRefs = @(
+        "codex/unified-free-tts-reliability",
+        "agent/professional-tts-engine"
+    )
+    $downloadedFrom = ""
 
     Write-Host "[1/5] تنزيل جميع ملفات الإصدار الموحد من GitHub..." -ForegroundColor Cyan
-    try {
-        Import-Module BitsTransfer -ErrorAction SilentlyContinue
-        Start-BitsTransfer -Source $url -Destination $archive -ErrorAction Stop
-    } catch {
-        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive -TimeoutSec 600
+    foreach ($sourceRef in $sourceRefs) {
+        $url = "https://github.com/Agfsgsy/awesome-voice-ai-tools/archive/refs/heads/$sourceRef.zip"
+        Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+        try {
+            try {
+                Import-Module BitsTransfer -ErrorAction SilentlyContinue
+                Start-BitsTransfer -Source $url -Destination $archive -ErrorAction Stop
+            } catch {
+                Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive -TimeoutSec 600
+            }
+            if ((Test-Path -LiteralPath $archive) -and (Get-Item -LiteralPath $archive).Length -gt 1024) {
+                $downloadedFrom = $sourceRef
+                break
+            }
+        } catch {
+            Write-Host "تعذر المصدر $sourceRef؛ تتم تجربة المصدر الاحتياطي..." -ForegroundColor Yellow
+        }
     }
-    if (-not (Test-Path -LiteralPath $archive)) { throw "لم يكتمل تنزيل المشروع." }
+    if (-not $downloadedFrom) { throw "لم يكتمل تنزيل المشروع من أي مصدر موثوق." }
+    Write-Host "مصدر الإصدار: $downloadedFrom" -ForegroundColor Green
 
     Write-Host "[2/5] فك الضغط ومزامنة المشروع كاملًا..." -ForegroundColor Cyan
     Expand-Archive -LiteralPath $archive -DestinationPath $extract -Force
