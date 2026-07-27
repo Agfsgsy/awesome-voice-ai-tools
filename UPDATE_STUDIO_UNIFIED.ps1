@@ -109,7 +109,7 @@ try {
     }
 
     Start-Process -FilePath $exe
-    Title "تم تثبيت استوديو ابن الواقدي 5.0 — Unified Stable"
+    Title "تم تثبيت استوديو ابن الواقدي 5.1 — Free First"
     Write-Host "تم تحديث المشروع كاملًا من مصدر واحد، وليس ملفات متفرقة." -ForegroundColor Green
     Write-Host "تم الحفاظ على المفاتيح والجلسات والمخرجات وملفات المستخدم." -ForegroundColor Green
 }
