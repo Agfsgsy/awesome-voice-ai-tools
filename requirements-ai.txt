@@ -14,7 +14,7 @@ scipy==1.14.1
 
 # TTS Engines (open source, no paid APIs)
 # 1. Piper TTS - lightweight, works on CPU
-piper-tts>=1.2.0
+piper-tts>=1.6.0,<2.0.0
 
 # 2. Kokoro TTS - lightweight, good quality
 kokoro>=0.8.4
