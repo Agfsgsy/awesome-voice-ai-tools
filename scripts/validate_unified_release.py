@@ -78,12 +78,17 @@ def _validate_api_contracts() -> None:
         ("/api/yemeni-creative-safe/write", "POST"),
         ("/api/yemeni-creative-safe/produce", "POST"),
         ("/api/voice-clone/generate", "POST"),
+        ("/api/voice-clone-fast/generate", "POST"),
     }
     required_routes = required_bodies | {
         ("/api/voice-clone/status", "GET"),
         ("/api/voice-clone/setup-local", "POST"),
         ("/api/voice-clone/profiles", "POST"),
         ("/api/voice-clone/profiles", "GET"),
+        ("/api/voice-clone-fast/status", "GET"),
+        ("/api/voice-clone-runtime/status", "GET"),
+        ("/api/voice-clone-runtime/warm", "POST"),
+        ("/static/voice_clone.html", "GET"),
         ("/api/studio-pro/clone", "POST"),
         ("/api/yemeni-creative-safe/health", "GET"),
     }
@@ -118,6 +123,11 @@ def _validate_api_contracts() -> None:
 def _validate_voice_clone() -> None:
     backend = _text("backend/api/voice_clone_routes.py")
     repair = _text("backend/api/voice_clone_repair_runtime.py")
+    fast = _text("backend/api/voice_clone_fast_routes.py")
+    fast_patch = _text("backend/api/voice_clone_fast_runtime_patch.py")
+    xtts_runtime = _text("backend/api/voice_clone_xtts_runtime.py")
+    ui_patch = _text("frontend/static/voice_clone_fast_patch.js")
+    ui_runtime = _text("backend/api/voice_clone_ui_runtime.py")
     frontend = _text("frontend/static/voice_clone.html")
     shell = _text("frontend/static/studio_shell.html")
     preserved_shell = _text("frontend/static/studio_shell_preserved.html")
@@ -143,11 +153,57 @@ def _validate_voice_clone() -> None:
         'TRANSFORMERS_VERSION = "4.57.6"',
         'COQUI_VERSION = "0.27.5"',
         "--force-reinstall",
+        "_dependency_check",
+        "_model_check",
+        "xtts_model_ready.json",
         "clone._setup_local_engine = _repair_local_engine",
         "من دون لمس ملفاتك",
     ):
         if marker not in repair:
-            fail(f"XTTS compatibility repair is missing: {marker}")
+            fail(f"XTTS compatibility/warm-up repair is missing: {marker}")
+
+    for marker in (
+        'provider: Literal["auto", "local", "elevenlabs", "gemini_vertex"]',
+        "MAX_REFERENCE_SECONDS = 30.0",
+        "optimized_references",
+        "_ensure_eleven_voice_fast",
+        "gemini-2.5-flash-tts-eap-11-2025",
+        "/api/voice-clone-fast",
+    ):
+        if marker not in fast:
+            fail(f"Fast voice-clone backend is missing: {marker}")
+
+    for marker in (
+        "fast._produce_with_provider = _bounded_produce",
+        "xtts.generate",
+        "asyncio.wait_for",
+        "google.auth.default",
+    ):
+        if marker not in fast_patch:
+            fail(f"Fast voice-clone hardening is missing: {marker}")
+
+    for marker in (
+        "ThreadingHTTPServer",
+        "xtts_persistent_server.py",
+        "X-Ibn-Waqadi-Token",
+        "model.tts_to_file",
+        "/api/voice-clone-runtime",
+    ):
+        if marker not in xtts_runtime:
+            fail(f"Persistent XTTS runtime is missing: {marker}")
+
+    for marker in (
+        "/api/voice-clone-fast/generate",
+        "/api/voice-clone-runtime/warm",
+        "gemini_vertex",
+        "تلقائي سريع",
+        "10–30 ثانية",
+    ):
+        if marker not in ui_patch:
+            fail(f"Fast clone UI patch is missing: {marker}")
+
+    if "voice_clone_fast_patch.js" not in ui_runtime or "html.replace" not in ui_runtime:
+        fail("The preserved clone page is not receiving the additive fast patch")
 
     for marker in (
         "/api/voice-clone/status",
@@ -158,12 +214,19 @@ def _validate_voice_clone() -> None:
         "لا يوجد محرك يضمن تطابقًا صوتيًا 100%",
     ):
         if marker not in frontend:
-            fail(f"Voice Clone frontend is missing: {marker}")
+            fail(f"Original Voice Clone frontend was changed or is missing: {marker}")
 
     if "/static/voice_clone.html" not in shell or "/static/voice_clone.html" not in preserved_shell:
         fail("The interfaces do not expose Voice Clone Pro")
-    if "voice_clone_router" not in main or "voice_clone_repair_runtime" not in main:
-        fail("Voice Clone routes or the XTTS repair are not mounted")
+    for marker in (
+        "voice_clone_router",
+        "voice_clone_repair_runtime",
+        "voice_clone_fast_router",
+        "voice_clone_runtime_router",
+        "voice_clone_ui_router",
+    ):
+        if marker not in main:
+            fail(f"A required clone router/runtime is not mounted: {marker}")
     if "create_profile_from_uploads" not in legacy or "generate_from_profile" not in legacy:
         fail("The legacy clone box does not delegate to Voice Clone Pro")
     if "speaker_wav=str(reference)" not in coqui:
@@ -199,9 +262,16 @@ def _validate_yemeni_features() -> None:
         if marker not in repaired_frontend:
             fail(f"The repaired Yemeni frontend is missing: {marker}")
 
-    for marker in ("asyncio.wait_for", "_write_local", "_simple_mix", "12, token", "safe_hotfix"):
+    for marker in (
+        "_write_local",
+        "_audible_mix",
+        "_minimal_mix",
+        "18, token",
+        "music_mandatory",
+        "music_included",
+    ):
         if marker not in repaired_backend:
-            fail(f"The repaired Yemeni backend is missing: {marker}")
+            fail(f"The current Yemeni music backend is missing: {marker}")
 
     if "/static/yemeni_creative_pro.html" not in shell or "/static/yemeni_creative_pro.html" not in preserved_shell:
         fail("The preserved interfaces do not open the repaired Yemeni page")
@@ -221,9 +291,9 @@ def main() -> None:
     _validate_api_contracts()
     _validate_voice_clone()
     _validate_yemeni_features()
-    print("[SUCCESS] Voice Clone Pro 6.2.0 and the XTTS dependency repair are connected.")
-    print("[SUCCESS] The designed interface is restored and all old tools remain available.")
-    print("[SUCCESS] The additive Yemeni shila/zamil repair is connected without deleting the original feature.")
+    print("[SUCCESS] Voice Clone Pro 6.2.0 fast routing and persistent XTTS are connected.")
+    print("[SUCCESS] The designed interface and all old tools remain available.")
+    print("[SUCCESS] Current shila/zamil music contracts and clone consent protections are valid.")
 
 
 if __name__ == "__main__":
