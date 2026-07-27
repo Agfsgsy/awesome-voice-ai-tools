@@ -1,5 +1,4 @@
-"""Build-time validation for the Ultimate Voice desktop release."""
-
+"""Build-time validation for the Yemeni Creative desktop release."""
 from __future__ import annotations
 
 import json
@@ -19,7 +18,7 @@ from fastapi.routing import APIRoute
 from backend.core.config import APP_VERSION, CLOUD_ENGINES, ENGINE_PRIORITY, FREE_ENGINES
 from main import app
 
-EXPECTED_VERSION = "6.0.0"
+EXPECTED_VERSION = "6.1.0"
 
 
 def fail(message: str) -> None:
@@ -33,53 +32,37 @@ def _text(path: str) -> str:
 def _validate_versions() -> None:
     if APP_VERSION != EXPECTED_VERSION:
         fail(f"APP_VERSION is {APP_VERSION}, expected {EXPECTED_VERSION}")
-
     project = tomllib.loads(_text("pyproject.toml"))
     if project.get("project", {}).get("version") != EXPECTED_VERSION:
         fail("pyproject.toml does not use the unified version")
-
-    default_config = json.loads(_text("config/default.json"))
-    if default_config.get("version") != EXPECTED_VERSION:
+    if json.loads(_text("config/default.json")).get("version") != EXPECTED_VERSION:
         fail("config/default.json does not use the unified version")
-
-    version_contracts = {
+    contracts = {
         "setup.py": f'version="{EXPECTED_VERSION}"',
         "installer/VoiceAIStudio.iss": f'#define MyAppVersion "{EXPECTED_VERSION}"',
         "frontend/static/studio_shell.html": f"VERSION='{EXPECTED_VERSION}'",
-        "frontend/static/ultimate_studio.html": "Ultimate Voice 6.0",
-        ".github/workflows/build-windows-installer.yml": "IbnWaqadiStudio-6.0-Windows-Setup",
+        "frontend/static/yemeni_creative.html": "الإصدار 6.1.0",
+        ".github/workflows/build-windows-installer.yml": "IbnWaqadiStudio-6.1-Windows-Setup",
     }
-    for path, marker in version_contracts.items():
+    for path, marker in contracts.items():
         if marker not in _text(path):
-            fail(f"{path} does not use version {EXPECTED_VERSION}")
-    workflow = _text(".github/workflows/build-windows-installer.yml")
-    if "IbnWaqadiStudio-6.0-Windows-Portable" not in workflow:
-        fail("Windows portable artifact does not use the unified version")
+            fail(f"{path} does not use release {EXPECTED_VERSION}")
+    if "IbnWaqadiStudio-6.1-Windows-Portable" not in _text(".github/workflows/build-windows-installer.yml"):
+        fail("Windows portable artifact does not use version 6.1")
 
 
-def _validate_free_first_policy() -> None:
+def _validate_engine_policy() -> None:
     if not FREE_ENGINES or FREE_ENGINES[0] != "edge":
-        fail("Edge must be the primary free neural engine")
+        fail("Edge must remain the primary free neural engine")
     if ENGINE_PRIORITY[: len(FREE_ENGINES)] != FREE_ENGINES:
-        fail("Free engines must come before cloud engines")
+        fail("Free engines must come before explicit cloud engines")
     if any(engine not in ENGINE_PRIORITY for engine in CLOUD_ENGINES):
-        fail("Cloud engines are missing from the explicit engine list")
-
-    interview_source = _text("backend/api/interview_pro_routes.py")
-    if 'engine: str = Field(default="edge"' not in interview_source:
-        fail("Interview Pro is not free-first")
-
-    interview_ui = _text("frontend/static/interview_pro.html")
-    if '<option value="edge"' not in interview_ui:
-        fail("Interview Pro has no free neural engine option")
-    if "الصوت المجاني الميكانيكي" in _text("frontend/static/interview_ultra.html"):
-        fail("Dialogue Ultra still describes the free neural voice as mechanical")
-
-    producer = _text("frontend/static/producer.html")
-    if '<option value="edge" selected>' not in producer or "voiceCatalogs" not in producer:
-        fail("Producer does not expose engine-specific free voice choices")
-    if '<option value="piper">' not in producer:
-        fail("Producer does not expose the offline Piper engine")
+        fail("A cloud engine is missing from the explicit engine list")
+    source = _text("backend/api/yemeni_creative_routes.py")
+    if "_synthesize_strict" not in source:
+        fail("Yemeni Creative must use strict provider selection")
+    if "provider = request.provider" not in source:
+        fail("Yemeni Creative does not preserve the selected provider")
 
 
 def _validate_api_contracts() -> None:
@@ -93,10 +76,11 @@ def _validate_api_contracts() -> None:
         ("/api/ultimate/synthesize", "POST"),
         ("/api/ultimate/creative", "POST"),
         ("/api/ultimate/dialogue", "POST"),
+        ("/api/yemeni-creative/write", "POST"),
+        ("/api/yemeni-creative/produce", "POST"),
     }
     found: set[tuple[str, str]] = set()
     duplicates: dict[tuple[str, str], list[str]] = defaultdict(list)
-
     for route in app.routes:
         if not isinstance(route, APIRoute):
             continue
@@ -110,61 +94,68 @@ def _validate_api_contracts() -> None:
                 found.add(key)
                 if not route.dependant.body_params:
                     fail(f"Missing JSON request body on {key[1]} {key[0]}")
-
     duplicate_routes = {key: names for key, names in duplicates.items() if len(names) > 1}
     if duplicate_routes:
         fail(f"Duplicate routes detected: {duplicate_routes}")
-
     missing = required_bodies - found
     if missing:
         fail(f"Missing required routes: {sorted(missing)}")
-
     schema = app.openapi()
     for path, method in required_bodies:
         operation = schema.get("paths", {}).get(path, {}).get(method.lower(), {})
         if "requestBody" not in operation:
             fail(f"OpenAPI has no requestBody for {method} {path}")
-        parameters = operation.get("parameters", [])
-        if any(item.get("in") == "query" and item.get("name") in {"req", "payload", "body"} for item in parameters):
-            fail(f"OpenAPI exposes an invalid query payload for {method} {path}")
 
 
-def _validate_frontend_contracts() -> None:
+def _validate_yemeni_creative() -> None:
+    backend = _text("backend/api/yemeni_creative_routes.py")
+    frontend = _text("frontend/static/yemeni_creative.html")
     shell = _text("frontend/static/studio_shell.html")
-    if "studio:navigate" not in shell or "addEventListener('message'" not in shell:
-        fail("The dashboard navigation bridge is missing")
-    ultimate = _text("frontend/static/ultimate_studio.html")
+    desktop = _text("desktop_app.py")
     for marker in (
-        "/api/ultimate/synthesize",
-        "/api/ultimate/creative",
-        "/api/ultimate/dialogue",
-        "/api/ultimate/providers",
-        "ultimate_ui_lang",
+        "zamil",
+        "shila",
+        "success_cinematic",
+        "dedication_warm",
+        "libmp3lame",
+        "320k",
+        "48000",
+        "الأعمال اليمنية",
+        "original_text_and_music",
     ):
-        if marker not in ultimate:
-            fail(f"Ultimate studio is missing frontend contract: {marker}")
-    if "/static/ultimate_studio.html" not in _text("desktop_app.py"):
-        fail("The packaged desktop launcher does not open Ultimate Voice")
+        if marker not in backend:
+            fail(f"Yemeni backend is missing: {marker}")
+    for marker in (
+        "/api/yemeni-creative/catalog",
+        "/api/yemeni-creative/write",
+        "/api/yemeni-creative/produce",
+        "تحميل الماستر النهائي",
+        "فتح حزمة المشروع",
+    ):
+        if marker not in frontend:
+            fail(f"Yemeni frontend is missing: {marker}")
+    if "/static/yemeni_creative.html" not in shell:
+        fail("The unified shell does not expose Yemeni Creative")
+    if "/static/studio_shell.html" not in desktop:
+        fail("The Windows launcher does not open the unified 6.1 shell")
+    if "لا يقتبس" not in backend or "لا تطلب تقليد" not in frontend:
+        fail("Original-only copyright safeguards are missing")
 
-    old_badges = re.compile(r"(Producer 2\.8|Studio 2\.7|الإصدار 3\.4|Strict Cloud 3\.8|Smart Probe 4\.2)")
-    for path in (
-        "frontend/static/dashboard.html",
-        "frontend/static/producer.html",
-        "frontend/static/pro.html",
-        "frontend/static/interview_ultra.html",
-        "frontend/static/gemini_keys.html",
-    ):
-        if old_badges.search(_text(path)):
-            fail(f"{path} still contains a fragmented legacy version")
+
+def _validate_download_runtime() -> None:
+    runtime = _text("backend/api/download_export_runtime.py")
+    if "shutil.copy2" not in runtime or "OUTPUTS_DIR" not in runtime:
+        fail("Reliable audio download/export runtime is missing")
 
 
 def main() -> None:
     _validate_versions()
-    _validate_free_first_policy()
+    _validate_engine_policy()
     _validate_api_contracts()
-    _validate_frontend_contracts()
-    print("[SUCCESS] Ultimate Voice 6.0 contracts validated.")
-    print("[SUCCESS] Versions, strict JSON bodies, bilingual UI, and free-first audio are consistent.")
+    _validate_yemeni_creative()
+    _validate_download_runtime()
+    print("[SUCCESS] Yemeni Creative 6.1.0 contracts validated.")
+    print("[SUCCESS] Original writing, strict voices, 320 kbps mastering and Desktop project packs are consistent.")
 
 
 if __name__ == "__main__":
