@@ -1,4 +1,5 @@
 """Microsoft Edge neural TTS plugin with Arabic voices and humanized prosody."""
+
 from __future__ import annotations
 
 import asyncio
@@ -60,17 +61,90 @@ class EdgeTTSPlugin(TTSPluginBase):
         "ar-LY-ImanNeural": {"language": "ar", "locale": "ar-LY", "gender": "female", "label": "إيمان - ليبية"},
         "en-US-GuyNeural": {"language": "en", "locale": "en-US", "gender": "male", "label": "Guy - English"},
         "en-US-JennyNeural": {"language": "en", "locale": "en-US", "gender": "female", "label": "Jenny - English"},
+        "en-GB-RyanNeural": {"language": "en", "locale": "en-GB", "gender": "male", "label": "Ryan - British"},
+        "en-GB-SoniaNeural": {"language": "en", "locale": "en-GB", "gender": "female", "label": "Sonia - British"},
+        "en-AU-WilliamNeural": {"language": "en", "locale": "en-AU", "gender": "male", "label": "William - Australian"},
+        "en-AU-NatashaNeural": {
+            "language": "en",
+            "locale": "en-AU",
+            "gender": "female",
+            "label": "Natasha - Australian",
+        },
     }
 
     PROFILES = {
-        "human_ultra": {"label": "بشري فائق", "rate": -4, "pitch": 0, "volume": 5, "pause": 190, "chunk": 340, "variation": True},
-        "natural": {"label": "طبيعي بشري", "rate": -1, "pitch": 0, "volume": 2, "pause": 170, "chunk": 500, "variation": False},
-        "sermon_calm": {"label": "واعظ هادئ", "rate": -13, "pitch": -2, "volume": 5, "pause": 340, "chunk": 310, "variation": True},
-        "sermon_powerful": {"label": "خطيب قوي", "rate": -7, "pitch": -4, "volume": 17, "pause": 270, "chunk": 300, "variation": True},
-        "dua_emotional": {"label": "دعاء مؤثر", "rate": -19, "pitch": -1, "volume": 0, "pause": 430, "chunk": 270, "variation": True},
-        "documentary": {"label": "وثائقي رزين", "rate": -6, "pitch": -3, "volume": 8, "pause": 240, "chunk": 360, "variation": True},
-        "energetic": {"label": "حماسي", "rate": 8, "pitch": 2, "volume": 11, "pause": 125, "chunk": 330, "variation": True},
-        "broadcast_power": {"label": "إذاعي قوي", "rate": -2, "pitch": -2, "volume": 13, "pause": 170, "chunk": 360, "variation": True},
+        "human_ultra": {
+            "label": "بشري فائق",
+            "rate": -4,
+            "pitch": 0,
+            "volume": 5,
+            "pause": 190,
+            "chunk": 340,
+            "variation": True,
+        },
+        "natural": {
+            "label": "طبيعي بشري",
+            "rate": -1,
+            "pitch": 0,
+            "volume": 2,
+            "pause": 170,
+            "chunk": 500,
+            "variation": False,
+        },
+        "sermon_calm": {
+            "label": "واعظ هادئ",
+            "rate": -13,
+            "pitch": -2,
+            "volume": 5,
+            "pause": 340,
+            "chunk": 310,
+            "variation": True,
+        },
+        "sermon_powerful": {
+            "label": "خطيب قوي",
+            "rate": -7,
+            "pitch": -4,
+            "volume": 17,
+            "pause": 270,
+            "chunk": 300,
+            "variation": True,
+        },
+        "dua_emotional": {
+            "label": "دعاء مؤثر",
+            "rate": -19,
+            "pitch": -1,
+            "volume": 0,
+            "pause": 430,
+            "chunk": 270,
+            "variation": True,
+        },
+        "documentary": {
+            "label": "وثائقي رزين",
+            "rate": -6,
+            "pitch": -3,
+            "volume": 8,
+            "pause": 240,
+            "chunk": 360,
+            "variation": True,
+        },
+        "energetic": {
+            "label": "حماسي",
+            "rate": 8,
+            "pitch": 2,
+            "volume": 11,
+            "pause": 125,
+            "chunk": 330,
+            "variation": True,
+        },
+        "broadcast_power": {
+            "label": "إذاعي قوي",
+            "rate": -2,
+            "pitch": -2,
+            "volume": 13,
+            "pause": 170,
+            "chunk": 360,
+            "variation": True,
+        },
     }
 
     DEFAULT_BY_LANGUAGE = {"ar": "ar-SA-HamedNeural", "en": "en-US-GuyNeural"}
@@ -79,6 +153,7 @@ class EdgeTTSPlugin(TTSPluginBase):
     def check(self) -> bool:
         try:
             import edge_tts  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -86,6 +161,7 @@ class EdgeTTSPlugin(TTSPluginBase):
     def install(self) -> Dict[str, Any]:
         import subprocess as sp
         import sys
+
         try:
             sp.check_call([sys.executable, "-m", "pip", "install", "edge-tts>=7,<8"])
             return {"success": self.check(), "engine": self.name, "message": "edge-tts installed successfully"}
@@ -93,7 +169,11 @@ class EdgeTTSPlugin(TTSPluginBase):
             return {"success": False, "engine": self.name, "message": str(exc)}
 
     def download_models(self, model_name: str = "default") -> Dict[str, Any]:
-        return {"success": self.check(), "model": "cloud-neural", "message": "لا يحتاج إلى تنزيل نموذج، لكنه يحتاج الإنترنت."}
+        return {
+            "success": self.check(),
+            "model": "cloud-neural",
+            "message": "لا يحتاج إلى تنزيل نموذج، لكنه يحتاج الإنترنت.",
+        }
 
     def list_models(self) -> List[Dict[str, Any]]:
         return [{"name": "cloud-neural", "language": "multi", "downloaded": self.check()}]
@@ -171,7 +251,10 @@ class EdgeTTSPlugin(TTSPluginBase):
     def _friendly_error(exc: Exception) -> str:
         raw = str(exc)
         lowered = raw.lower()
-        if any(token in lowered for token in ("getaddrinfo", "cannot connect", "speech.platform.bing.com", "ssl", "timed out")):
+        if any(
+            token in lowered
+            for token in ("getaddrinfo", "cannot connect", "speech.platform.bing.com", "ssl", "timed out")
+        ):
             return "تعذر الاتصال بخدمة الصوت العصبي. افحص الإنترنت أو DNS أو VPN ثم أعد المحاولة."
         if "winerror 2" in lowered or "cannot find the file" in lowered:
             return "تعذر تشغيل أداة الصوت المرفقة. أعد بناء النسخة من آخر تحديث."
@@ -184,13 +267,16 @@ class EdgeTTSPlugin(TTSPluginBase):
             return executable
         try:
             import imageio_ffmpeg
+
             executable = imageio_ffmpeg.get_ffmpeg_exe()
             return executable if Path(executable).exists() else None
         except Exception:
             return None
 
     @classmethod
-    def _segment_prosody(cls, segment: str, index: int, base_rate: int, base_pitch: int, base_volume: int, variation: bool) -> Tuple[int, int, int]:
+    def _segment_prosody(
+        cls, segment: str, index: int, base_rate: int, base_pitch: int, base_volume: int, variation: bool
+    ) -> Tuple[int, int, int]:
         if not variation:
             return base_rate, base_pitch, base_volume
         patterns = [(-2, 0, 0), (0, 1, 1), (-1, -1, 0), (1, 0, 2), (-2, 1, 0), (0, -1, 1)]
@@ -253,9 +339,22 @@ class EdgeTTSPlugin(TTSPluginBase):
                     if pause_ms not in silence_cache:
                         silence = work_dir / f"silence_{pause_ms}.mp3"
                         command = [
-                            ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-                            "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
-                            "-t", f"{pause_ms / 1000:.3f}", "-c:a", "libmp3lame", "-b:a", "64k", str(silence),
+                            ffmpeg,
+                            "-hide_banner",
+                            "-loglevel",
+                            "error",
+                            "-y",
+                            "-f",
+                            "lavfi",
+                            "-i",
+                            "anullsrc=r=24000:cl=mono",
+                            "-t",
+                            f"{pause_ms / 1000:.3f}",
+                            "-c:a",
+                            "libmp3lame",
+                            "-b:a",
+                            "64k",
+                            str(silence),
                         ]
                         completed = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
                         if completed.returncode != 0:
@@ -265,16 +364,36 @@ class EdgeTTSPlugin(TTSPluginBase):
                     entries.append(f"file '{safe_silence}'")
             list_path.write_text("\n".join(entries), encoding="utf-8")
             command = [
-                ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-                "-f", "concat", "-safe", "0", "-i", str(list_path),
-                "-vn", "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "24000", "-ac", "1", str(output),
+                ffmpeg,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_path),
+                "-vn",
+                "-c:a",
+                "libmp3lame",
+                "-b:a",
+                "192k",
+                "-ar",
+                "24000",
+                "-ac",
+                "1",
+                str(output),
             ]
             completed = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
             return completed.returncode == 0 and output.exists() and output.stat().st_size > 0
         finally:
             shutil.rmtree(work_dir, ignore_errors=True)
 
-    async def generate(self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(
+        self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0
+    ) -> Dict[str, Any]:
         if not self.check():
             return {"success": False, "engine": self.name, "message": "محرك الصوت العصبي غير موجود داخل البرنامج."}
         text = self._prepare_text((text or "").strip())
@@ -289,7 +408,11 @@ class EdgeTTSPlugin(TTSPluginBase):
 
         selected_voice, profile_name = self._parse_voice_profile(voice, language)
         if selected_voice not in self.VOICES:
-            return {"success": False, "engine": self.name, "message": "الصوت المحدد غير موجود في قائمة الأصوات المدعومة."}
+            return {
+                "success": False,
+                "engine": self.name,
+                "message": "الصوت المحدد غير موجود في قائمة الأصوات المدعومة.",
+            }
 
         profile = self.PROFILES[profile_name]
         base_rate = max(-50, min(100, round((speed - 1.0) * 100) + int(profile["rate"])))
@@ -317,9 +440,7 @@ class EdgeTTSPlugin(TTSPluginBase):
                     await self._render(edge_tts, segment, part_path, selected_voice, rate, pitch, volume)
                     rendered.append((part_path, pause_kind))
 
-                merged = await asyncio.to_thread(
-                    self._merge_with_ffmpeg, rendered, output, int(profile["pause"])
-                )
+                merged = await asyncio.to_thread(self._merge_with_ffmpeg, rendered, output, int(profile["pause"]))
                 if not merged:
                     output.unlink(missing_ok=True)
                     await self._render(edge_tts, text, output, selected_voice, base_rate, base_pitch, base_volume)
