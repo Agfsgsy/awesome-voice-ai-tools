@@ -59,6 +59,21 @@ def _friendly_error(value: str) -> str:
     return value[-1800:] or "تعذر تجهيز XTTS لسبب غير معروف."
 
 
+def _dependency_check(python: str):
+    code = (
+        "import torch,torchaudio,transformers;"
+        "from TTS.api import TTS;"
+        f"assert torch.__version__.split('+')[0]=='{TORCH_VERSION}',torch.__version__;"
+        f"assert transformers.__version__=='{TRANSFORMERS_VERSION}',transformers.__version__;"
+        "print('dependencies-ready')"
+    )
+    return clone._run(
+        [python, "-c", code],
+        timeout=420,
+        env={**os.environ, "COQUI_TOS_AGREED": "1", "PYTHONUTF8": "1"},
+    )
+
+
 def _model_check(python: str):
     """Download and load the real model, not only import the Python package."""
     code = (
@@ -111,6 +126,52 @@ def _read_status_with_model() -> dict:
     return status
 
 
+def _install_dependencies(base_python: list[str], python: str) -> None:
+    clone._write_status("installing", "جاري تحديث أدوات التثبيت داخل بيئة XTTS...", 18)
+    completed = _pip(python, "pip", "setuptools", "wheel", timeout=900)
+    if completed.returncode != 0:
+        raise RuntimeError(_tail(completed, "تعذر تحديث pip"))
+
+    clone._write_status("installing", "جاري تثبيت PyTorch المتوافق للمحرك المحلي...", 32)
+    completed = clone._run(
+        [
+            python,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-input",
+            "--upgrade",
+            f"torch=={TORCH_VERSION}",
+            f"torchaudio=={TORCH_VERSION}",
+            "--index-url",
+            "https://download.pytorch.org/whl/cpu",
+        ],
+        timeout=3600,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(_tail(completed, "تعذر تثبيت PyTorch"))
+
+    clone._write_status("installing", "جاري تثبيت Coqui XTTS-v2...", 55)
+    completed = _pip(python, f"coqui-tts=={COQUI_VERSION}", timeout=3600)
+    if completed.returncode != 0:
+        raise RuntimeError(_tail(completed, "تعذر تثبيت Coqui TTS"))
+
+    clone._write_status(
+        "installing",
+        f"جاري تثبيت Transformers {TRANSFORMERS_VERSION} المتوافق...",
+        72,
+    )
+    completed = _pip(
+        python,
+        f"transformers=={TRANSFORMERS_VERSION}",
+        timeout=1800,
+        force=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(_tail(completed, "تعذر تثبيت Transformers المتوافق"))
+
+
 def _repair_local_engine() -> None:
     """Install, repair, download, and warm XTTS without deleting user data."""
     if not clone._SETUP_LOCK.acquire(blocking=False):
@@ -128,49 +189,12 @@ def _repair_local_engine() -> None:
                 raise RuntimeError(_tail(completed, "تعذر إنشاء بيئة XTTS"))
 
         python = str(clone._engine_python())
-        clone._write_status("installing", "جاري تحديث أدوات التثبيت داخل بيئة XTTS...", 18)
-        completed = _pip(python, "pip", "setuptools", "wheel", timeout=900)
-        if completed.returncode != 0:
-            raise RuntimeError(_tail(completed, "تعذر تحديث pip"))
-
-        clone._write_status("installing", "جاري تثبيت PyTorch المتوافق للمحرك المحلي...", 32)
-        completed = clone._run(
-            [
-                python,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--no-input",
-                "--upgrade",
-                f"torch=={TORCH_VERSION}",
-                f"torchaudio=={TORCH_VERSION}",
-                "--index-url",
-                "https://download.pytorch.org/whl/cpu",
-            ],
-            timeout=3600,
-        )
-        if completed.returncode != 0:
-            raise RuntimeError(_tail(completed, "تعذر تثبيت PyTorch"))
-
-        clone._write_status("installing", "جاري تثبيت Coqui XTTS-v2...", 55)
-        completed = _pip(python, f"coqui-tts=={COQUI_VERSION}", timeout=3600)
-        if completed.returncode != 0:
-            raise RuntimeError(_tail(completed, "تعذر تثبيت Coqui TTS"))
-
-        clone._write_status(
-            "installing",
-            f"جاري تثبيت Transformers {TRANSFORMERS_VERSION} المتوافق...",
-            72,
-        )
-        completed = _pip(
-            python,
-            f"transformers=={TRANSFORMERS_VERSION}",
-            timeout=1800,
-            force=True,
-        )
-        if completed.returncode != 0:
-            raise RuntimeError(_tail(completed, "تعذر تثبيت Transformers المتوافق"))
+        clone._write_status("installing", "جاري فحص الإصدارات الموجودة قبل أي تنزيل...", 14)
+        dependency_result = _dependency_check(python)
+        if dependency_result.returncode != 0:
+            _install_dependencies(base_python, python)
+        else:
+            clone._write_status("installing", "مكونات XTTS المتوافقة موجودة؛ لن يعاد تثبيتها.", 76)
 
         clone.WORKER_FILE.write_text(clone._worker_source(), encoding="utf-8")
         MODEL_MARKER.unlink(missing_ok=True)
