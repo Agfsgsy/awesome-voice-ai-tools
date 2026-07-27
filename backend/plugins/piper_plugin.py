@@ -93,7 +93,7 @@ class PiperPlugin(TTSPluginBase):
                     continue
                 temp = target.with_suffix(target.suffix + ".part")
                 temp.unlink(missing_ok=True)
-                request = urllib.request.Request(url, headers={"User-Agent": "IbnWaqadiStudio/5.1"})
+                request = urllib.request.Request(url, headers={"User-Agent": "IbnWaqadiStudio/6.0"})
                 with urllib.request.urlopen(request, timeout=180) as response, temp.open("wb") as output:
                     shutil.copyfileobj(response, output)
                 if temp.stat().st_size <= 100:
