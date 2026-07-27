@@ -243,7 +243,7 @@ async def stable_scene_audio(
                     break
     raise HTTPException(
         status_code=502,
-        detail="تعذر مشهد Gemini السحابي من دون التحويل إلى صوت ميكانيكي. " + "; ".join(errors[-8:]),
+        detail="تعذر مشهد Gemini السحابي، ولم يُغيّر البرنامج المحرك الذي اخترته. " + "; ".join(errors[-8:]),
     )
 
 
