@@ -6,7 +6,7 @@ echo "=== Installing AI TTS Engines ==="
 PYTHON=${PYTHON:-python3}
 
 echo "[1/5] Installing Piper TTS..."
-pip install -q piper-tts && echo "  [OK]" || echo "  [SKIP] Failed"
+pip install -q "piper-tts>=1.6,<2" && echo "  [OK]" || echo "  [SKIP] Failed"
 
 echo "[2/5] Installing Kokoro TTS..."
 pip install -q kokoro && echo "  [OK]" || echo "  [SKIP] Failed"

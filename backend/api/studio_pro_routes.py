@@ -12,10 +12,12 @@ from pydantic import BaseModel, Field
 
 from backend.core.config import OUTPUTS_DIR, UPLOADS_DIR
 from backend.core.gemini_key_pool import ordered_keys, record_result
+from backend.core.logger import get_logger
 from backend.core.tts_registry import tts_registry
 from backend.plugins.builtin.audio_effects import _ffmpeg_executable
 
 router = APIRouter(prefix="/api/studio-pro", tags=["Studio Pro"])
+logger = get_logger("studio_exports")
 
 
 async def _available_text_models(client: httpx.AsyncClient, key: str) -> list[str]:
@@ -148,23 +150,63 @@ def _desktop_exports() -> Path:
     return target
 
 
+def _copy_to_desktop(source: Path) -> Path | None:
+    """Best-effort export that never discards a completed audio result."""
+    try:
+        target_dir = _desktop_exports()
+    except OSError as exc:
+        logger.warning("Desktop export folder is unavailable: %s", exc)
+        return None
+
+    for attempt in range(8):
+        target = target_dir / source.name
+        if attempt or target.exists():
+            target = target_dir / f"{source.stem}_{uuid.uuid4().hex[:8]}{source.suffix}"
+        try:
+            shutil.copy2(source, target)
+            return target
+        except OSError as exc:
+            logger.warning("Desktop export attempt %s failed for %s: %s", attempt + 1, source.name, exc)
+    return None
+
+
+def _desktop_note(target: Path | None) -> str:
+    if target:
+        return " وحُفظت نسخة على سطح المكتب."
+    return " والنتيجة محفوظة داخل التطبيق؛ تعذر نسخها إلى سطح المكتب لأن Windows منع الكتابة أو لأن الملف مفتوح."
+
+
 @router.post("/export/{filename}")
 async def export_to_desktop(filename: str):
     safe = Path(filename).name
     source = OUTPUTS_DIR / safe
     if not source.exists() or not source.is_file():
         raise HTTPException(status_code=404, detail="لم يتم العثور على الملف الصوتي.")
-    target_dir = _desktop_exports()
-    target = target_dir / safe
-    if target.exists():
-        target = target_dir / f"{target.stem}_{uuid.uuid4().hex[:6]}{target.suffix}"
-    shutil.copy2(source, target)
-    return {"success": True, "path": str(target), "folder": str(target_dir), "message": "تم حفظ نسخة في مجلد Voice AI Studio Exports على سطح المكتب."}
+    target = _copy_to_desktop(source)
+    if target:
+        return {
+            "success": True,
+            "exported": True,
+            "path": str(target),
+            "folder": str(target.parent),
+            "message": "تم حفظ نسخة في مجلد Voice AI Studio Exports على سطح المكتب.",
+        }
+    return {
+        "success": True,
+        "exported": False,
+        "path": str(source),
+        "folder": str(OUTPUTS_DIR),
+        "message": "الملف محفوظ داخل التطبيق. أغلق أي نسخة مفتوحة منه أو اسمح بالكتابة على سطح المكتب ثم أعد التصدير.",
+    }
 
 
 @router.get("/export-folder")
 async def export_folder():
-    return {"success": True, "path": str(_desktop_exports())}
+    try:
+        path = _desktop_exports()
+    except OSError:
+        path = OUTPUTS_DIR
+    return {"success": True, "path": str(path)}
 
 
 class MixRequest(BaseModel):
@@ -188,9 +230,14 @@ async def mix_audio(req: MixRequest):
     process = subprocess.run(command, capture_output=True, text=True, timeout=900, check=False)
     if process.returncode != 0 or not output.exists():
         raise HTTPException(status_code=500, detail=(process.stderr or "فشل دمج الصوت والموسيقى")[-1200:])
-    target = _desktop_exports() / output.name
-    shutil.copy2(output, target)
-    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target), "message": "تم دمج الموسيقى وخفضها تلقائيًا تحت الكلام وحفظ الملف على سطح المكتب."}
+    target = _copy_to_desktop(output)
+    return {
+        "success": True,
+        "url": f"/api/downloads/{output.name}",
+        "desktop_path": str(target) if target else None,
+        "desktop_exported": bool(target),
+        "message": "تم دمج الموسيقى وخفضها تلقائيًا تحت الكلام." + _desktop_note(target),
+    }
 
 
 @router.post("/clone")
@@ -218,6 +265,11 @@ async def clone_voice(sample: UploadFile = File(...), text: str = Form(...), con
     source = Path(result.get("file", ""))
     if not source.exists():
         raise HTTPException(status_code=500, detail="لم يُنشأ ملف الاستنساخ.")
-    target = _desktop_exports() / source.name
-    shutil.copy2(source, target)
-    return {"success": True, "url": result.get("url") or f"/api/downloads/{source.name}", "desktop_path": str(target), "message": "تم إنشاء الصوت بالعينة المصرح بها وحفظه على سطح المكتب."}
+    target = _copy_to_desktop(source)
+    return {
+        "success": True,
+        "url": result.get("url") or f"/api/downloads/{source.name}",
+        "desktop_path": str(target) if target else None,
+        "desktop_exported": bool(target),
+        "message": "تم إنشاء الصوت بالعينة المصرح بها." + _desktop_note(target),
+    }

@@ -1,13 +1,13 @@
-"""اختبارات أساسية للمشروع"""
-import os
+"""اختبارات أساسية للمشروع."""
 import pytest
 
 
 
 def test_config_import():
-    from backend.core.config import APP_NAME, APP_VERSION, APP_PORT
-    assert APP_NAME == "Voice AI Studio Arabic"
-    assert APP_VERSION == "2.0.0"
+    from backend.core.config import APP_NAME, APP_RELEASE, APP_VERSION, APP_PORT
+    assert APP_NAME == "استوديو ابن الواقدي"
+    assert APP_VERSION == "5.1.0"
+    assert APP_RELEASE == "Free First"
     assert APP_PORT == 8000
 
 
@@ -51,11 +51,14 @@ def test_health_checks():
 async def test_tts_fallback():
     from backend.core.tts_engine import tts
     result = await tts.synthesize(text="test", engine="fallback")
-    assert result["success"] is True
+    assert result["success"] is False
     assert result["engine"] == "fallback"
+    assert "غير معروف" in result["message"]
 
 
 def test_fastapi_app():
     from main import app
     assert app is not None
-    assert app.title == "Voice AI Studio Arabic"
+    assert app.title == "استوديو ابن الواقدي"
+    assert app.version == "5.1.0"
+    assert app.state.release_channel == "free-first"

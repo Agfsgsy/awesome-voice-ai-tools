@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voice-ai-studio-arabic"
-version = "2.0.0"
+version = "5.1.0"
 description = "منصة صوتيات عربية لتوليد واستنساخ الصوت"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.14"
 license = {text = "MIT"}
 authors = [{name = "Voice AI Studio"}]
 
@@ -18,6 +18,12 @@ dependencies = [
     "python-multipart>=0.0.20",
     "httpx>=0.28.0",
     "aiofiles>=24.0.0",
+    "requests>=2.31.0",
+    "pydub>=0.25.1",
+    "soundfile>=0.12.1",
+    "edge-tts>=7.0.0,<8.0.0",
+    "piper-tts>=1.6.0,<2.0.0",
+    "imageio-ffmpeg>=0.5.1",
 ]
 
 [project.optional-dependencies]

@@ -1,7 +1,8 @@
-"""Strict cloud-only policy and real per-key verification.
+"""Free-first audio policy and real per-key verification.
 
 This runtime is loaded last. It enforces these invariants:
-- Mechanical/free engines are never selected automatically.
+- Free neural audio is selected automatically without requiring an API key.
+- Explicit cloud selections never switch silently to another provider.
 - A Gemini key is usable only after both a real text request and a real audio request succeed.
 - Temporary 429 windows never disconnect a previously verified key.
 - Every key keeps an independent verification and transient-limit record.
@@ -9,8 +10,6 @@ This runtime is loaded last. It enforces these invariants:
 from __future__ import annotations
 
 import asyncio
-import base64
-import shutil
 import subprocess
 import time
 import uuid
@@ -40,7 +39,6 @@ from backend.plugins.builtin.audio_effects import _ffmpeg_executable, process_au
 _ORIGINAL_STATUSES = pool.key_statuses
 _ORIGINAL_SET_SELECTED = pool.set_selected_key
 HARD_FAILURES = {"invalid", "forbidden"}
-MECHANICAL_ENGINES = {"edge", "edge_fallback", "piper", "coqui", "kokoro", "melotts", "styletts2", "fallback"}
 
 
 def _record_for(key: str) -> tuple[dict[str, Any], dict[str, Any], str]:
@@ -169,7 +167,7 @@ async def _post_with_window_retry(
 
 
 def _temporary_result(key: str, number: int, detail: str, retry_after: int, text_ok: bool = False) -> dict[str, Any]:
-    state, previous, _ = _record_for(key)
+    _state, previous, _ = _record_for(key)
     was_verified = _is_verified_record(previous)
     message = f"حد طلبات مؤقت، وليس انتهاء الحصة. أعد المحاولة بعد نحو {retry_after} ثانية."
     values: dict[str, Any] = {
@@ -224,7 +222,7 @@ async def strict_test_one(key: str, number: int = 1) -> dict[str, Any]:
                 "generationConfig": {"temperature": 0, "maxOutputTokens": 10},
             }
             try:
-                response, waited = await _post_with_window_retry(
+                response, _waited = await _post_with_window_retry(
                     client,
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                     key,
@@ -274,7 +272,7 @@ async def strict_test_one(key: str, number: int = 1) -> dict[str, Any]:
                 },
             }
             try:
-                response, waited = await _post_with_window_retry(
+                response, _waited = await _post_with_window_retry(
                     client,
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                     key,
@@ -354,16 +352,16 @@ async def strict_test_one(key: str, number: int = 1) -> dict[str, Any]:
 
 def _cloud_provider_order(req, turns) -> list[str]:
     requested = str(req.provider or "auto")
-    all_ids = all(dialogue_ultra_routes._voice_id_for_role(role) for role, _ in turns)
-    eleven_ready = bool(dialogue_ultra_routes._eleven_api_key() and all_ids)
     if requested == "auto":
-        return (["eleven_dialogue"] if eleven_ready else []) + ["gemini_native"]
+        return ["edge_fallback"]
     if requested in {"eleven_dialogue", "gemini_native", "legacy_contextual", "edge_fallback"}:
         return [requested]
     raise HTTPException(status_code=400, detail="اختر محركًا معروفًا.")
 
 
 def _strict_engine_order(requested: str) -> list[str]:
+    if requested in {"auto", "free"}:
+        return ["edge", "piper"]
     return [requested]
 
 
@@ -401,48 +399,56 @@ async def strict_interview_render(req):
         raise HTTPException(status_code=500, detail=(process.stderr or "فشل دمج المقابلة")[-1200:])
     final = OUTPUTS_DIR / f"ibn_alwaqadi_podcast_{token}.mp3"
     output = final if process_audio(str(raw), str(final), req.master) else raw
-    target = studio_pro_routes._desktop_exports() / output.name
-    shutil.copy2(output, target)
+    target = studio_pro_routes._copy_to_desktop(output)
     return {
         "success": True,
         "url": f"/api/downloads/{output.name}",
-        "desktop_path": str(target),
+        "desktop_path": str(target) if target else None,
+        "desktop_exported": bool(target),
         "segments": len(segments),
         "speakers": len({role for role, _ in segments}),
         "engine_requested": requested,
         "engine_used": requested,
         "fallback": False,
-        "message": "تم إنتاج المقابلة بالمحرك الذي اخترته فقط، من دون أي تحويل تلقائي.",
+        "message": "تم إنتاج المقابلة بالمحرك الذي اخترته فقط، من دون أي تحويل تلقائي." + studio_pro_routes._desktop_note(target),
     }
 
 
-async def strict_api_tts(req):
+async def strict_api_tts(req: routes.TTSRequest):
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="النص مطلوب.")
     requested = str(req.engine or "auto")
-    if requested == "auto":
-        if strict_ordered_keys():
-            requested = "gemini"
-        else:
-            eleven = tts_registry.get_plugin("elevenlabs")
-            try:
-                requested = "elevenlabs" if eleven and eleven.check() else ""
-            except Exception:
-                requested = ""
-        if not requested:
-            raise HTTPException(status_code=409, detail="لا يوجد محرك سحابي مؤكد. لن ينتقل البرنامج إلى صوت مجاني تلقائيًا.")
+    candidates = ["edge", "piper"] if requested == "auto" else [requested]
     if requested == "gemini" and not strict_ordered_keys():
         raise HTTPException(status_code=409, detail="لا يوجد مفتاح Gemini مؤكد نصًا وصوتًا. اختبره وشغّله أولًا.")
-    plugin = tts_registry.get_plugin(requested)
-    if not plugin:
-        raise HTTPException(status_code=503, detail=f"المحرك المختار {requested} غير متاح. لم يتم تشغيل أي محرك بديل.")
-    result = await plugin.generate(text=req.text, voice=req.voice, language=req.language, speed=req.speed)
-    if not result or not result.get("success"):
-        raise HTTPException(status_code=502, detail=(result or {}).get("message", f"فشل المحرك {requested} من دون تحويل تلقائي."))
-    result["engine_requested"] = requested
-    result["engine_used"] = requested
-    result["fallback"] = False
-    return result
+    errors: list[str] = []
+    for candidate in candidates:
+        plugin = tts_registry.get_plugin(candidate)
+        if not plugin:
+            errors.append(f"{candidate}: غير متاح")
+            continue
+        try:
+            result = await plugin.generate(
+                text=req.text,
+                voice=req.voice if candidate != "piper" else "kareem",
+                language=req.language,
+                speed=req.speed,
+            )
+        except Exception as exc:
+            result = {"success": False, "message": f"{type(exc).__name__}: {exc}"}
+        if result and result.get("success"):
+            result["engine_requested"] = requested
+            result["engine_used"] = candidate
+            result["fallback"] = requested == "auto" and candidate != "edge"
+            if result["fallback"]:
+                result["message"] = (
+                    f"{result.get('message', 'تم إنشاء الصوت.')} "
+                    "استُخدم Piper المحلي بعد تعذر الصوت العصبي عبر الإنترنت."
+                )
+            return result
+        errors.append(f"{candidate}: {(result or {}).get('message', 'فشل التوليد')}")
+    detail = " | ".join(errors[-4:]) or "لا يوجد محرك صوت مجاني جاهز."
+    raise HTTPException(status_code=502, detail=f"تعذر إنشاء الصوت المجاني. {detail}")
 
 
 def _replace_route(router, path: str, endpoint) -> None:
@@ -454,14 +460,13 @@ def _replace_route(router, path: str, endpoint) -> None:
 
 
 def _cloud_auto_select() -> str | None:
-    if strict_ordered_keys():
-        return "gemini"
-    eleven = tts_registry.get_plugin("elevenlabs")
-    try:
-        if eleven and eleven.check():
-            return "elevenlabs"
-    except Exception:
-        pass
+    for name in ("edge", "piper"):
+        plugin = tts_registry.get_plugin(name)
+        try:
+            if plugin and plugin.check():
+                return name
+        except Exception:
+            continue
     return None
 
 
@@ -487,7 +492,6 @@ def install() -> None:
     tts_registry.auto_select_engine = _cloud_auto_select
     routes.tts_registry.auto_select_engine = _cloud_auto_select
 
-    _replace_route(interview_pro_routes.router, "/api/interview-pro/render", strict_interview_render)
     _replace_route(routes.router, "/api/tts", strict_api_tts)
     _replace_route(routes.router, "/api/speech", strict_api_tts)
 

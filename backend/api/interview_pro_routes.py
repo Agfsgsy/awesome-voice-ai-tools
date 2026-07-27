@@ -1,10 +1,9 @@
-"""Professional multi-speaker interview production with resumable Cloud-Only jobs."""
+"""Professional multi-speaker interview production with resumable free-first jobs."""
 from __future__ import annotations
 
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import time
 import wave
@@ -14,7 +13,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.api.studio_pro_routes import _ask_gemini, _desktop_exports
+from backend.api.studio_pro_routes import _ask_gemini, _copy_to_desktop, _desktop_note
 from backend.core.config import OUTPUTS_DIR
 from backend.core.tts_registry import tts_registry
 from backend.plugins.builtin.audio_effects import _ffmpeg_executable, process_audio
@@ -33,7 +32,7 @@ class ScenarioRequest(BaseModel):
 
 class RenderRequest(BaseModel):
     script: str = Field(min_length=2, max_length=50000)
-    engine: str = Field(default="gemini", max_length=30)
+    engine: str = Field(default="edge", max_length=30)
     master: str = Field(default="podcast_ultra", max_length=50)
     base_speed: float = Field(default=0.96, ge=0.75, le=1.20)
     pause_ms: int = Field(default=420, ge=150, le=1400)
@@ -49,7 +48,8 @@ FORMATS = {
 ENGINE_LABELS = {
     "gemini": "Gemini TTS السحابي",
     "elevenlabs": "ElevenLabs المدفوع",
-    "edge": "الصوت المجاني المختار يدويًا",
+    "edge": "الصوت العربي العصبي المجاني",
+    "piper": "Piper المحلي المجاني",
 }
 
 
@@ -285,7 +285,7 @@ async def render(req: RenderRequest):
     segments = _parse(req.script)
     if not segments:
         raise HTTPException(status_code=400, detail={"message": "اكتب الحوار بصيغة اسم المتحدث: النص"})
-    requested = req.engine if req.engine in {"gemini", "edge", "elevenlabs"} else "gemini"
+    requested = req.engine if req.engine in {"gemini", "edge", "piper", "elevenlabs"} else "edge"
     engine_label = ENGINE_LABELS.get(requested, requested)
     ffmpeg = _ffmpeg_executable()
     if not ffmpeg:
@@ -296,10 +296,8 @@ async def render(req: RenderRequest):
     final = OUTPUTS_DIR / f"ibn_alwaqadi_podcast_{job_id}.mp3"
     raw = OUTPUTS_DIR / f"ibn_alwaqadi_interview_{job_id}.wav"
     if final.exists() and final.stat().st_size > 256:
-        target = _desktop_exports() / final.name
-        if not target.exists() or target.stat().st_size != final.stat().st_size:
-            shutil.copy2(final, target)
-        return {"success": True, "url": f"/api/downloads/{final.name}", "desktop_path": str(target), "segments": len(segments), "speakers": len({role for role, _ in segments}), "engine_requested": requested, "engine_used": requested, "fallback": False, "cached": True, "job_id": job_id, "message": "المقابلة جاهزة من الجلسة المحفوظة، ولم تُرسل طلبات صوت جديدة."}
+        target = _copy_to_desktop(final)
+        return {"success": True, "url": f"/api/downloads/{final.name}", "desktop_path": str(target) if target else None, "desktop_exported": bool(target), "segments": len(segments), "speakers": len({role for role, _ in segments}), "engine_requested": requested, "engine_used": requested, "fallback": False, "cached": True, "job_id": job_id, "message": "المقابلة جاهزة من الجلسة المحفوظة، ولم تُرسل طلبات صوت جديدة." + _desktop_note(target)}
     generated, resumed = await _generate_segments(segments, requested, req.base_speed, work, ffmpeg)
     pause = work / f"pause_{req.pause_ms}.wav"
     if not pause.exists() or pause.stat().st_size <= 44:
@@ -316,8 +314,7 @@ async def render(req: RenderRequest):
     if process.returncode != 0 or not raw.exists() or raw.stat().st_size <= 44:
         raise HTTPException(status_code=500, detail={"message": (process.stderr or "فشل دمج المقابلة")[-1200:], "completed": len(generated), "total": len(segments), "resume_supported": True})
     output = final if process_audio(str(raw), str(final), req.master) else raw
-    target = _desktop_exports() / output.name
-    shutil.copy2(output, target)
-    _write_manifest(work, {"status": "completed", "engine": requested, "completed": len(segments), "total": len(segments), "output": str(output), "desktop_path": str(target)})
+    target = _copy_to_desktop(output)
+    _write_manifest(work, {"status": "completed", "engine": requested, "completed": len(segments), "total": len(segments), "output": str(output), "desktop_path": str(target) if target else None})
     resume_note = f" تم استعادة {resumed} مشهد محفوظ." if resumed else ""
-    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target), "segments": len(segments), "speakers": len({role for role, _ in segments}), "engine_requested": requested, "engine_used": requested, "fallback": False, "cached": False, "resumed_segments": resumed, "job_id": job_id, "message": f"تم إنتاج المقابلة باستخدام {engine_label} فقط وحفظها على سطح المكتب.{resume_note}"}
+    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target) if target else None, "desktop_exported": bool(target), "segments": len(segments), "speakers": len({role for role, _ in segments}), "engine_requested": requested, "engine_used": requested, "fallback": False, "cached": False, "resumed_segments": resumed, "job_id": job_id, "message": f"تم إنتاج المقابلة باستخدام {engine_label} فقط.{_desktop_note(target)}{resume_note}"}

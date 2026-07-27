@@ -11,8 +11,8 @@
 <body>
 <div class="wrap">
 <header class="hero">
-  <div><h1>🎙️ <span class="brand">استوديو ابن الواقدي</span></h1><p>الحوار الطبيعي Ultra — إنتاج سحابي ثابت للمقابلات والبودكاست.</p><div class="phone">+967771550103</div></div>
-  <div><div class="badge">Strict Cloud 3.8</div><div class="nav" style="margin-top:10px"><a href="/static/interview_pro.html">المقابلات Pro</a><a href="/static/producer.html">المنتج الصوتي</a><a href="/static/pro.html">الاستوديو الكامل</a></div></div>
+  <div><h1>🎙️ <span class="brand">استوديو ابن الواقدي</span></h1><p>الحوار الطبيعي Ultra — إنتاج عربي مجاني افتراضيًا للمقابلات والبودكاست.</p><div class="phone">+967771550103</div></div>
+  <div><div class="badge">Free First 5.1</div><div class="nav" style="margin-top:10px"><a href="/static/interview_pro.html">المقابلات Pro</a><a href="/static/producer.html">المنتج الصوتي</a><a href="/static/pro.html">الاستوديو الكامل</a></div></div>
 </header>
 <div class="layout">
 <main class="card">
@@ -31,8 +31,8 @@
     <div class="buttons"><button id="scenario" class="btn green">إنشاء سيناريو احترافي</button><button id="humanize" class="btn gold">تحويله إلى حوار بشري طبيعي</button></div>
   </section>
   <div class="field"><label>سيناريو المقابلة</label><textarea id="script" placeholder="المذيع_رجل: أهلًا بكم...&#10;الضيف_رجل: شكرًا لكم...&#10;الضيفة_امرأة: يسعدني المشاركة..."></textarea></div>
-  <button id="render" class="primary">إنتاج المقابلة من المحرك المختار فقط</button>
-  <div id="status" class="status">جاهز. لن يتحول البرنامج إلى الصوت الميكانيكي إلا عند اختياره يدويًا.</div>
+  <button id="render" class="primary">إنتاج المقابلة بالصوت المجاني</button>
+  <div id="status" class="status">جاهز. الصوت العربي العصبي المجاني هو الاختيار الافتراضي.</div>
   <div id="result" class="result"><audio id="audio" controls></audio><div class="buttons"><a id="download" class="link" download>تحميل المقابلة</a><span id="details" class="small"></span></div></div>
 </main>
 <aside class="card sticky">
@@ -40,10 +40,10 @@
     <div class="title">🎧 محرك الحوار</div>
     <div class="field"><label>وضع الإنتاج</label>
       <select id="provider">
-        <option value="auto">تلقائي سحابي فقط — لا يستخدم الميكانيكي</option>
+        <option value="edge_fallback" selected>الصوت العربي العصبي المجاني — موصى به</option>
+        <option value="auto">تلقائي مجاني — متوافق مع الإعدادات القديمة</option>
         <option value="gemini_native">Gemini TTS السحابي — يستخدم حصص Gemini فقط</option>
         <option value="eleven_dialogue">ElevenLabs Dialogue v3 — مدفوع فقط</option>
-        <option value="edge_fallback">الصوت المجاني الميكانيكي — اختيار يدوي فقط</option>
       </select>
       <div id="providerHelp" class="providerHelp"></div>
     </div>
@@ -51,7 +51,7 @@
     <div class="field"><label>الماستر النهائي</label><select id="master"><option value="podcast_truth">True Podcast — طبيعي بلا صدى</option><option value="podcast_ultra">بودكاست بشري فائق</option><option value="podcast">بودكاست احترافي</option><option value="warm_broadcast">إذاعي دافئ</option><option value="none">بدون ماستر</option></select></div>
     <div class="field"><label>الفاصل بين المشاهد <span id="pauseLabel">260ms</span></label><input id="pause" type="range" min="80" max="700" step="20" value="260"></div>
   </div>
-  <div class="box"><div class="title">🔒 سياسة المحرك الجديدة</div><div class="small"><strong>Gemini وElevenLabs لا يتحولان تلقائيًا إلى الصوت الميكانيكي.</strong><br>إذا تعذر المحرك السحابي سيظهر سبب الخطأ، وتبقى أنت صاحب القرار. لاستخدام المجاني الميكانيكي اختره بنفسك من القائمة.</div></div>
+  <div class="box"><div class="title">✅ سياسة المحرك الموحّدة</div><div class="small"><strong>الإنتاج يبدأ بالصوت العربي العصبي المجاني ولا يحتاج مفتاح API.</strong><br>Gemini وElevenLabs اختياريان؛ وإذا اخترت أحدهما صراحةً فلن ينتقل البرنامج إلى مزود آخر دون علمك.</div></div>
   <div class="box">
     <div class="title">🔐 إعداد ElevenLabs Dialogue v3</div>
     <div class="small">اختياري ومدفوع. ضع Voice ID مختلفًا لكل شخصية مستخدمة.</div>
@@ -59,7 +59,7 @@
     <div class="voiceGrid"><div class="field"><label>المذيع الرجل</label><input id="hostMale" placeholder="Voice ID"></div><div class="field"><label>المذيعة</label><input id="hostFemale" placeholder="Voice ID"></div><div class="field"><label>الضيف الرجل</label><input id="guestMale" placeholder="Voice ID"></div><div class="field"><label>الضيفة</label><input id="guestFemale" placeholder="Voice ID"></div><div class="field"><label>الخبير</label><input id="expertMale" placeholder="Voice ID"></div></div>
     <button id="save" class="btn green">حفظ إعدادات الحوار</button><div id="settingsState" class="small" style="margin-top:8px"></div>
   </div>
-  <div class="notice">الصوت الميكانيكي لم يُحذف؛ أصبح خيارًا يدويًا فقط. التوليد السحابي قد يتأخر في المقابلات الطويلة، لذلك لا تغلق البرنامج أثناء الإنتاج.</div>
+  <div class="notice">الصوت المجاني يحتاج اتصالًا بالإنترنت أثناء التوليد، ولا يستهلك مفاتيح Gemini. تُحفظ النتائج محليًا لتجنب إعادة الطلب نفسه.</div>
 </aside>
 </div>
 </div>
@@ -67,15 +67,15 @@
 const $=id=>document.getElementById(id);
 function st(m,t=''){$('status').textContent=m;$('status').className='status'+(t?' '+t:'')}
 async function jf(u,o){const r=await fetch(u,o);let d={};try{d=await r.json()}catch{}if(!r.ok||d.success===false)throw new Error(d.detail||d.message||('HTTP '+r.status));return d}
-const providerNotes={auto:'يستخدم أفضل محرك سحابي جاهز فقط. لن ينتقل إلى الصوت الميكانيكي.',gemini_native:'يثبت على Gemini TTS ويستخدم مفاتيح Gemini وحصص المشروع فقط.',eleven_dialogue:'يثبت على ElevenLabs Dialogue v3 فقط، ويلزم مفتاح وVoice ID لكل شخصية.',edge_fallback:'المحرك المجاني الميكانيكي. لن يعمل إلا لأنك اخترته يدويًا.'};
+const providerNotes={auto:'اختيار متوافق مع الإعدادات القديمة ويستخدم الصوت العربي العصبي المجاني.',gemini_native:'يثبت على Gemini TTS ويستخدم مفاتيح Gemini وحصص المشروع فقط.',eleven_dialogue:'يثبت على ElevenLabs Dialogue v3 فقط، ويلزم مفتاح وVoice ID لكل شخصية.',edge_fallback:'أصوات عربية عصبية مجانية متعددة اللهجات، بلا مفتاح API.'};
 function updateProviderHelp(){$('providerHelp').textContent=providerNotes[$('provider').value]||''}
 $('provider').onchange=updateProviderHelp;
 $('pause').oninput=()=> $('pauseLabel').textContent=$('pause').value+'ms';
-async function load(){try{const d=await jf('/api/dialogue-ultra/settings');let saved=d.default_provider||'auto';if(saved==='legacy_contextual')saved='edge_fallback';$('provider').value=[...$('provider').options].some(o=>o.value===saved)?saved:'auto';updateProviderHelp();$('hostMale').value=d.host_male_voice_id||'';$('hostFemale').value=d.host_female_voice_id||'';$('guestMale').value=d.guest_male_voice_id||'';$('guestFemale').value=d.guest_female_voice_id||'';$('expertMale').value=d.expert_male_voice_id||'';$('settingsState').textContent=d.eleven_api_key_set?'مفتاح ElevenLabs محفوظ.':'ElevenLabs غير معد؛ استخدم Gemini أو أضف إعداداته.'}catch(e){$('settingsState').textContent=e.message}}
+async function load(){try{const d=await jf('/api/dialogue-ultra/settings');let saved=d.default_provider||'edge_fallback';if(saved==='legacy_contextual'||saved==='auto')saved='edge_fallback';$('provider').value=[...$('provider').options].some(o=>o.value===saved)?saved:'edge_fallback';updateProviderHelp();$('hostMale').value=d.host_male_voice_id||'';$('hostFemale').value=d.host_female_voice_id||'';$('guestMale').value=d.guest_male_voice_id||'';$('guestFemale').value=d.guest_female_voice_id||'';$('expertMale').value=d.expert_male_voice_id||'';$('settingsState').textContent=d.eleven_api_key_set?'مفتاح ElevenLabs محفوظ.':'ElevenLabs اختياري؛ الصوت المجاني جاهز من دون إعداد.'}catch(e){$('settingsState').textContent=e.message}}
 $('scenario').onclick=async()=>{const topic=$('topic').value.trim();if(!topic)return st('اكتب موضوع المقابلة أولًا.','error');try{$('scenario').disabled=true;st('جاري بناء سيناريو بودكاست احترافي...','warning');const d=await jf('/api/interview-pro/scenario',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic,duration_minutes:Number($('minutes').value),format:$('format').value,dialect:$('dialect').value,tone:'calm_powerful',audience:$('audience').value})});$('script').value=d.script;st(d.message,'success')}catch(e){st(e.message,'error')}finally{$('scenario').disabled=false}};
 $('humanize').onclick=async()=>{const script=$('script').value.trim();if(!script)return st('أنشئ أو الصق السيناريو أولًا.','error');try{$('humanize').disabled=true;st('جاري إعادة إخراج الحوار ليصبح أكثر طبيعية...','warning');const d=await jf('/api/dialogue-ultra/humanize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script,dialect:$('dialect').value,tone:$('tone').value,preserve_facts:true})});$('script').value=d.script;st(d.message,'success')}catch(e){st(e.message,'error')}finally{$('humanize').disabled=false}};
 $('save').onclick=async()=>{try{$('save').disabled=true;const d=await jf('/api/dialogue-ultra/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eleven_api_key:$('elevenKey').value.trim(),host_male_voice_id:$('hostMale').value.trim(),host_female_voice_id:$('hostFemale').value.trim(),guest_male_voice_id:$('guestMale').value.trim(),guest_female_voice_id:$('guestFemale').value.trim(),expert_male_voice_id:$('expertMale').value.trim(),default_provider:$('provider').value})});$('elevenKey').value='';$('settingsState').textContent=d.message}catch(e){$('settingsState').textContent=e.message}finally{$('save').disabled=false}};
-$('render').onclick=async()=>{const script=$('script').value.trim();if(!script)return st('أنشئ أو الصق سيناريو المقابلة أولًا.','error');const provider=$('provider').value;try{$('render').disabled=true;$('result').className='result';st(provider==='edge_fallback'?'جاري الإنتاج بالمحرك الميكانيكي الذي اخترته يدويًا...':'جاري الإنتاج من المحرك السحابي المختار. لن يتم التحويل إلى الميكانيكي...','warning');const d=await jf('/api/dialogue-safe/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script,provider,master:$('master').value,dialect:$('dialect').value,tone:$('tone').value,gemini_model:$('geminiModel').value,pause_ms:Number($('pause').value),seed:0})});$('audio').src=d.url+'?v='+Date.now();$('download').href=d.url;$('details').textContent=`المحرك: ${d.provider} — النموذج: ${d.model||'-'} — المتحدثون: ${d.speakers}`;$('result').className='result show';st(d.message,'success')}catch(e){st('توقف المحرك المختار من دون التحويل إلى الصوت الميكانيكي:\n'+e.message,'error')}finally{$('render').disabled=false}};
+$('render').onclick=async()=>{const script=$('script').value.trim();if(!script)return st('أنشئ أو الصق سيناريو المقابلة أولًا.','error');const provider=$('provider').value;try{$('render').disabled=true;$('result').className='result';st(provider==='edge_fallback'||provider==='auto'?'جاري الإنتاج بالأصوات العربية العصبية المجانية...':'جاري الإنتاج من المحرك السحابي الذي اخترته...','warning');const d=await jf('/api/dialogue-safe/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script,provider,master:$('master').value,dialect:$('dialect').value,tone:$('tone').value,gemini_model:$('geminiModel').value,pause_ms:Number($('pause').value),seed:0})});$('audio').src=d.url+'?v='+Date.now();$('download').href=d.url;$('details').textContent=`المحرك: ${d.provider} — النموذج: ${d.model||'-'} — المتحدثون: ${d.speakers}`;$('result').className='result show';st(d.message,'success')}catch(e){st('توقف المحرك المختار:\n'+e.message,'error')}finally{$('render').disabled=false}};
 load();updateProviderHelp();
 </script>
 </body>

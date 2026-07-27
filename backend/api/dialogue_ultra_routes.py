@@ -23,7 +23,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.api.studio_pro_routes import _ask_gemini, _desktop_exports
+from backend.api.studio_pro_routes import _ask_gemini, _copy_to_desktop, _desktop_note
 from backend.core.config import CONFIG_DIR, OUTPUTS_DIR
 from backend.core.tts_registry import tts_registry
 from backend.plugins.builtin.audio_effects import _ffmpeg_executable, process_audio
@@ -54,7 +54,7 @@ class UltraSettings(BaseModel):
     guest_male_voice_id: str = Field(default="", max_length=150)
     guest_female_voice_id: str = Field(default="", max_length=150)
     expert_male_voice_id: str = Field(default="", max_length=150)
-    default_provider: str = Field(default="auto", max_length=40)
+    default_provider: str = Field(default="edge_fallback", max_length=40)
 
 
 class HumanizeRequest(BaseModel):
@@ -410,14 +410,14 @@ async def _legacy_contextual(turns: list[tuple[str, str]], pause_ms: int) -> Pat
 @router.get("/settings")
 async def get_settings():
     data = _settings()
-    return {"success": True, "eleven_api_key_set": bool(_eleven_api_key()), "host_male_voice_id": data.get("host_male_voice_id", ""), "host_female_voice_id": data.get("host_female_voice_id", ""), "guest_male_voice_id": data.get("guest_male_voice_id", ""), "guest_female_voice_id": data.get("guest_female_voice_id", ""), "expert_male_voice_id": data.get("expert_male_voice_id", ""), "default_provider": data.get("default_provider", "auto")}
+    return {"success": True, "eleven_api_key_set": bool(_eleven_api_key()), "host_male_voice_id": data.get("host_male_voice_id", ""), "host_female_voice_id": data.get("host_female_voice_id", ""), "guest_male_voice_id": data.get("guest_male_voice_id", ""), "guest_female_voice_id": data.get("guest_female_voice_id", ""), "expert_male_voice_id": data.get("expert_male_voice_id", ""), "default_provider": data.get("default_provider", "edge_fallback")}
 
 
 @router.post("/settings")
 async def save_settings(req: UltraSettings):
     previous = _settings()
     api_key = req.eleven_api_key.strip() or str(previous.get("eleven_api_key", "")).strip()
-    data = {"eleven_api_key": api_key, "host_male_voice_id": req.host_male_voice_id.strip(), "host_female_voice_id": req.host_female_voice_id.strip(), "guest_male_voice_id": req.guest_male_voice_id.strip(), "guest_female_voice_id": req.guest_female_voice_id.strip(), "expert_male_voice_id": req.expert_male_voice_id.strip(), "default_provider": req.default_provider.strip() or "auto"}
+    data = {"eleven_api_key": api_key, "host_male_voice_id": req.host_male_voice_id.strip(), "host_female_voice_id": req.host_female_voice_id.strip(), "guest_male_voice_id": req.guest_male_voice_id.strip(), "guest_female_voice_id": req.guest_female_voice_id.strip(), "expert_male_voice_id": req.expert_male_voice_id.strip(), "default_provider": req.default_provider.strip() or "edge_fallback"}
     for key, value in data.items():
         if key.endswith("_voice_id") and value and len(value) < 8:
             raise HTTPException(status_code=400, detail=f"{key} غير صحيح.")
@@ -489,6 +489,5 @@ async def render_ultra(req: RenderUltraRequest):
         model_used = "gemini-segmented"
     final = OUTPUTS_DIR / f"ibn_alwaqadi_true_podcast_{token}.mp3"
     output = final if req.master != "none" and process_audio(str(raw), str(final), req.master) else raw
-    target = _desktop_exports() / output.name
-    shutil.copy2(output, target)
-    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target), "provider": used_provider, "model": model_used, "turns": len(turns), "speakers": len({_canonical_role(role) for role, _ in turns}), "message": "تم إنتاج المقابلة بوضع الحوار الطبيعي وحفظها على سطح المكتب."}
+    target = _copy_to_desktop(output)
+    return {"success": True, "url": f"/api/downloads/{output.name}", "desktop_path": str(target) if target else None, "desktop_exported": bool(target), "provider": used_provider, "model": model_used, "turns": len(turns), "speakers": len({_canonical_role(role) for role, _ in turns}), "message": "تم إنتاج المقابلة بوضع الحوار الطبيعي." + _desktop_note(target)}

@@ -19,7 +19,7 @@ from backend.api.interview_pro_routes import (
     create_scenario as _create_interview_scenario,
     render as _render_interview,
 )
-from backend.core.config import APP_NAME, APP_VERSION, OUTPUTS_DIR
+from backend.core.config import APP_NAME, APP_RELEASE, APP_VERSION, ENGINE_PRIORITY, OUTPUTS_DIR
 from backend.core import gemini_key_pool
 
 
@@ -95,8 +95,8 @@ async def studio_version():
         "success": True,
         "name": APP_NAME,
         "version": APP_VERSION,
-        "release": "Unified Stable",
-        "update_channel": "agent/professional-tts-engine",
+        "release": APP_RELEASE,
+        "update_channel": "free-first",
     }
 
 
@@ -108,9 +108,12 @@ async def studio_health():
         "success": True,
         "name": APP_NAME,
         "version": APP_VERSION,
-        "release": "Unified Stable",
-        "cloud_only": True,
-        "automatic_free_fallback": False,
+        "release": APP_RELEASE,
+        "cloud_only": False,
+        "free_first": True,
+        "default_engine": ENGINE_PRIORITY[0],
+        "automatic_free_fallback": True,
+        "explicit_cloud_choice_is_strict": True,
         "interview_request_contract": "application/json body",
         "persistent_sessions": True,
         "resumable_interviews": True,
