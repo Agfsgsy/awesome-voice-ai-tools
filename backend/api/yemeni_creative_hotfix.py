@@ -2,7 +2,7 @@
 
 This module does not replace or delete the original Yemeni Creative implementation.
 It exposes safe endpoints used by the repaired UI: fast local writing, bounded Gemini
-writing, strict provider selection, resilient music mixing, and Desktop project packs.
+writing, strict provider selection, resilient audible music mixing, and Desktop packs.
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ class SafeProduceRequest(BaseModel):
     tone: str = Field(default="energetic", max_length=40)
     speed: float = Field(default=0.96, ge=0.75, le=1.20)
     music_style: str = Field(default="shila_modern", max_length=40)
-    music_volume: float = Field(default=0.18, ge=0.0, le=0.45)
+    music_volume: float = Field(default=0.30, ge=0.0, le=0.55)
     include_music: bool = True
     master_loudness: float = Field(default=-14.0, ge=-20.0, le=-10.0)
 
@@ -113,17 +113,90 @@ def _desktop_root() -> Path:
 def _run(command: list[str], timeout: int = 1200) -> None:
     completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
     if completed.returncode != 0:
-        raise RuntimeError((completed.stderr or completed.stdout or "فشل تجهيز الصوت")[-1800:])
+        raise RuntimeError((completed.stderr or completed.stdout or "فشل تجهيز الصوت")[-2400:])
 
 
-def _simple_mix(ffmpeg: str, voice: Path, music: Path, output: Path, volume: float, loudness: float) -> None:
-    """Fallback mixer for FFmpeg builds where sidechaincompress is unavailable."""
+def _music_settings(content_type: str, requested_style: str, requested_volume: float) -> tuple[str, float, bool]:
+    """Return a valid style, an audible floor, and whether music is mandatory."""
+    mandatory = content_type in {"shila", "zamil"}
+    defaults = {
+        "shila": ("shila_modern", 0.32),
+        "zamil": ("zamil_power", 0.36),
+        "success": ("success_cinematic", 0.26),
+        "dedication": ("dedication_warm", 0.22),
+        "poem": ("poetry_minimal", 0.18),
+    }
+    default_style, floor = defaults.get(content_type, ("yemeni_oud", 0.22))
+    style = requested_style if requested_style in legacy.MUSIC_STYLES else default_style
+    if content_type == "shila" and style not in {"shila_modern", "yemeni_oud", "success_cinematic"}:
+        style = "shila_modern"
+    if content_type == "zamil" and style not in {"zamil_power", "yemeni_oud"}:
+        style = "zamil_power"
+    volume = max(float(requested_volume or 0.0), floor if mandatory else 0.0)
+    return style, min(volume, 0.55), mandatory
+
+
+def _audible_mix(
+    ffmpeg: str,
+    voice: Path,
+    music: Path,
+    output: Path,
+    volume: float,
+    loudness: float,
+    *,
+    energetic: bool,
+) -> None:
+    """Compatible mix with an audible intro/outro and no sidechain-only dependency."""
+    intro_ms = 1350 if energetic else 950
+    outro_seconds = 2.4 if energetic else 1.8
+    # Voice is delayed so the listener hears the Yemeni instrumental before speech.
+    # Music is looped and the output duration follows delayed+padded voice.
     graph = (
-        "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,highpass=f=65,"
-        "acompressor=threshold=-20dB:ratio=2.5:attack=12:release=180[voice];"
-        f"[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume={volume:.4f}[bed];"
-        f"[voice][bed]amix=inputs=2:duration=first:dropout_transition=2,"
-        f"loudnorm=I={loudness}:TP=-1.0:LRA=9,alimiter=limit=0.96[out]"
+        "[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+        "highpass=f=65,acompressor=threshold=-21dB:ratio=2.4:attack=12:release=180,"
+        f"adelay={intro_ms}|{intro_ms},apad=pad_dur={outro_seconds:.2f}[voice];"
+        "[1:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+        f"volume={volume:.4f},lowpass=f=14500,afade=t=in:st=0:d=0.75[bed];"
+        "[voice][bed]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,"
+        f"loudnorm=I={loudness}:TP=-1.0:LRA=10,alimiter=limit=0.96[out]"
+    )
+    _run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(voice),
+            "-stream_loop",
+            "-1",
+            "-i",
+            str(music),
+            "-filter_complex",
+            graph,
+            "-map",
+            "[out]",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "320k",
+            str(output),
+        ]
+    )
+
+
+def _minimal_mix(ffmpeg: str, voice: Path, music: Path, output: Path, volume: float) -> None:
+    """Last compatible music mix; still never returns a voice-only shila/zamil."""
+    graph = (
+        "[0:a]aresample=48000,aformat=channel_layouts=stereo,volume=1.0[voice];"
+        f"[1:a]aresample=48000,aformat=channel_layouts=stereo,volume={volume:.4f}[bed];"
+        "[voice][bed]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,"
+        "alimiter=limit=0.94[out]"
     )
     _run(
         [
@@ -156,6 +229,10 @@ def _simple_mix(ffmpeg: str, voice: Path, music: Path, output: Path, volume: flo
     )
 
 
+def _valid_audio(path: Path | None, minimum: int = 4096) -> bool:
+    return bool(path and path.exists() and path.is_file() and path.stat().st_size >= minimum)
+
+
 def _project_pack(
     *,
     token: str,
@@ -169,6 +246,8 @@ def _project_pack(
     warnings: list[str],
     voice_metadata: Any,
     music_style: str,
+    music_volume: float,
+    music_included: bool,
 ) -> Path:
     label = legacy.CONTENT_TYPES.get(content_type, legacy.CONTENT_TYPES["dedication"])["label"]
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -179,8 +258,8 @@ def _project_pack(
     voice_target = directory / f"{_safe_component(title)} - الصوت المنفرد{voice_audio.suffix.lower()}"
     shutil.copy2(final_audio, final_target)
     shutil.copy2(voice_audio, voice_target)
-    if instrumental and instrumental.exists():
-        shutil.copy2(instrumental, directory / f"{_safe_component(title)} - الموسيقى الأصلية.mp3")
+    if _valid_audio(instrumental):
+        shutil.copy2(instrumental, directory / f"{_safe_component(title)} - الموسيقى اليمنية الأصلية.mp3")
     (directory / f"{_safe_component(title)} - الكلمات.txt").write_text(text, encoding="utf-8-sig")
     metadata = {
         "title": title,
@@ -189,6 +268,8 @@ def _project_pack(
         "provider": provider,
         "voice": voice_metadata,
         "music_style": music_style,
+        "music_volume": music_volume,
+        "music_included": music_included,
         "quality": "MP3 320kbps / 48kHz stereo",
         "warnings": warnings,
         "created_at": datetime.now().isoformat(timespec="seconds"),
@@ -210,7 +291,8 @@ async def health():
         "content_types": list(legacy.CONTENT_TYPES),
         "shila_ready": "shila" in legacy.CONTENT_TYPES,
         "zamil_ready": "zamil" in legacy.CONTENT_TYPES,
-        "message": "محرك الشيلات والزامل جاهز. الإنشاء المحلي يعمل دون مفتاح Gemini.",
+        "music_required_for_shila_zamil": True,
+        "message": "محرك الشيلات والزامل جاهز، والموسيقى أصبحت إلزامية في الماستر النهائي.",
     }
 
 
@@ -219,8 +301,6 @@ async def write_safe(request: SafeWriteRequest):
     if request.content_type not in legacy.CONTENT_TYPES:
         raise HTTPException(status_code=422, detail="نوع العمل غير معروف.")
 
-    # Local writing is deliberately instant and is the default. Gemini is bounded
-    # by a short timeout so the button never appears frozen for minutes.
     if request.writer_provider == "local":
         title, body = _write_local(request)
         return {
@@ -263,12 +343,19 @@ async def write_safe(request: SafeWriteRequest):
 async def produce_safe(request: SafeProduceRequest):
     if request.content_type not in legacy.CONTENT_TYPES:
         raise HTTPException(status_code=422, detail="نوع العمل غير معروف.")
-    if request.include_music and request.music_style not in legacy.MUSIC_STYLES:
+
+    style, effective_volume, music_mandatory = _music_settings(
+        request.content_type,
+        request.music_style,
+        request.music_volume,
+    )
+    include_music = bool(request.include_music or music_mandatory)
+    if include_music and style not in legacy.MUSIC_STYLES:
         raise HTTPException(status_code=422, detail="النمط الموسيقي غير معروف.")
 
     ffmpeg = _ffmpeg_executable()
     if not ffmpeg:
-        raise HTTPException(status_code=503, detail="FFmpeg غير جاهز داخل النسخة الحالية. شغّل إصلاح البرنامج مرة أخرى.")
+        raise HTTPException(status_code=503, detail="FFmpeg غير جاهز داخل النسخة الحالية.")
 
     provider = (request.provider or "edge").strip().lower()
     locale = "ar-YE" if provider == "edge" else None
@@ -290,7 +377,7 @@ async def produce_safe(request: SafeProduceRequest):
         raise HTTPException(status_code=504, detail="انتهت مهلة محرك الصوت. افحص الإنترنت ثم أعد المحاولة.") from exc
 
     voice = Path(str(result.get("file", "")))
-    if not voice.exists() or voice.stat().st_size < 256:
+    if not _valid_audio(voice, 256):
         raise HTTPException(status_code=502, detail="لم يُنشأ ملف الصوت رغم اكتمال الطلب.")
 
     token = uuid.uuid4().hex[:12]
@@ -298,31 +385,59 @@ async def produce_safe(request: SafeProduceRequest):
     instrumental: Path | None = None
     music_wav: Path | None = None
     warnings: list[str] = []
+    music_included = False
 
-    if request.include_music and request.music_volume > 0:
+    if include_music:
+        music_wav = OUTPUTS_DIR / f"yemeni_safe_music_{style}_{token}.wav"
+        instrumental = OUTPUTS_DIR / f"yemeni_safe_music_{style}_{token}_instrumental.mp3"
         try:
-            # A 12-second original loop is enough because FFmpeg repeats it. This
-            # keeps the button responsive while the final output remains 48 kHz.
-            music_wav = OUTPUTS_DIR / f"yemeni_safe_music_{request.music_style}_{token}.wav"
-            instrumental = OUTPUTS_DIR / f"yemeni_safe_music_{request.music_style}_{token}_instrumental.mp3"
-            legacy._music_sample(legacy.MUSIC_STYLES[request.music_style], 12, token, music_wav)
+            # 18-second original loop gives more Yemeni melodic variation before looping.
+            legacy._music_sample(legacy.MUSIC_STYLES[style], 18, token, music_wav)
+            if not _valid_audio(music_wav):
+                raise RuntimeError("لم يتكوّن ملف الموسيقى اليمنية.")
             legacy._instrumental_mp3(ffmpeg, music_wav, instrumental)
+            if not _valid_audio(instrumental):
+                raise RuntimeError("لم يكتمل ملف الموسيقى المنفردة.")
+
+            energetic = request.content_type in {"shila", "zamil", "success"}
             try:
-                legacy._master_with_music(ffmpeg, voice, music_wav, final, request.music_volume, request.master_loudness)
-            except Exception as advanced_exc:
-                logger.warning("Advanced Yemeni mix failed; using compatible mix: %s", advanced_exc)
-                warnings.append("استُخدم الدمج المتوافق لأن الدمج المتقدم غير مدعوم في FFmpeg الحالي.")
-                _simple_mix(ffmpeg, voice, music_wav, final, request.music_volume, request.master_loudness)
+                _audible_mix(
+                    ffmpeg,
+                    voice,
+                    music_wav,
+                    final,
+                    effective_volume,
+                    request.master_loudness,
+                    energetic=energetic,
+                )
+            except Exception as first_exc:
+                logger.warning("Audible Yemeni mix failed; trying minimal compatible mix: %s", first_exc)
+                warnings.append("استُخدم الدمج المتوافق مع نسخة FFmpeg الموجودة.")
+                _minimal_mix(ffmpeg, voice, music_wav, final, effective_volume)
+
+            if not _valid_audio(final):
+                raise RuntimeError("لم يكتمل الماستر الموسيقي النهائي.")
+            music_included = True
         except Exception as music_exc:
-            logger.warning("Yemeni music failed; preserving voice master: %s", music_exc)
-            warnings.append("تعذرت الموسيقى، فتم حفظ الصوت بماستر واضح بدل فقدان النتيجة.")
+            final.unlink(missing_ok=True)
+            if music_mandatory:
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "لم يتم إنشاء الشيلة/الزامل لأن الموسيقى لم تندمج. "
+                        "لن يحفظ البرنامج صوتًا منفردًا على أنه شيلة. السبب: " + _plain(music_exc)
+                    ),
+                ) from music_exc
+            warnings.append("تعذرت الموسيقى، فتم حفظ الصوت بماستر واضح.")
             instrumental = None
             legacy._master_voice(ffmpeg, voice, final, request.master_loudness)
     else:
         legacy._master_voice(ffmpeg, voice, final, request.master_loudness)
 
-    if not final.exists() or final.stat().st_size < 1024:
+    if not _valid_audio(final, 1024):
         raise HTTPException(status_code=500, detail="لم يكتمل ملف الماستر النهائي.")
+    if music_mandatory and not music_included:
+        raise HTTPException(status_code=500, detail="تم منع إخراج الشيلة أو الزامل من دون موسيقى.")
 
     project = _project_pack(
         token=token,
@@ -335,7 +450,9 @@ async def produce_safe(request: SafeProduceRequest):
         instrumental=instrumental,
         warnings=warnings,
         voice_metadata=result.get("voice_metadata") or result.get("voice"),
-        music_style=request.music_style if request.include_music else "none",
+        music_style=style if include_music else "none",
+        music_volume=effective_volume if include_music else 0.0,
+        music_included=music_included,
     )
 
     return {
@@ -344,11 +461,18 @@ async def produce_safe(request: SafeProduceRequest):
         "provider": provider,
         "url": f"/api/downloads/{final.name}",
         "voice_url": result.get("url") or f"/api/downloads/{voice.name}",
-        "instrumental_url": f"/api/downloads/{instrumental.name}" if instrumental and instrumental.exists() else None,
+        "instrumental_url": f"/api/downloads/{instrumental.name}" if _valid_audio(instrumental) else None,
         "desktop_project": str(project),
         "quality": "MP3 320kbps / 48kHz stereo",
+        "music_included": music_included,
+        "music_style": style,
+        "music_volume": effective_volume,
         "warnings": warnings,
-        "message": "تم إنتاج العمل وحفظ حزمته على سطح المكتب." + (" توجد ملاحظة موضحة في النتيجة." if warnings else ""),
+        "message": (
+            "تم إنتاج الشيلة/الزامل مع موسيقى يمنية أصلية واضحة وحفظ الحزمة على سطح المكتب."
+            if music_included and request.content_type in {"shila", "zamil"}
+            else "تم إنتاج العمل وحفظ حزمته على سطح المكتب."
+        ),
     }
 
 
