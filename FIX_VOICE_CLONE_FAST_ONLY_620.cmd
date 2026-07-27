@@ -3,7 +3,7 @@ setlocal EnableExtensions
 chcp 65001 >nul
 title Ibn Al-Waqadi Studio 6.2 - Voice Clone Fast Fix Only
 
-set "SOURCE_COMMIT=e3d6b157af17d1556512d8aadeff185fe663f296"
+set "SOURCE_COMMIT=e9544c294d7be46df1b1ec6121ca4a18ecda144f"
 set "RAW=https://raw.githubusercontent.com/Agfsgsy/awesome-voice-ai-tools/%SOURCE_COMMIT%"
 set "PROJECT="
 if exist "%USERPROFILE%\Desktop\VoiceAIStudio-Pro-Latest\BUILD_WINDOWS_INSTALLER.bat" set "PROJECT=%USERPROFILE%\Desktop\VoiceAIStudio-Pro-Latest"
