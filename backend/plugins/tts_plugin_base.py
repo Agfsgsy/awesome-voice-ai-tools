@@ -60,13 +60,14 @@ class TTSPluginBase(ABC):
         installed = self.check()
         models = self.list_models()
         voices = self.list_voices()
+        ready = installed and any(model.get("downloaded", False) for model in models)
         return {
             "name": self.name,
             "label": self.label,
             "installed": installed,
             "models_count": len(models),
             "voices_count": len(voices),
-            "ready": installed and len(models) > 0,
+            "ready": ready,
             "requires_gpu": self.requires_gpu,
             "is_open_source": self.is_open_source,
         }
