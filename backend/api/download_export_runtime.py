@@ -40,13 +40,9 @@ def _desktop_directory() -> Path:
     if user_profile:
         candidates.append(Path(user_profile) / "Desktop")
     candidates.append(Path.home() / "Desktop")
-
     for candidate in candidates:
         if candidate.exists() and candidate.is_dir():
             return candidate
-
-    # The user's machine previously used USERPROFILE\Desktop. Create it only when
-    # Windows has no existing Desktop candidate; no existing file is removed.
     fallback = Path(user_profile) / "Desktop" if user_profile else Path.home() / "Desktop"
     fallback.mkdir(parents=True, exist_ok=True)
     return fallback
@@ -66,13 +62,11 @@ def _read_interview_engine(job_id: str) -> str:
 def _related_engine(filename: str) -> str:
     """Infer provider for final files whose visible name no longer contains it."""
     low = filename.lower()
-
     job = re.search(r"ibn_alwaqadi_(?:podcast|interview)_([a-f0-9]{18})", low)
     if job:
         engine = _read_interview_engine(job.group(1))
         if engine:
             return engine
-
     dialogue = re.search(r"ibn_alwaqadi_dialogue_([a-f0-9]{10})", low)
     if dialogue:
         token = dialogue.group(1)
@@ -82,7 +76,6 @@ def _related_engine(filename: str) -> str:
             return "gemini"
         if (OUTPUTS_DIR / f"ibn_alwaqadi_dialogue_v3_{token}.mp3").exists():
             return "elevenlabs"
-
     producer = re.search(r"interview_final_([a-f0-9]{10})", low)
     if producer:
         token = producer.group(1)
@@ -96,7 +89,9 @@ def _provider(filename: str) -> tuple[str, str]:
     low = filename.lower()
     engine = _related_engine(filename)
     if not engine:
-        if low.startswith("gemini_") or "_gemini_" in low:
+        if low.startswith("yemeni_music_"):
+            engine = "yemeni_music"
+        elif low.startswith("gemini_") or "_gemini_" in low:
             engine = "gemini"
         elif low.startswith("edge_") or "_edge_" in low or "edge_free" in low:
             engine = "edge"
@@ -106,19 +101,21 @@ def _provider(filename: str) -> tuple[str, str]:
             engine = "local"
         elif low.startswith("mix_"):
             engine = "mixed"
-
     labels = {
         "gemini": ("Gemini", "Gemini"),
         "edge": ("الصوت المجاني", "الصوت المجاني"),
         "elevenlabs": ("ElevenLabs", "ElevenLabs"),
         "local": ("المحركات المحلية", "محرك محلي"),
         "mixed": ("المخرجات المختلطة", "مزيج صوتي"),
+        "yemeni_music": ("الموسيقى اليمنية الأصلية", "موسيقى أصلية"),
     }
     return labels.get(engine, ("ملفات صوتية أخرى", "صوت"))
 
 
 def _tool(filename: str) -> str:
     low = filename.lower()
+    if low.startswith("yemeni_"):
+        return "الإهداءات والأشعار اليمنية"
     if "ibn_alwaqadi_podcast_" in low or low.startswith("interview_"):
         return "المقابلات البشرية Pro"
     if "dialogue" in low or "edge_free" in low or "gemini_native_strict" in low:
@@ -159,15 +156,9 @@ def export_download_copy(source: Path) -> Path:
         raise FileNotFoundError(source)
     if source.suffix.lower() not in _AUDIO_SUFFIXES:
         raise ValueError("الملف المطلوب ليس ملفًا صوتيًا مدعومًا.")
-
     provider_folder, provider_label = _provider(source.name)
     tool_name = _tool(source.name)
-    directory = (
-        _desktop_directory()
-        / "استوديو ابن الواقدي"
-        / _safe_component(provider_folder)
-        / _safe_component(tool_name)
-    )
+    directory = _desktop_directory() / "استوديو ابن الواقدي" / _safe_component(provider_folder) / _safe_component(tool_name)
     directory.mkdir(parents=True, exist_ok=True)
     target = _unique_target(directory, f"{tool_name} - {provider_label}", source.suffix)
     shutil.copy2(source, target)
@@ -184,17 +175,13 @@ async def _download_and_export(filename: str):
     source = OUTPUTS_DIR / safe
     if not source.exists() or not source.is_file():
         raise HTTPException(status_code=404, detail="لم يتم العثور على الملف الصوتي.")
-
     download_name = source.name
     try:
         desktop_copy = export_download_copy(source)
         download_name = desktop_copy.name
         logger.info("Audio download exported to Desktop: %s", desktop_copy)
     except Exception as exc:
-        # Browser delivery still proceeds so a Desktop permission problem never
-        # destroys or blocks the completed source audio.
         logger.warning("Desktop audio export failed for %s: %s", source.name, exc)
-
     media_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
     return FileResponse(
         str(source),
