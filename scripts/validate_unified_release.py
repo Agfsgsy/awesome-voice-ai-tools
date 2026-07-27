@@ -1,4 +1,4 @@
-"""Build-time validation for Voice Clone Pro 6.2.0 and the additive Yemeni repair."""
+"""Build-time validation for Voice Clone Pro 6.2.0 and additive repairs."""
 from __future__ import annotations
 
 import json
@@ -43,12 +43,14 @@ def _validate_versions() -> None:
         "setup.py": f'version="{EXPECTED_VERSION}"',
         "installer/VoiceAIStudio.iss": f'#define MyAppVersion "{EXPECTED_VERSION}"',
         "frontend/static/studio_shell.html": f"VERSION='{EXPECTED_VERSION}'",
+        "frontend/static/studio_shell_preserved.html": "Professional Studio 6.2.0 — Preserved UI",
         "frontend/static/voice_clone.html": "الإصدار 6.2.0",
+        "desktop_app.py": "/static/studio_shell_preserved.html",
         "backend/core/config.py": 'APP_RELEASE = "Voice Clone Pro"',
     }
     for path, marker in contracts.items():
         if marker not in _text(path):
-            fail(f"Version marker is missing from {path}: {marker}")
+            fail(f"Version or preserved-interface marker is missing from {path}: {marker}")
 
 
 def _validate_engine_policy() -> None:
@@ -115,8 +117,10 @@ def _validate_api_contracts() -> None:
 
 def _validate_voice_clone() -> None:
     backend = _text("backend/api/voice_clone_routes.py")
+    repair = _text("backend/api/voice_clone_repair_runtime.py")
     frontend = _text("frontend/static/voice_clone.html")
     shell = _text("frontend/static/studio_shell.html")
+    preserved_shell = _text("frontend/static/studio_shell_preserved.html")
     legacy = _text("backend/api/studio_pro_routes.py")
     coqui = _text("backend/plugins/coqui_plugin.py")
     main = _text("main.py")
@@ -136,6 +140,16 @@ def _validate_voice_clone() -> None:
             fail(f"Voice Clone backend is missing: {marker}")
 
     for marker in (
+        'TRANSFORMERS_VERSION = "4.57.6"',
+        'COQUI_VERSION = "0.27.5"',
+        "--force-reinstall",
+        "clone._setup_local_engine = _repair_local_engine",
+        "من دون لمس ملفاتك",
+    ):
+        if marker not in repair:
+            fail(f"XTTS compatibility repair is missing: {marker}")
+
+    for marker in (
         "/api/voice-clone/status",
         "/api/voice-clone/setup-local",
         "/api/voice-clone/profiles",
@@ -146,10 +160,10 @@ def _validate_voice_clone() -> None:
         if marker not in frontend:
             fail(f"Voice Clone frontend is missing: {marker}")
 
-    if "/static/voice_clone.html" not in shell:
-        fail("The main interface does not expose Voice Clone Pro")
-    if "voice_clone_router" not in main:
-        fail("Voice Clone Pro router is not mounted")
+    if "/static/voice_clone.html" not in shell or "/static/voice_clone.html" not in preserved_shell:
+        fail("The interfaces do not expose Voice Clone Pro")
+    if "voice_clone_router" not in main or "voice_clone_repair_runtime" not in main:
+        fail("Voice Clone routes or the XTTS repair are not mounted")
     if "create_profile_from_uploads" not in legacy or "generate_from_profile" not in legacy:
         fail("The legacy clone box does not delegate to Voice Clone Pro")
     if "speaker_wav=str(reference)" not in coqui:
@@ -164,6 +178,7 @@ def _validate_yemeni_features() -> None:
     repaired_backend = _text("backend/api/yemeni_creative_hotfix.py")
     repaired_frontend = _text("frontend/static/yemeni_creative_pro.html")
     shell = _text("frontend/static/studio_shell.html")
+    preserved_shell = _text("frontend/static/studio_shell_preserved.html")
     main = _text("main.py")
 
     for marker in ("zamil", "shila", "success_cinematic", "320k", "الأعمال اليمنية"):
@@ -188,8 +203,10 @@ def _validate_yemeni_features() -> None:
         if marker not in repaired_backend:
             fail(f"The repaired Yemeni backend is missing: {marker}")
 
-    if "/static/yemeni_creative_pro.html" not in shell:
-        fail("The 6.2 interface does not open the repaired Yemeni page")
+    if "/static/yemeni_creative_pro.html" not in shell or "/static/yemeni_creative_pro.html" not in preserved_shell:
+        fail("The preserved interfaces do not open the repaired Yemeni page")
+    if "/static/ultimate_studio.html" not in preserved_shell or "الواجهة المصممة كاملة كما كانت" not in preserved_shell:
+        fail("The professionally designed Ultimate interface was not restored")
     if "yemeni_creative_router" not in main or "yemeni_creative_safe_router" not in main:
         fail("The original and repaired Yemeni routers are not both mounted")
 
@@ -204,7 +221,8 @@ def main() -> None:
     _validate_api_contracts()
     _validate_voice_clone()
     _validate_yemeni_features()
-    print("[SUCCESS] Voice Clone Pro 6.2.0 interface and tools are preserved.")
+    print("[SUCCESS] Voice Clone Pro 6.2.0 and the XTTS dependency repair are connected.")
+    print("[SUCCESS] The designed interface is restored and all old tools remain available.")
     print("[SUCCESS] The additive Yemeni shila/zamil repair is connected without deleting the original feature.")
 
 
