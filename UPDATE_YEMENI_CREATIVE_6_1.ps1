@@ -5,7 +5,7 @@
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-$SourceCommit = "3e22250a289fdd77b5b4c8ecdeff54bb88cca7b2"
+$SourceCommit = "65b565cd947af1edb8204cb22752c9db080d888f"
 $RawRoot = "https://raw.githubusercontent.com/Agfsgsy/awesome-voice-ai-tools/$SourceCommit"
 
 function Write-Step {
