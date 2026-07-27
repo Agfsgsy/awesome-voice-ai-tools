@@ -10,10 +10,14 @@ import httpx
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+from backend.api.voice_clone_routes import (
+    GenerateCloneRequest,
+    create_profile_from_uploads,
+    generate_from_profile,
+)
 from backend.core.config import OUTPUTS_DIR, UPLOADS_DIR
 from backend.core.gemini_key_pool import ordered_keys, record_result
 from backend.core.logger import get_logger
-from backend.core.tts_registry import tts_registry
 from backend.plugins.builtin.audio_effects import _ffmpeg_executable
 
 router = APIRouter(prefix="/api/studio-pro", tags=["Studio Pro"])
@@ -241,35 +245,34 @@ async def mix_audio(req: MixRequest):
 
 
 @router.post("/clone")
-async def clone_voice(sample: UploadFile = File(...), text: str = Form(...), consent: bool = Form(...)):
-    if not consent:
-        raise HTTPException(status_code=400, detail="يجب تأكيد أن الصوت لك أو أن لديك إذنًا صريحًا من صاحبه.")
-    if len(text.strip()) < 2:
-        raise HTTPException(status_code=400, detail="اكتب النص المطلوب.")
-    suffix = Path(sample.filename or "sample.wav").suffix.lower()
-    if suffix not in {".wav", ".mp3", ".m4a", ".flac", ".ogg"}:
-        raise HTTPException(status_code=400, detail="صيغة عينة الصوت غير مدعومة.")
-    sample_path = UPLOADS_DIR / f"consented_clone_{uuid.uuid4().hex[:10]}{suffix}"
-    with sample_path.open("wb") as target:
-        while chunk := await sample.read(1024 * 1024):
-            target.write(chunk)
-            if target.tell() > 50 * 1024 * 1024:
-                target.close(); sample_path.unlink(missing_ok=True)
-                raise HTTPException(status_code=413, detail="عينة الصوت أكبر من 50MB.")
-    plugin = tts_registry.get_plugin("coqui")
-    if not plugin or not plugin.check():
-        raise HTTPException(status_code=503, detail="واجهة الاستنساخ جاهزة، لكن محرك XTTS المحلي غير مثبت في هذه النسخة. ثبّت Coqui/XTTS ثم أعد المحاولة.")
-    result = await plugin.generate(text=text.strip(), voice=str(sample_path), language="ar", speed=1.0)
-    if not result or not result.get("success"):
-        raise HTTPException(status_code=502, detail=(result or {}).get("message", "فشل استنساخ الصوت."))
-    source = Path(result.get("file", ""))
-    if not source.exists():
-        raise HTTPException(status_code=500, detail="لم يُنشأ ملف الاستنساخ.")
-    target = _copy_to_desktop(source)
-    return {
-        "success": True,
-        "url": result.get("url") or f"/api/downloads/{source.name}",
-        "desktop_path": str(target) if target else None,
-        "desktop_exported": bool(target),
-        "message": "تم إنشاء الصوت بالعينة المصرح بها." + _desktop_note(target),
-    }
+async def clone_voice(
+    sample: UploadFile = File(...),
+    text: str = Form(...),
+    consent: bool = Form(...),
+    engine: str = Form("coqui"),
+):
+    """Compatibility endpoint for the old studio clone box.
+
+    The previous implementation called Coqui.generate() without passing the sample
+    as speaker_wav. This route now creates a real consent profile and delegates to
+    Voice Clone Pro. Existing UI requests continue to work unchanged.
+    """
+    provider = "elevenlabs" if engine.lower() in {"elevenlabs", "human_pro"} else "local"
+    manifest = await create_profile_from_uploads(
+        [sample],
+        name="استنساخ سريع",
+        owner_name="صاحب العينة",
+        consent=consent,
+        consent_statement="تم تأكيد امتلاك الصوت أو الإذن الصريح من واجهة الاستوديو الكامل.",
+    )
+    request = GenerateCloneRequest(
+        profile_id=str(manifest["id"]),
+        text=text.strip(),
+        provider=provider,
+        language="ar",
+        speed=1.0,
+        style="natural",
+    )
+    result = await generate_from_profile(request)
+    result["message"] = "تم إصلاح الاستنساخ القديم وإنشاء الصوت بعينة speaker_wav حقيقية. " + str(result.get("message", ""))
+    return result
