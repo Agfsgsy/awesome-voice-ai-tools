@@ -73,7 +73,9 @@ async def _bounded_produce(provider, request, manifest, references, raw):
             raw,
         )
 
-    timeout = 300.0 if provider == "elevenlabs" else 420.0
+    # Cloud attempts are deliberately bounded. Automatic mode falls through to the
+    # next real clone engine instead of displaying an endless spinner.
+    timeout = 150.0 if provider == "elevenlabs" else 240.0
     try:
         return await asyncio.wait_for(
             _ORIGINAL_PRODUCE(provider, request, manifest, references, raw),
