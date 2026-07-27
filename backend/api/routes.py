@@ -10,7 +10,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 from backend.core.config import (
@@ -80,6 +80,9 @@ def _pm_info():
 
 @router.get("/")
 async def root():
+    studio_path = FRONTEND_DIR / "static" / "studio_shell.html"
+    if studio_path.exists():
+        return RedirectResponse(url="/static/studio_shell.html", status_code=307)
     index_path = FRONTEND_DIR / "templates" / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
