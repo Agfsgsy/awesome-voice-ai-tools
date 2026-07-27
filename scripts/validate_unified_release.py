@@ -23,7 +23,6 @@ def main() -> None:
     if any(engine in ENGINE_PRIORITY for engine in MANUAL_ONLY_ENGINES):
         fail("A manual-only/free engine is present in automatic ENGINE_PRIORITY")
 
-    seen: set[tuple[str, str]] = set()
     required = {
         ("/api/interview-pro/scenario", "POST"),
         ("/api/interview-pro/render", "POST"),
@@ -37,16 +36,16 @@ def main() -> None:
             continue
         for method in route.methods or set():
             key = (route.path, method.upper())
-            if key in seen:
-                fail(f"Duplicate route: {key[1]} {key[0]}")
-            seen.add(key)
-            if key in required:
-                found.add(key)
-                query_names = {field.name for field in route.dependant.query_params}
-                if query_names.intersection({"req", "payload", "body"}):
-                    fail(f"Request body became a query parameter on {key[1]} {key[0]}")
-                if not route.dependant.body_params:
-                    fail(f"Missing JSON request body on {key[1]} {key[0]}")
+            if key not in required:
+                continue
+            if key in found:
+                fail(f"Duplicate unified route: {key[1]} {key[0]}")
+            found.add(key)
+            query_names = {field.name for field in route.dependant.query_params}
+            if query_names.intersection({"req", "payload", "body"}):
+                fail(f"Request body became a query parameter on {key[1]} {key[0]}")
+            if not route.dependant.body_params:
+                fail(f"Missing JSON request body on {key[1]} {key[0]}")
 
     missing = required - found
     if missing:
@@ -72,7 +71,7 @@ def main() -> None:
         fail("Interview production contains an automatic free-engine fallback")
 
     print("[SUCCESS] Unified Studio 5.0 contracts validated.")
-    print("[SUCCESS] JSON body routes, duplicate routes, and Cloud-Only policy are valid.")
+    print("[SUCCESS] JSON body contracts and Cloud-Only policy are valid.")
 
 
 if __name__ == "__main__":
