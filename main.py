@@ -33,7 +33,15 @@ from backend.api.unified_studio_routes import (
     interview_router as unified_interview_router,
     studio_router as unified_studio_router,
 )
-from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
+from backend.core.config import (
+    APP_DEBUG,
+    APP_HOST,
+    APP_NAME,
+    APP_PORT,
+    APP_RELEASE,
+    APP_VERSION,
+    FRONTEND_DIR,
+)
 from backend.core.logger import get_logger
 
 logger = get_logger("main")
@@ -41,7 +49,7 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting %s v%s — Unified Stable", APP_NAME, APP_VERSION)
+    logger.info("Starting %s v%s — %s", APP_NAME, APP_VERSION, APP_RELEASE)
     yield
     logger.info("Shutting down %s", APP_NAME)
 
@@ -49,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=APP_NAME,
     description=(
-        "استوديو ابن الواقدي: إصدار موحد ثابت، Cloud-Only، جلسات Gemini محفوظة، "
+        "استوديو ابن الواقدي: إصدار موحد مجاني افتراضيًا، صوت عربي عصبي، "
         "مقابلات قابلة للاستكمال، وعقود JSON صريحة تمنع أخطاء query.req."
     ),
     version=APP_VERSION,
@@ -57,7 +65,7 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
-app.state.release_channel = "unified-stable"
+app.state.release_channel = "free-first"
 
 app.add_middleware(
     CORSMiddleware,
@@ -87,6 +95,8 @@ app.include_router(dashboard_router)
 def _validate_api_contracts() -> None:
     """Fail fast if a future change breaks one of the unified JSON contracts."""
     required_body_routes = {
+        ("/api/tts", "POST"),
+        ("/api/speech", "POST"),
         ("/api/interview-pro/scenario", "POST"),
         ("/api/interview-pro/render", "POST"),
         ("/api/studio/v1/interviews/scenario", "POST"),
@@ -105,7 +115,7 @@ def _validate_api_contracts() -> None:
                 raise RuntimeError(f"Duplicate unified API route detected: {method} {route.path}")
             found.add(key)
             query_names = {field.name for field in route.dependant.query_params}
-            if "req" in query_names or "payload" in query_names:
+            if query_names.intersection({"req", "payload", "body"}):
                 raise RuntimeError(f"Invalid query-body contract: {method} {route.path}")
             if not route.dependant.body_params:
                 raise RuntimeError(f"Missing JSON body contract: {method} {route.path}")
