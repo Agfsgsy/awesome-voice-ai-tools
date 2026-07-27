@@ -96,7 +96,7 @@ async def studio_version():
         "name": APP_NAME,
         "version": APP_VERSION,
         "release": APP_RELEASE,
-        "update_channel": "free-first",
+        "update_channel": "ultimate-voice",
     }
 
 
