@@ -24,6 +24,7 @@ from backend.api import gemini_rotation_runtime as _gemini_rotation_runtime
 from backend.api.dashboard_routes import router as dashboard_router
 from backend.api.ultimate_studio_routes import router as ultimate_studio_router
 from backend.api.yemeni_creative_routes import router as yemeni_creative_router
+from backend.api.voice_clone_routes import router as voice_clone_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
@@ -62,14 +63,14 @@ app = FastAPI(
     title=APP_NAME,
     description=(
         "استوديو ابن الواقدي: صوت عربي احترافي، كتابة إبداعية، أعمال يمنية أصلية، "
-        "مقابلات قابلة للاستكمال، وحفظ منظم على سطح المكتب."
+        "استنساخ صوت مصرح به، مقابلات قابلة للاستكمال، وحفظ منظم على سطح المكتب."
     ),
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
-app.state.release_channel = "yemeni-creative"
+app.state.release_channel = "voice-clone-pro"
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,9 +87,6 @@ app.include_router(gemini_session_router)
 app.include_router(studio_router)
 app.include_router(studio_pro_router)
 app.include_router(producer_router)
-# The unified interview router replaces the old router registration while keeping
-# the same public URLs and implementation. Its Body(...) declarations prevent the
-# packaged application from interpreting payloads as query parameters.
 app.include_router(unified_interview_router)
 app.include_router(unified_studio_router)
 app.include_router(dialogue_ultra_router)
@@ -96,6 +94,7 @@ app.include_router(dialogue_safe_router)
 app.include_router(dashboard_router)
 app.include_router(ultimate_studio_router)
 app.include_router(yemeni_creative_router)
+app.include_router(voice_clone_router)
 
 # Replace only the existing GET audio-download handler. No generated file is
 # deleted, moved, renamed, or overwritten; a verified copy is added to Desktop.
@@ -116,6 +115,7 @@ def _validate_api_contracts() -> None:
         ("/api/ultimate/dialogue", "POST"),
         ("/api/yemeni-creative/write", "POST"),
         ("/api/yemeni-creative/produce", "POST"),
+        ("/api/voice-clone/generate", "POST"),
     }
     found: set[tuple[str, str]] = set()
 
