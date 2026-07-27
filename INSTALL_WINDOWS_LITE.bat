@@ -8,7 +8,7 @@ if errorlevel 1 (
   exit /b 1
 )
 python -m pip install --upgrade pip
-python -m pip install fastapi==0.115.6 "uvicorn[standard]==0.34.0" pydantic==2.10.4 python-multipart==0.0.20 httpx==0.28.1 aiofiles==24.1.0 requests edge-tts pydub soundfile imageio-ffmpeg
+python -m pip install fastapi==0.115.6 "uvicorn[standard]==0.34.0" pydantic==2.10.4 python-multipart==0.0.20 httpx==0.28.1 aiofiles==24.1.0 requests "edge-tts>=7,<8" "piper-tts>=1.6,<2" pydub soundfile imageio-ffmpeg
 if errorlevel 1 (
   echo فشل التثبيت. صوّر الخطأ وأرسله.
   pause
