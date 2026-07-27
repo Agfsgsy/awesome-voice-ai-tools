@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name="voice-ai-studio-arabic",
-    version="6.0.0",
-    description="منصة صوتيات عربية لتوليد واستنساخ الصوت",
+    version="6.1.0",
+    description="منصة صوتيات عربية لتوليد واستنساخ الصوت والأعمال اليمنية الأصلية",
     packages=find_packages(),
     python_requires=">=3.9,<3.14",
     entry_points={
