@@ -1,6 +1,6 @@
 # Ibn Al-Waqadi Studio 6.2.0 - Voice Clone Pro safe installer.
 # ASCII-only for Windows PowerShell 5.1.
-# It builds from an exact snapshot in TEMP and installs the verified application.
+# Uses a very short build path to avoid Windows WinError 206 / MAX_PATH failures.
 # It never writes to or deletes the user's source project. LocalAppData user data,
 # keys, sessions, existing generated audio, and voice profiles are preserved.
 
@@ -79,25 +79,34 @@ function Validate-Snapshot {
     }
 }
 
-$TempRoot = Join-Path $env:TEMP ("IbnWaqadi-VoiceClone62-" + [guid]::NewGuid().ToString("N"))
-$Archive = Join-Path $TempRoot "source.zip"
-$Extract = Join-Path $TempRoot "source"
+# Keep every build path short. This is the direct fix for WinError 206.
+$BuildId = [guid]::NewGuid().ToString("N").Substring(0, 6)
+$TempRoot = Join-Path $env:SystemDrive ("VC62-" + $BuildId)
+$Archive = Join-Path $TempRoot "a.zip"
+$Extract = Join-Path $TempRoot "x"
+$Snapshot = Join-Path $TempRoot "s"
+$BuildWork = Join-Path $TempRoot "b"
+$BuildDist = Join-Path $Snapshot "dist"
+$ShortTemp = Join-Path $TempRoot "t"
+$PyiConfig = Join-Path $TempRoot "p"
 $LogRoot = Join-Path $env:LOCALAPPDATA "VoiceAIStudioArabic\logs"
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $LogFile = Join-Path $LogRoot ("voice-clone-pro-6.2-install-" + $Stamp + ".log")
 $TranscriptStarted = $false
 
 try {
-    New-Item -ItemType Directory -Force -Path $TempRoot, $Extract, $LogRoot | Out-Null
+    Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $TempRoot, $Extract, $BuildWork, $ShortTemp, $PyiConfig, $LogRoot | Out-Null
     try {
         Start-Transcript -LiteralPath $LogFile -Force | Out-Null
         $TranscriptStarted = $true
     }
     catch {}
 
-    Step "Ibn Al-Waqadi Studio 6.2.0 - Voice Clone Pro safe installation"
+    Step "Ibn Al-Waqadi Studio 6.2.0 - Voice Clone Pro short-path installation"
+    Write-Host "Build root: $TempRoot" -ForegroundColor Green
     Write-Host "No source project files will be changed or deleted." -ForegroundColor Yellow
-    Write-Host "Keys, sessions, old tools, generated audio, and LocalAppData will be preserved." -ForegroundColor Yellow
+    Write-Host "Keys, sessions, old tools, generated audio, and voice profiles are preserved." -ForegroundColor Yellow
 
     Ensure-Python311
 
@@ -119,12 +128,14 @@ try {
         throw "The source snapshot download is missing or incomplete."
     }
 
-    Step "2/6 - Extract and validate every Voice Clone Pro file"
+    Step "2/6 - Extract into a short source path and validate every feature"
     Expand-Archive -LiteralPath $Archive -DestinationPath $Extract -Force
-    $SnapshotDirectory = Get-ChildItem -LiteralPath $Extract -Directory | Select-Object -First 1
-    if (-not $SnapshotDirectory) { throw "The source snapshot could not be located after extraction." }
-    $Snapshot = $SnapshotDirectory.FullName
+    $DownloadedFolder = Get-ChildItem -LiteralPath $Extract -Directory | Select-Object -First 1
+    if (-not $DownloadedFolder) { throw "The source snapshot could not be located after extraction." }
+    Move-Item -LiteralPath $DownloadedFolder.FullName -Destination $Snapshot -Force
+    Remove-Item -LiteralPath $Extract -Recurse -Force -ErrorAction SilentlyContinue
     Validate-Snapshot -Root $Snapshot
+    Write-Host "Short source path: $Snapshot" -ForegroundColor Green
     Write-Host "Snapshot validation passed." -ForegroundColor Green
 
     Step "3/6 - Install the lightweight desktop build requirements"
@@ -151,25 +162,46 @@ try {
         Pop-Location
     }
 
-    Step "5/6 - Build the Windows application and verified installer"
+    Step "5/6 - Build with short TEMP, work and distribution paths"
     Push-Location $Snapshot
+    $OldTemp = $env:TEMP
+    $OldTmp = $env:TMP
+    $OldPyi = $env:PYINSTALLER_CONFIG_DIR
     try {
-        Remove-Item -LiteralPath (Join-Path $Snapshot "build"), (Join-Path $Snapshot "dist"), (Join-Path $Snapshot "dist-installer") -Recurse -Force -ErrorAction SilentlyContinue
-        & py -3.11 -m PyInstaller --noconfirm --clean VoiceAIStudio.spec
+        Remove-Item -LiteralPath $BuildWork, $BuildDist, (Join-Path $Snapshot "dist-installer") -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $BuildWork, $BuildDist, $ShortTemp, $PyiConfig | Out-Null
+        $env:TEMP = $ShortTemp
+        $env:TMP = $ShortTemp
+        $env:PYINSTALLER_CONFIG_DIR = $PyiConfig
+        & py -3.11 -m PyInstaller --noconfirm --clean --workpath $BuildWork --distpath $BuildDist VoiceAIStudio.spec
         if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
-        $PortableExe = Join-Path $Snapshot "dist\VoiceAIStudioArabic\VoiceAIStudioArabic.exe"
+        $PortableExe = Join-Path $BuildDist "VoiceAIStudioArabic\VoiceAIStudioArabic.exe"
         if (-not (Test-Path -LiteralPath $PortableExe -PathType Leaf)) {
             throw "The desktop executable was not created."
         }
-
-        $Iscc = Find-Iscc
-        if ([string]::IsNullOrWhiteSpace($Iscc)) {
-            $Winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-            if (-not $Winget) { throw "Inno Setup is missing and winget is unavailable." }
-            & winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
-            $Iscc = Find-Iscc
+    }
+    finally {
+        $env:TEMP = $OldTemp
+        $env:TMP = $OldTmp
+        if ([string]::IsNullOrWhiteSpace($OldPyi)) {
+            Remove-Item Env:PYINSTALLER_CONFIG_DIR -ErrorAction SilentlyContinue
         }
-        if ([string]::IsNullOrWhiteSpace($Iscc)) { throw "Inno Setup compiler was not found." }
+        else {
+            $env:PYINSTALLER_CONFIG_DIR = $OldPyi
+        }
+        Pop-Location
+    }
+
+    $Iscc = Find-Iscc
+    if ([string]::IsNullOrWhiteSpace($Iscc)) {
+        $Winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+        if (-not $Winget) { throw "Inno Setup is missing and winget is unavailable." }
+        & winget install --id JRSoftware.InnoSetup --exact --silent --accept-package-agreements --accept-source-agreements
+        $Iscc = Find-Iscc
+    }
+    if ([string]::IsNullOrWhiteSpace($Iscc)) { throw "Inno Setup compiler was not found." }
+    Push-Location $Snapshot
+    try {
         New-Item -ItemType Directory -Force -Path (Join-Path $Snapshot "dist-installer") | Out-Null
         & $Iscc "installer\VoiceAIStudio.iss"
         if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed." }
@@ -202,8 +234,8 @@ try {
     Start-Process -FilePath $InstalledExe
     Write-Host ""
     Write-Host "SUCCESS: Voice Clone Pro 6.2.0 is installed and running." -ForegroundColor Green
+    Write-Host "The WinError 206 long-path problem was avoided with a short build root." -ForegroundColor Green
     Write-Host "Open the main menu and choose Voice Clone Pro." -ForegroundColor Green
-    Write-Host "The source project was not changed." -ForegroundColor Green
     Write-Host "Installation log: $LogFile" -ForegroundColor DarkGray
 }
 catch {
