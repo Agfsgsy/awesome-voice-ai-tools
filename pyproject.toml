@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voice-ai-studio-arabic"
-version = "6.0.0"
-description = "منصة صوتيات عربية لتوليد واستنساخ الصوت"
+version = "6.1.0"
+description = "منصة صوتيات عربية لتوليد واستنساخ الصوت والأعمال اليمنية الأصلية"
 readme = "README.md"
 requires-python = ">=3.9,<3.14"
 license = {text = "MIT"}
