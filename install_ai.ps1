@@ -36,7 +36,7 @@ if ($cuda_available) {
 Write-Host "`n[4/5] Installing TTS Engines..." -ForegroundColor Cyan
 
 Write-Host "  - Piper TTS..."
-pip install piper-tts
+pip install "piper-tts>=1.6,<2"
 
 Write-Host "  - Kokoro TTS..."
 pip install kokoro
