@@ -26,6 +26,7 @@ from backend.api.ultimate_studio_routes import router as ultimate_studio_router
 from backend.api.yemeni_creative_routes import router as yemeni_creative_router
 from backend.api.yemeni_creative_hotfix import router as yemeni_creative_safe_router
 from backend.api.voice_clone_routes import router as voice_clone_router
+from backend.api import voice_clone_repair_runtime as _voice_clone_repair_runtime
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
