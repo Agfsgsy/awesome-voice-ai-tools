@@ -1,7 +1,6 @@
 """Standalone Windows desktop launcher for Ibn Al-Waqadi Voice Studio."""
 
 from __future__ import annotations
-
 import ctypes
 import os
 import socket
@@ -82,7 +81,7 @@ def main() -> int:
         return 2
     window = webview.create_window(
         APP_TITLE,
-        url=f"http://127.0.0.1:{port}/static/ultimate_studio.html",
+        url=f"http://127.0.0.1:{port}/static/studio_shell.html",
         width=1440,
         height=920,
         min_size=(900, 650),
