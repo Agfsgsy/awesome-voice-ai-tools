@@ -63,6 +63,9 @@ hiddenimports += [
     "piper.config",
     "piper.voice",
     "webview.platforms.winforms",
+    "google.auth",
+    "google.auth.transport.requests",
+    "google.oauth2.service_account",
 ]
 
 a = Analysis(
