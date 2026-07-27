@@ -1,4 +1,5 @@
 """ElevenLabs Human Pro TTS plugin for highly natural multilingual Arabic speech."""
+
 from __future__ import annotations
 
 import hashlib
@@ -9,6 +10,8 @@ import httpx
 
 from backend.core.config import OUTPUTS_DIR
 from backend.core.logger import get_logger
+from backend.core.provider_settings import provider_config
+from backend.core.voice_catalog import voices_for
 from backend.plugins.tts_plugin_base import TTSPluginBase
 
 logger = get_logger("plugin_elevenlabs")
@@ -37,13 +40,14 @@ class ElevenLabsPlugin(TTSPluginBase):
     }
 
     def _api_key(self) -> str:
-        return os.getenv("ELEVENLABS_API_KEY", "").strip()
+        return provider_config(self.name).get("api_key", "").strip() or os.getenv("ELEVENLABS_API_KEY", "").strip()
 
-    def _default_voice(self) -> str:
-        return os.getenv("ELEVENLABS_VOICE_ID", "").strip()
+    def _default_voice(self, language: str = "ar", gender: str = "male") -> str:
+        field = f"{gender}_voice_id_{'en' if language.startswith('en') else 'ar'}"
+        return provider_config(self.name).get(field, "").strip() or os.getenv("ELEVENLABS_VOICE_ID", "").strip()
 
     def check(self) -> bool:
-        return bool(self._api_key() and self._default_voice())
+        return bool(self._api_key())
 
     def install(self) -> Dict[str, Any]:
         return {
@@ -63,8 +67,16 @@ class ElevenLabsPlugin(TTSPluginBase):
         ]
 
     def list_voices(self) -> List[Dict[str, str]]:
-        voice_id = self._default_voice()
-        return ([{"name": voice_id, "label": "صوت Human Pro المحفوظ", "language": "ar"}] if voice_id else [])
+        return [
+            {
+                "name": item["id"],
+                "label": item["name_ar"],
+                "language": item["language"],
+                "locale": item["locale"],
+                "gender": item["gender"],
+            }
+            for item in voices_for(self.name)
+        ]
 
     @staticmethod
     def _profile_settings(profile: str) -> Dict[str, float | bool]:
@@ -89,16 +101,22 @@ class ElevenLabsPlugin(TTSPluginBase):
                 paragraphs.append(line)
         return "\n\n".join(paragraphs)
 
-    async def generate(self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0) -> Dict[str, Any]:
+    async def generate(
+        self, text: str, voice: str = "default", language: str = "ar", speed: float = 1.0
+    ) -> Dict[str, Any]:
         api_key = self._api_key()
         if not api_key:
-            return {"success": False, "engine": self.name, "message": "أدخل مفتاح ElevenLabs من إعدادات Human Pro أولًا."}
+            return {
+                "success": False,
+                "engine": self.name,
+                "message": "أدخل مفتاح ElevenLabs من إعدادات Human Pro أولًا.",
+            }
 
         raw_voice = voice or "default"
         profile = "human_ultra"
         if "|" in raw_voice:
             raw_voice, profile = raw_voice.split("|", 1)
-        voice_id = self._default_voice() if raw_voice in {"", "default", "human-pro"} else raw_voice
+        voice_id = self._default_voice(language=language) if raw_voice in {"", "default", "human-pro"} else raw_voice
         if not voice_id:
             return {"success": False, "engine": self.name, "message": "أدخل معرّف الصوت Voice ID في إعدادات Human Pro."}
 
@@ -106,12 +124,20 @@ class ElevenLabsPlugin(TTSPluginBase):
         if not clean_text:
             return {"success": False, "engine": self.name, "message": "النص فارغ."}
 
-        model_id = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2").strip() or "eleven_multilingual_v2"
+        model_id = (
+            provider_config(self.name).get("model_id", "").strip()
+            or os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2").strip()
+            or "eleven_multilingual_v2"
+        )
         if model_id not in self.MODELS:
             model_id = "eleven_multilingual_v2"
         limit = self.MODEL_LIMITS.get(model_id, 10000)
         if len(clean_text) > limit:
-            return {"success": False, "engine": self.name, "message": f"هذا النموذج يقبل حتى {limit} حرفًا في الطلب الواحد."}
+            return {
+                "success": False,
+                "engine": self.name,
+                "message": f"هذا النموذج يقبل حتى {limit} حرفًا في الطلب الواحد.",
+            }
 
         settings = self._profile_settings(profile)
         settings["speed"] = max(0.7, min(1.2, float(speed)))
