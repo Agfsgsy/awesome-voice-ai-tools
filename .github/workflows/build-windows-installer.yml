@@ -48,7 +48,7 @@ jobs:
         shell: pwsh
         run: python -m compileall -q main.py desktop_app.py backend scripts
 
-      - name: Validate Yemeni Creative release
+      - name: Validate Voice Clone Pro release
         shell: pwsh
         run: python scripts/validate_unified_release.py
 
@@ -75,7 +75,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: IbnWaqadiStudio-6.1-Windows-Setup
+          name: IbnWaqadiStudio-6.2-Windows-Setup
           path: dist-installer/VoiceAIStudioSetup.exe
           if-no-files-found: error
           retention-days: 30
@@ -83,7 +83,7 @@ jobs:
       - name: Upload portable folder
         uses: actions/upload-artifact@v4
         with:
-          name: IbnWaqadiStudio-6.1-Windows-Portable
+          name: IbnWaqadiStudio-6.2-Windows-Portable
           path: dist/VoiceAIStudioArabic
           if-no-files-found: error
           retention-days: 14
