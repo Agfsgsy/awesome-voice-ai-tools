@@ -24,6 +24,7 @@ from backend.api import gemini_rotation_runtime as _gemini_rotation_runtime
 from backend.api.dashboard_routes import router as dashboard_router
 from backend.api.ultimate_studio_routes import router as ultimate_studio_router
 from backend.api.yemeni_creative_routes import router as yemeni_creative_router
+from backend.api.yemeni_creative_hotfix import router as yemeni_creative_safe_router
 from backend.api.voice_clone_routes import router as voice_clone_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
@@ -94,6 +95,7 @@ app.include_router(dialogue_safe_router)
 app.include_router(dashboard_router)
 app.include_router(ultimate_studio_router)
 app.include_router(yemeni_creative_router)
+app.include_router(yemeni_creative_safe_router)
 app.include_router(voice_clone_router)
 
 # Replace only the existing GET audio-download handler. No generated file is
@@ -115,6 +117,8 @@ def _validate_api_contracts() -> None:
         ("/api/ultimate/dialogue", "POST"),
         ("/api/yemeni-creative/write", "POST"),
         ("/api/yemeni-creative/produce", "POST"),
+        ("/api/yemeni-creative-safe/write", "POST"),
+        ("/api/yemeni-creative-safe/produce", "POST"),
         ("/api/voice-clone/generate", "POST"),
     }
     found: set[tuple[str, str]] = set()
