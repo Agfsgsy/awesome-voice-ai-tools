@@ -120,10 +120,17 @@ class PiperPlugin(TTSPluginBase):
             model_path = Path(model["path"])
             config_path = model_path.with_suffix(".onnx.json")
             voice_obj = PiperVoice.load(str(model_path), config_path=str(config_path))
-            filepath = self._save_wav(b"", text, 22050)
+            import hashlib
+            name_hash = hashlib.md5(text.encode()).hexdigest()[:8]
+            from backend.core.config import OUTPUTS_DIR
+            out_name = f"{self.name}_{name_hash}.wav"
+            filepath = OUTPUTS_DIR / out_name
 
             with wave.open(str(filepath), "wb") as wav_file:
-                voice_obj.synthesize_wav(text, wav_file, length_scale=1.0/speed)
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(int(voice_obj.config.sample_rate * speed))
+                voice_obj.synthesize_wav(text, wav_file)
 
             return {
                 "success": True,
