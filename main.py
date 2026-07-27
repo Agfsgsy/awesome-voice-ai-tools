@@ -1,4 +1,5 @@
 """نقطة تشغيل استوديو ابن الواقدي — الإصدار الموحد الثابت."""
+
 from __future__ import annotations
 
 import sys
@@ -21,6 +22,7 @@ from backend.api import dialogue_audio_runtime as _dialogue_audio_runtime
 from backend.api.dialogue_safe_routes import router as dialogue_safe_router
 from backend.api import gemini_rotation_runtime as _gemini_rotation_runtime
 from backend.api.dashboard_routes import router as dashboard_router
+from backend.api.ultimate_studio_routes import router as ultimate_studio_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
@@ -65,7 +67,7 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
-app.state.release_channel = "free-first"
+app.state.release_channel = "ultimate-voice"
 
 app.add_middleware(
     CORSMiddleware,
@@ -90,6 +92,7 @@ app.include_router(unified_studio_router)
 app.include_router(dialogue_ultra_router)
 app.include_router(dialogue_safe_router)
 app.include_router(dashboard_router)
+app.include_router(ultimate_studio_router)
 
 
 def _validate_api_contracts() -> None:
@@ -101,6 +104,9 @@ def _validate_api_contracts() -> None:
         ("/api/interview-pro/render", "POST"),
         ("/api/studio/v1/interviews/scenario", "POST"),
         ("/api/studio/v1/interviews/render", "POST"),
+        ("/api/ultimate/synthesize", "POST"),
+        ("/api/ultimate/creative", "POST"),
+        ("/api/ultimate/dialogue", "POST"),
     }
     found: set[tuple[str, str]] = set()
 
