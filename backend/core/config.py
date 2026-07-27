@@ -41,8 +41,8 @@ for directory in [DATA_DIR, MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, 
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "استوديو ابن الواقدي"
-APP_VERSION = "5.1.0"
-APP_RELEASE = "Free First"
+APP_VERSION = "6.0.0"
+APP_RELEASE = "Ultimate Voice"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
@@ -61,5 +61,5 @@ SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
 # The default path never requires a paid API key. Edge provides the most natural
 # Arabic voices, while Piper is the local/offline fallback after its model is cached.
 FREE_ENGINES = ["edge", "piper"]
-CLOUD_ENGINES = ["gemini", "elevenlabs"]
+CLOUD_ENGINES = ["gemini", "elevenlabs", "azure", "google_cloud", "openai"]
 ENGINE_PRIORITY = [*FREE_ENGINES, *CLOUD_ENGINES]
