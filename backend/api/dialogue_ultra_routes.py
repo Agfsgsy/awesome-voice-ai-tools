@@ -41,7 +41,7 @@ GEMINI_MODELS = (
 ROLE_DEFAULTS = {
     "المذيع_رجل": {"alias": "Host", "gemini_voice": "Algieba", "tag": "[warm, calm, close-mic, conversational]"},
     "المذيعة_امرأة": {"alias": "HostWoman", "gemini_voice": "Achernar", "tag": "[warm, clear, close-mic, conversational]"},
-    "الضيف_رجل": {"alias": "Guest", "gemini_voice": "Gacrux", "tag": "[thoughtful, relaxed, natural pace]"},
+    "الضيف_رجل": {"alias": "Guest", "gemini_voice": "Iapetus", "tag": "[thoughtful, relaxed, natural pace]"},
     "الضيفة_امرأة": {"alias": "GuestWoman", "gemini_voice": "Sulafat", "tag": "[warm, sincere, natural pace]"},
     "الخبير_رجل": {"alias": "Expert", "gemini_voice": "Charon", "tag": "[measured, knowledgeable, calm]"},
 }
