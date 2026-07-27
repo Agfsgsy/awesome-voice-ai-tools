@@ -10,6 +10,7 @@ env/
 ENV/
 *.egg-info/
 dist/
+dist-installer/
 build/
 
 # Environment

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>استوديو ابن الواقدي — Ultimate Voice 6</title>
+  <style>
+    :root{--bg:#07111f;--panel:#0c1b2d;--panel2:#10243a;--line:#24405c;--text:#f4f8ff;--muted:#9fb3c8;--a:#24d1bc;--b:#2388ff;--warn:#ffbf4a;--bad:#ff6470;--ok:#4ee1a0;--shadow:0 22px 60px #0007}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 20% -10%,#16466d 0,transparent 34%),radial-gradient(circle at 90% 20%,#0e594f 0,transparent 27%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;min-height:100vh}
+    button,input,select,textarea{font:inherit}button{cursor:pointer}.app{max-width:1540px;margin:auto;padding:22px}.top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:22px}.brand{display:flex;align-items:center;gap:14px}.logo{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;font-size:29px;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 12px 40px #20aee555}.brand h1{font-size:22px;margin:0 0 5px}.brand p{color:var(--muted);margin:0;font-size:13px}.topActions{display:flex;gap:10px;align-items:center}.pill,.ghost,.primary,.tab{border:1px solid var(--line);border-radius:13px;color:var(--text);background:#10233a;padding:11px 15px}.pill:hover,.ghost:hover,.tab:hover{border-color:#3b769d}.primary{border:0;background:linear-gradient(100deg,var(--a),var(--b));font-weight:800;padding:13px 22px;box-shadow:0 10px 28px #168bd533}.primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}.shell{display:grid;grid-template-columns:230px minmax(0,1fr);gap:20px}.nav{background:#0a1829cc;border:1px solid var(--line);border-radius:22px;padding:14px;box-shadow:var(--shadow);height:max-content;position:sticky;top:18px}.tab{width:100%;display:flex;gap:11px;align-items:center;text-align:start;margin-bottom:8px;background:transparent}.tab.active{background:linear-gradient(90deg,#13a89744,#2688ff44);border-color:#26a9d7}.tabIcon{font-size:20px}.version{border-top:1px solid var(--line);margin-top:18px;padding:18px 8px 5px;color:var(--muted);font-size:12px}.main{min-width:0}.hero{border:1px solid #2b617c;border-radius:24px;padding:25px;background:linear-gradient(120deg,#102d46e8,#0b2534e8);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}.hero h2{font-size:28px;margin:0 0 9px}.hero p{margin:0;color:#bdd0df;line-height:1.8}.heroBadge{white-space:nowrap;color:#06151e;background:linear-gradient(100deg,#4ee1a0,#43c6ff);padding:9px 13px;border-radius:999px;font-weight:900}.page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}.card{grid-column:span 12;background:#0a192acc;border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 14px 40px #0004}.card.half{grid-column:span 6}.card.third{grid-column:span 4}.card h3{margin:0 0 17px;font-size:18px}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{min-width:0}.field.full{grid-column:1/-1}.field label{display:block;color:#bdd0df;font-size:13px;margin:0 2px 7px}.field small{display:block;color:var(--muted);margin-top:6px;line-height:1.5}.control{width:100%;background:#071625;border:1px solid #294763;color:var(--text);border-radius:12px;padding:12px 13px;outline:0}.control:focus{border-color:#26c4d1;box-shadow:0 0 0 3px #20b9c51f}.control:disabled{opacity:.55}.text{min-height:210px;resize:vertical;line-height:1.9}.text.large{min-height:330px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}.status{display:none;margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);line-height:1.6}.status.show{display:block}.status.ok{border-color:#2f9d77;background:#123c31;color:#b5f6da}.status.err{border-color:#a83f4a;background:#3b1921;color:#ffd1d6}.status.wait{border-color:#9e7733;background:#3b2d16;color:#ffe0a1}.match{display:flex;gap:9px;align-items:center;color:var(--muted);font-size:13px;margin:13px 0}.dot{width:9px;height:9px;border-radius:50%;background:var(--warn)}.dot.ok{background:var(--ok);box-shadow:0 0 14px var(--ok)}audio{width:100%;margin-top:15px}.resultActions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.providerGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.provider{border:1px solid var(--line);background:#0d2135;border-radius:16px;padding:16px;min-height:180px;display:flex;flex-direction:column}.provider h4{margin:0 0 7px}.provider p{color:var(--muted);line-height:1.6;font-size:13px;flex:1}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.tag{font-size:11px;border:1px solid #31516d;border-radius:999px;padding:5px 8px;color:#c7d6e3}.tag.free{color:#84f3c4;border-color:#26785d}.tag.trial{color:#ffdc83;border-color:#7b622b}.tag.paid{color:#ff9da6;border-color:#7a353c}.provider a{color:#66d5ff;font-size:12px}.notice{border:1px solid #856829;background:#322713;color:#ffe6a8;border-radius:14px;padding:13px 15px;line-height:1.7;margin-bottom:16px}.muted{color:var(--muted)}.hidden{display:none!important}.counter{font-size:12px;color:var(--muted)}.switch{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}.switch button{border:0;background:transparent;color:var(--muted);padding:9px 13px}.switch button.active{color:#06141c;background:var(--a);font-weight:800}.loader{width:15px;height:15px;border:2px solid #ffffff55;border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .8s linear infinite;vertical-align:-2px;margin-inline-end:7px}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:1050px){.shell{grid-template-columns:1fr}.nav{position:static;display:flex;overflow:auto;gap:7px}.tab{min-width:145px;margin:0}.version{display:none}.providerGrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:720px){.app{padding:12px}.top{align-items:flex-start}.brand p{display:none}.brand h1{font-size:17px}.logo{width:45px;height:45px}.hero{align-items:flex-start;flex-direction:column}.hero h2{font-size:23px}.card.half,.card.third{grid-column:span 12}.fields{grid-template-columns:1fr}.providerGrid{grid-template-columns:1fr}.topActions .ghost{display:none}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><div class="logo">🎙️</div><div><h1 data-t="brand">استوديو ابن الواقدي</h1><p data-t="subtitle">صوت صارم المطابقة • كتابة إبداعية • مقابلات متعددة المتحدثين</p></div></div>
+    <div class="topActions">
+      <a class="ghost" href="/static/studio_shell.html" data-t="legacy">الأدوات السابقة</a>
+      <div class="switch" aria-label="Interface language"><button id="langAr">العربية</button><button id="langEn">English</button></div>
+    </div>
+  </header>
+  <div class="shell">
+    <aside class="nav">
+      <button class="tab active" data-page="voice"><span class="tabIcon">🎧</span><span data-t="tabVoice">إنتاج الصوت</span></button>
+      <button class="tab" data-page="writer"><span class="tabIcon">✨</span><span data-t="tabWriter">الكاتب المبدع</span></button>
+      <button class="tab" data-page="dialogue"><span class="tabIcon">👥</span><span data-t="tabDialogue">المقابلات</span></button>
+      <button class="tab" data-page="connections"><span class="tabIcon">🔑</span><span data-t="tabConnections">الربط والمفاتيح</span></button>
+      <button class="tab" data-page="tools"><span class="tabIcon">🧰</span><span data-t="tabTools">المحركات والأدوات</span></button>
+      <div class="version"><strong>Ultimate Voice 6.0</strong><br><span data-t="privacy">المفاتيح تحفظ محليًا ولا تُخزن في المتصفح.</span></div>
+    </aside>
+    <main class="main">
+      <section class="hero">
+        <div><h2 data-t="heroTitle">صوتك الصحيح، بلا تبديل صامت</h2><p data-t="heroText">اختر اللغة والجنس واللهجة والنبرة؛ يعرض الاستوديو الأصوات المطابقة فقط، ويتوقف برسالة واضحة إذا لم تتوفر مطابقة حقيقية.</p></div>
+        <div class="heroBadge" data-t="heroBadge">مطابقة صارمة</div>
+      </section>
+
+      <section class="page active" id="page-voice">
+        <div class="grid">
+          <article class="card half">
+            <h3 data-t="voiceSetup">إعداد الصوت</h3>
+            <div class="fields">
+              <div class="field"><label data-t="provider">المحرك</label><select id="voiceProvider" class="control"></select></div>
+              <div class="field"><label data-t="outputLanguage">لغة النص والصوت</label><select id="voiceLanguage" class="control"><option value="ar" data-t="arabic">العربية</option><option value="en" data-t="english">الإنجليزية</option></select></div>
+              <div class="field"><label data-t="speakerGender">جنس المتحدث</label><select id="voiceGender" class="control"><option value="male" data-t="male">رجل</option><option value="female" data-t="female">امرأة</option><option value="neutral" data-t="neutral">محايد رسميًا</option></select></div>
+              <div class="field"><label data-t="locale">اللهجة / المنطقة</label><select id="voiceLocale" class="control"></select></div>
+              <div class="field full"><label data-t="voice">الصوت المطابق</label><select id="voiceId" class="control"></select><small id="voiceNote"></small></div>
+              <div class="field"><label data-t="tone">النبرة</label><select id="voiceTone" class="control"></select></div>
+              <div class="field"><label><span data-t="speed">السرعة</span> <span id="speedValue">1.00×</span></label><input id="voiceSpeed" type="range" min=".7" max="1.25" step=".01" value="1" class="control"></div>
+              <div class="field full"><label data-t="effect">المعالجة الصوتية</label><select id="voiceEffect" class="control"><option value="none" data-t="effectNone">بدون معالجة</option><option value="human_master" data-t="effectHuman">موازنة بشرية</option><option value="studio" data-t="effectStudio">استوديو احترافي</option><option value="warm_broadcast" data-t="effectBroadcast">إذاعي دافئ</option><option value="podcast" data-t="effectPodcast">بودكاست قريب</option></select></div>
+            </div>
+            <div class="match"><span id="matchDot" class="dot"></span><span id="matchText" data-t="checkingVoices">جارٍ فحص المطابقة…</span></div>
+          </article>
+          <article class="card half">
+            <div class="row between"><h3 data-t="speechText">نص الإلقاء</h3><span class="counter" id="voiceCount">0 / 12000</span></div>
+            <textarea id="voiceText" class="control text" maxlength="12000" data-ph="voicePlaceholder" placeholder="اكتب النص العربي أو الإنجليزي هنا…"></textarea>
+            <button id="voiceGenerate" class="primary" style="width:100%;margin-top:14px" data-t="generateVoice">إنتاج الصوت المطابق</button>
+            <div id="voiceStatus" class="status"></div>
+            <div id="voiceResult" class="hidden"><audio id="voiceAudio" controls></audio><div class="resultActions"><a id="voiceDownload" class="ghost" download data-t="download">تنزيل الملف</a></div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-writer">
+        <div class="grid">
+          <article class="card half">
+            <h3 data-t="writerBrief">فكرة النص وأسلوبه</h3>
+            <div class="fields">
+              <div class="field"><label data-t="writerMode">المهمة</label><select id="writerMode" class="control"><option value="generate" data-t="modeGenerate">تأليف جديد</option><option value="rewrite" data-t="modeRewrite">إعادة صياغة</option><option value="interview" data-t="modeInterview">بناء مقابلة</option></select></div>
+              <div class="field"><label data-t="writerLanguage">لغة الكتابة</label><select id="writerLanguage" class="control"><option value="ar" data-t="arabic">العربية</option><option value="en" data-t="english">الإنجليزية</option></select></div>
+              <div class="field"><label data-t="contentType">نوع المحتوى</label><select id="contentType" class="control"><option value="podcast" data-t="podcast">بودكاست</option><option value="interview" data-t="interview">مقابلة</option><option value="lecture" data-t="lecture">محاضرة</option><option value="sermon" data-t="sermon">موعظة</option><option value="documentary" data-t="documentary">وثائقي</option><option value="video" data-t="video">فيديو</option></select></div>
+              <div class="field"><label data-t="dialect">اللهجة / الأسلوب اللغوي</label><select id="writerDialect" class="control"><option value="msa" data-t="msa">فصحى حديثة</option><option value="yemeni" data-t="yemeni">يمني</option><option value="gulf" data-t="gulf">خليجي</option><option value="saudi" data-t="saudi">سعودي</option><option value="egyptian" data-t="egyptian">مصري</option><option value="american" data-t="american">أمريكي</option><option value="british" data-t="british">بريطاني</option></select></div>
+              <div class="field"><label data-t="creativeTone">أسلوب التأثير</label><select id="writerTone" class="control"><option value="engaging" data-t="engaging">مشوق ومؤثر</option><option value="thoughtful" data-t="thoughtful">عميق ومفكر</option><option value="professional" data-t="professional">احترافي رصين</option><option value="emotional" data-t="emotional">وجداني</option><option value="challenging" data-t="challenging">أسئلة وتحدٍ فكري</option></select></div>
+              <div class="field"><label data-t="writerEngine">عقل الكتابة</label><select id="writerProvider" class="control"><option value="auto" data-t="autoWriter">تلقائي: Gemini ثم محلي</option><option value="local" data-t="localWriter">محلي مجاني</option><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></div>
+              <div class="field"><label data-t="duration">المدة بالدقائق</label><input id="writerDuration" class="control" type="number" min="1" max="45" value="4"></div>
+              <div class="field"><label data-t="speakers">عدد المتحدثين</label><input id="writerSpeakers" class="control" type="number" min="2" max="6" value="3"></div>
+              <div class="field full"><label data-t="audience">الجمهور</label><input id="writerAudience" class="control" data-ph="audiencePlaceholder" placeholder="الجمهور العربي العام"></div>
+              <div class="field full"><label data-t="subject">الموضوع</label><textarea id="writerSubject" class="control" rows="3" data-ph="subjectPlaceholder" placeholder="اكتب الفكرة والهدف…"></textarea></div>
+              <div class="field full"><label data-t="sourceText">النص الأصلي أو الحقائق التي يجب الحفاظ عليها</label><textarea id="writerSource" class="control text" data-ph="sourcePlaceholder" placeholder="اختياري للتأليف، ومهم لإعادة الصياغة…"></textarea></div>
+            </div>
+            <button id="writerGenerate" class="primary" style="width:100%;margin-top:14px" data-t="writeNow">اكتب النص باحتراف</button>
+            <div id="writerStatus" class="status"></div>
+          </article>
+          <article class="card half">
+            <div class="row between"><h3 data-t="finalScript">النص النهائي القابل للتعديل</h3><span id="writerUsed" class="tag"></span></div>
+            <textarea id="writerOutput" class="control text large" data-ph="outputPlaceholder" placeholder="سيظهر النص هنا، ويمكنك تعديله فورًا…"></textarea>
+            <div class="resultActions"><button id="copyScript" class="ghost" data-t="copy">نسخ</button><button id="toVoice" class="ghost" data-t="sendVoice">إرساله للصوت</button><button id="toDialogue" class="ghost" data-t="sendDialogue">إرساله للمقابلة</button></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-dialogue">
+        <div class="grid">
+          <article class="card half">
+            <h3 data-t="dialogueSettings">إعداد المقابلة</h3>
+            <div class="notice" data-t="roleNotice">استخدم أسماء الأدوار الواضحة؛ كل دور يطابق جنسه مستقلًا. لن يُستبدل صوت امرأة برجل أو العكس.</div>
+            <div class="fields">
+              <div class="field"><label data-t="provider">المحرك</label><select id="dialogueProvider" class="control"></select></div>
+              <div class="field"><label data-t="writerLanguage">اللغة</label><select id="dialogueLanguage" class="control"><option value="ar" data-t="arabic">العربية</option><option value="en" data-t="english">الإنجليزية</option></select></div>
+              <div class="field"><label data-t="tone">النبرة</label><select id="dialogueTone" class="control"></select></div>
+              <div class="field"><label data-t="pause">الوقفة بين المتحدثين</label><select id="dialoguePause" class="control"><option value="260">260ms</option><option value="360" selected>360ms</option><option value="520">520ms</option><option value="700">700ms</option></select></div>
+              <div class="field"><label><span data-t="speed">السرعة</span> <span id="dialogueSpeedValue">0.98×</span></label><input id="dialogueSpeed" type="range" min=".7" max="1.25" step=".01" value=".98" class="control"></div>
+              <div class="field"><label data-t="effect">المعالجة</label><select id="dialogueEffect" class="control"><option value="podcast" data-t="effectPodcast">بودكاست قريب</option><option value="studio" data-t="effectStudio">استوديو احترافي</option><option value="none" data-t="effectNone">بدون معالجة</option></select></div>
+            </div>
+            <button id="dialogueGenerate" class="primary" style="width:100%;margin-top:15px" data-t="generateDialogue">إنتاج المقابلة كاملة</button>
+            <div id="dialogueStatus" class="status"></div>
+            <div id="dialogueResult" class="hidden"><audio id="dialogueAudio" controls></audio><div id="roleMap" class="tags" style="margin-top:12px"></div><a id="dialogueDownload" class="ghost" download data-t="download">تنزيل الملف</a></div>
+          </article>
+          <article class="card half">
+            <div class="row between"><h3 data-t="interviewScript">سيناريو المقابلة</h3><button id="sampleDialogue" class="ghost" data-t="sample">مثال صحيح</button></div>
+            <textarea id="dialogueText" class="control text large" data-ph="dialoguePlaceholder" placeholder="المذيع_رجل: أهلًا بكم…&#10;الضيفة_امرأة: شكرًا للاستضافة…"></textarea>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-connections">
+        <div class="grid">
+          <article class="card half">
+            <h3 data-t="connectProvider">ربط مزود صوت أو كتابة</h3>
+            <div class="notice" data-t="keyPrivacy">المفاتيح تُرسل إلى البرنامج المحلي فقط، وتُحفظ في مجلد إعداداته. لا يحفظها المتصفح.</div>
+            <div class="field"><label data-t="provider">المزود</label><select id="connectionProvider" class="control"></select></div>
+            <div id="connectionFields" class="fields" style="margin-top:14px"></div>
+            <div class="resultActions"><button id="saveConnection" class="primary" data-t="saveSettings">حفظ الإعدادات</button><button id="testConnection" class="ghost" data-t="testConnection">اختبار اتصال حقيقي</button><button id="clearSecret" class="ghost" data-t="clearKey">مسح المفتاح</button></div>
+            <div id="connectionStatus" class="status"></div>
+          </article>
+          <article class="card half">
+            <h3 data-t="connectionGuide">دليل الربط الصريح</h3>
+            <div id="connectionInfo"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-tools">
+        <div class="card">
+          <div class="row between"><div><h3 data-t="toolLibrary">مكتبة المحركات والأدوات</h3><p class="muted" data-t="toolLibraryText">المتاح فعليًا منفصل عن الإضافات الاختيارية، والتكلفة موضحة بلا ادعاء أن كل خدمة مجانية.</p></div></div>
+          <div id="providerGrid" class="providerGrid"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T={
+ar:{brand:'استوديو ابن الواقدي',subtitle:'صوت صارم المطابقة • كتابة إبداعية • مقابلات متعددة المتحدثين',legacy:'الأدوات السابقة',tabVoice:'إنتاج الصوت',tabWriter:'الكاتب المبدع',tabDialogue:'المقابلات',tabConnections:'الربط والمفاتيح',tabTools:'المحركات والأدوات',privacy:'المفاتيح تحفظ محليًا ولا تُخزن في المتصفح.',heroTitle:'صوتك الصحيح، بلا تبديل صامت',heroText:'اختر اللغة والجنس واللهجة والنبرة؛ يعرض الاستوديو الأصوات المطابقة فقط، ويتوقف برسالة واضحة إذا لم تتوفر مطابقة حقيقية.',heroBadge:'مطابقة صارمة',voiceSetup:'إعداد الصوت',provider:'المحرك',outputLanguage:'لغة النص والصوت',arabic:'العربية',english:'الإنجليزية',speakerGender:'جنس المتحدث',male:'رجل',female:'امرأة',neutral:'محايد رسميًا',locale:'اللهجة / المنطقة',voice:'الصوت المطابق',tone:'النبرة',speed:'السرعة',effect:'المعالجة الصوتية',effectNone:'بدون معالجة',effectHuman:'موازنة بشرية',effectStudio:'استوديو احترافي',effectBroadcast:'إذاعي دافئ',effectPodcast:'بودكاست قريب',checkingVoices:'جارٍ فحص المطابقة…',speechText:'نص الإلقاء',voicePlaceholder:'اكتب النص العربي أو الإنجليزي هنا…',generateVoice:'إنتاج الصوت المطابق',download:'تنزيل الملف',writerBrief:'فكرة النص وأسلوبه',writerMode:'المهمة',modeGenerate:'تأليف جديد',modeRewrite:'إعادة صياغة',modeInterview:'بناء مقابلة',writerLanguage:'لغة الكتابة',contentType:'نوع المحتوى',podcast:'بودكاست',interview:'مقابلة',lecture:'محاضرة',sermon:'موعظة',documentary:'وثائقي',video:'فيديو',dialect:'اللهجة / الأسلوب اللغوي',msa:'فصحى حديثة',yemeni:'يمني',gulf:'خليجي',saudi:'سعودي',egyptian:'مصري',american:'أمريكي',british:'بريطاني',creativeTone:'أسلوب التأثير',engaging:'مشوق ومؤثر',thoughtful:'عميق ومفكر',professional:'احترافي رصين',emotional:'وجداني',challenging:'أسئلة وتحدٍ فكري',writerEngine:'عقل الكتابة',autoWriter:'تلقائي: Gemini ثم محلي',localWriter:'محلي مجاني',duration:'المدة بالدقائق',speakers:'عدد المتحدثين',audience:'الجمهور',audiencePlaceholder:'الجمهور العربي العام',subject:'الموضوع',subjectPlaceholder:'اكتب الفكرة والهدف…',sourceText:'النص الأصلي أو الحقائق التي يجب الحفاظ عليها',sourcePlaceholder:'اختياري للتأليف، ومهم لإعادة الصياغة…',writeNow:'اكتب النص باحتراف',finalScript:'النص النهائي القابل للتعديل',outputPlaceholder:'سيظهر النص هنا، ويمكنك تعديله فورًا…',copy:'نسخ',sendVoice:'إرساله للصوت',sendDialogue:'إرساله للمقابلة',dialogueSettings:'إعداد المقابلة',roleNotice:'استخدم أسماء الأدوار الواضحة؛ كل دور يطابق جنسه مستقلًا. لن يُستبدل صوت امرأة برجل أو العكس.',pause:'الوقفة بين المتحدثين',generateDialogue:'إنتاج المقابلة كاملة',interviewScript:'سيناريو المقابلة',sample:'مثال صحيح',dialoguePlaceholder:'المذيع_رجل: أهلًا بكم…\\nالضيفة_امرأة: شكرًا للاستضافة…',connectProvider:'ربط مزود صوت أو كتابة',keyPrivacy:'المفاتيح تُرسل إلى البرنامج المحلي فقط، وتُحفظ في مجلد إعداداته. لا يحفظها المتصفح.',saveSettings:'حفظ الإعدادات',testConnection:'اختبار اتصال حقيقي',clearKey:'مسح المفتاح',connectionGuide:'دليل الربط الصريح',toolLibrary:'مكتبة المحركات والأدوات',toolLibraryText:'المتاح فعليًا منفصل عن الإضافات الاختيارية، والتكلفة موضحة بلا ادعاء أن كل خدمة مجانية.',ready:'جاهز',notReady:'غير مربوط',optional:'إضافة اختيارية',free:'مجاني',open_source:'مفتوح المصدر',trial:'تجربة/حصة مجانية',paid:'مدفوع',docs:'التعليمات الرسمية',noVoices:'لا يوجد صوت مطابق تمامًا. غيّر الجنس أو اللهجة أو المحرك.',voicesMatched:'الأصوات المعروضة مطابقة للغة والجنس.',openaiNeutral:'OpenAI لا ينشر تصنيفًا رسميًا ثابتًا لجنس أصواته؛ لذلك يعرضها الاستوديو كمحايدة فقط.',writing:'جارٍ بناء النص…',generating:'جارٍ إنتاج الصوت والتحقق من المطابقة…',dialogueGenerating:'جارٍ إنتاج المقابلة دورًا بعد دور…',saved:'تم الحفظ محليًا.',copied:'تم نسخ النص.',needText:'اكتب النص أولًا.',needScript:'اكتب السيناريو أولًا.',connectionFields:'حقول الربط',configured:'المفتاح محفوظ',notConfigured:'لم يُحفظ مفتاح',api_key:'مفتاح API',region:'منطقة Azure',project_id:'معرّف مشروع Google',model_id:'معرّف النموذج',male_voice_id_ar:'معرّف صوت الرجل العربي',female_voice_id_ar:'معرّف صوت المرأة العربية',male_voice_id_en:'معرّف صوت الرجل الإنجليزي',female_voice_id_en:'معرّف صوت المرأة الإنجليزية',successVoice:'تم إنتاج الصوت المطابق بنجاح.',successWriter:'تم إنشاء النص وأصبح قابلًا للتعديل.',successDialogue:'تم إنتاج المقابلة بالأصوات المطابقة.',successConnection:'تم حفظ إعدادات الربط محليًا.',successTest:'نجح اختبار الاتصال الحقيقي.'},
+en:{brand:'Ibn Al-Waqadi Studio',subtitle:'Strict voice matching • Creative writing • Multi-speaker interviews',legacy:'Previous tools',tabVoice:'Voice production',tabWriter:'Creative writer',tabDialogue:'Interviews',tabConnections:'Connections & keys',tabTools:'Engines & tools',privacy:'Keys are stored locally and never in browser storage.',heroTitle:'The right voice, with no silent switching',heroText:'Choose language, gender, accent and tone. The studio shows exact matches only and stops clearly when a real match is unavailable.',heroBadge:'Strict matching',voiceSetup:'Voice setup',provider:'Engine',outputLanguage:'Text and voice language',arabic:'Arabic',english:'English',speakerGender:'Speaker gender',male:'Male',female:'Female',neutral:'Officially neutral',locale:'Accent / region',voice:'Matching voice',tone:'Tone',speed:'Speed',effect:'Audio mastering',effectNone:'No processing',effectHuman:'Human balance',effectStudio:'Professional studio',effectBroadcast:'Warm broadcast',effectPodcast:'Close podcast',checkingVoices:'Checking exact matches…',speechText:'Speech text',voicePlaceholder:'Write Arabic or English text here…',generateVoice:'Generate matching voice',download:'Download file',writerBrief:'Idea and writing style',writerMode:'Task',modeGenerate:'Write new script',modeRewrite:'Rewrite',modeInterview:'Build interview',writerLanguage:'Writing language',contentType:'Content type',podcast:'Podcast',interview:'Interview',lecture:'Lecture',sermon:'Sermon',documentary:'Documentary',video:'Video',dialect:'Dialect / language style',msa:'Modern Standard Arabic',yemeni:'Yemeni',gulf:'Gulf Arabic',saudi:'Saudi',egyptian:'Egyptian',american:'American',british:'British',creativeTone:'Creative impact',engaging:'Engaging and moving',thoughtful:'Deep and thoughtful',professional:'Professional and composed',emotional:'Emotional',challenging:'Insightful and challenging',writerEngine:'Writing intelligence',autoWriter:'Automatic: Gemini then local',localWriter:'Free local writer',duration:'Duration in minutes',speakers:'Number of speakers',audience:'Audience',audiencePlaceholder:'General audience',subject:'Subject',subjectPlaceholder:'Describe the idea and goal…',sourceText:'Source text or facts to preserve',sourcePlaceholder:'Optional for new writing; important for rewrites…',writeNow:'Write professional script',finalScript:'Editable final script',outputPlaceholder:'The script will appear here and remains fully editable…',copy:'Copy',sendVoice:'Send to voice',sendDialogue:'Send to interview',dialogueSettings:'Interview setup',roleNotice:'Use explicit role labels. Every role is matched independently; a female voice is never replaced with a male voice or vice versa.',pause:'Pause between speakers',generateDialogue:'Produce full interview',interviewScript:'Interview script',sample:'Correct sample',dialoguePlaceholder:'HOST_MALE: Welcome…\\nGUEST_FEMALE: Thank you for having me…',connectProvider:'Connect a voice or writing provider',keyPrivacy:'Keys are sent only to the local app and stored in its settings folder. The browser never stores them.',saveSettings:'Save settings',testConnection:'Run real connection test',clearKey:'Clear key',connectionGuide:'Transparent connection guide',toolLibrary:'Engine and tool library',toolLibraryText:'Working engines are separated from optional add-ons, and cost is stated honestly.',ready:'Ready',notReady:'Not connected',optional:'Optional add-on',free:'Free',open_source:'Open source',trial:'Trial / free quota',paid:'Paid',docs:'Official instructions',noVoices:'No exact voice match. Change gender, accent, or engine.',voicesMatched:'Every displayed voice matches the selected language and gender.',openaiNeutral:'OpenAI does not publish a stable official gender classification for its voices, so this studio exposes them only as neutral.',writing:'Building the script…',generating:'Generating voice and verifying the match…',dialogueGenerating:'Producing the interview role by role…',saved:'Saved locally.',copied:'Script copied.',needText:'Write the text first.',needScript:'Write the script first.',connectionFields:'Connection fields',configured:'Key saved',notConfigured:'No saved key',api_key:'API key',region:'Azure region',project_id:'Google project ID',model_id:'Model ID',male_voice_id_ar:'Arabic male voice ID',female_voice_id_ar:'Arabic female voice ID',male_voice_id_en:'English male voice ID',female_voice_id_en:'English female voice ID',successVoice:'Voice generated successfully with an exact match.',successWriter:'The script is ready and fully editable.',successDialogue:'The interview was produced with exact role-to-voice matches.',successConnection:'Connection settings were saved locally.',successTest:'The real connection test succeeded.'}
+};
+let uiLang=localStorage.getItem('ultimate_ui_lang')||'ar',providers=[],tones=[],voiceReady=false;
+const tr=k=>T[uiLang][k]||k;
+function applyLanguage(lang){
+  uiLang=lang;localStorage.setItem('ultimate_ui_lang',lang);document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+  document.querySelectorAll('[data-t]').forEach(el=>{const k=el.dataset.t;if(T[lang][k])el.textContent=T[lang][k]});
+  document.querySelectorAll('[data-ph]').forEach(el=>el.placeholder=tr(el.dataset.ph));
+  $('langAr').classList.toggle('active',lang==='ar');$('langEn').classList.toggle('active',lang==='en');
+  renderProviders();setTones();renderConnection();refreshVoices();
+}
+function status(id,message,type='wait'){const el=$(id);el.textContent=message;el.className='status show '+type}
+function clearStatus(id){$(id).className='status';$(id).textContent=''}
+async function api(url,options={}){
+  const r=await fetch(url,options);let d={};try{d=await r.json()}catch{d={detail:r.statusText}}
+  if(!r.ok)throw new Error(typeof d.detail==='string'?d.detail:JSON.stringify(d.detail||d));return d
+}
+function loading(button,on,labelKey){button.disabled=on;if(on){button.dataset.old=button.textContent;button.innerHTML='<span class="loader"></span>'+tr(labelKey)}else button.textContent=button.dataset.old||tr(labelKey)}
+function providerName(p){return uiLang==='ar'?p.name_ar:p.name_en}
+function fillProviderSelect(el,filter){
+  const old=el.value,items=providers.filter(filter||(()=>true));el.innerHTML=items.map(p=>`<option value="${p.id}">${providerName(p)}</option>`).join('');
+  if(items.some(p=>p.id===old))el.value=old;
+}
+function renderProviders(){
+  if(!providers.length)return;
+  fillProviderSelect($('voiceProvider'),p=>p.available&&p.voice_count>0);
+  fillProviderSelect($('dialogueProvider'),p=>p.available&&p.voice_count>0&&p.strict_gender);
+  fillProviderSelect($('connectionProvider'),p=>p.config_fields&&p.config_fields.length);
+  $('providerGrid').innerHTML=providers.map(p=>`<article class="provider"><div class="tags"><span class="tag ${p.category}">${tr(p.category)}</span><span class="tag">${p.configured?tr('ready'):(p.available?tr('notReady'):tr('optional'))}</span></div><h4>${providerName(p)}</h4><p>${uiLang==='ar'?p.cost_ar:p.cost_en}</p><div class="row"><span class="tag">${p.languages.map(x=>x.toUpperCase()).join(' • ')}</span><span class="tag">${p.voice_count} voices</span></div><a href="${p.docs}" target="_blank" rel="noopener">${tr('docs')} ↗</a></article>`).join('');
+}
+function setTones(){
+  for(const id of ['voiceTone','dialogueTone']){const el=$(id),old=el.value;el.innerHTML=tones.map(t=>`<option value="${t.id}">${uiLang==='ar'?t.name_ar:t.name_en}</option>`).join('');if(tones.some(t=>t.id===old))el.value=old}
+  if(!$('dialogueTone').value)$('dialogueTone').value='podcast';
+}
+async function refreshVoices(){
+  if(!providers.length)return;
+  const provider=$('voiceProvider').value,p=providers.find(x=>x.id===provider);if(!p)return;
+  if(provider==='openai'){$('voiceGender').value='neutral'}
+  else if($('voiceGender').value==='neutral'){$('voiceGender').value='male'}
+  [...$('voiceGender').options].forEach(o=>o.disabled=provider==='openai'?o.value!=='neutral':o.value==='neutral');
+  voiceReady=false;$('voiceGenerate').disabled=true;$('matchDot').className='dot';$('matchText').textContent=tr('checkingVoices');
+  try{
+    const qs=new URLSearchParams({provider,language:$('voiceLanguage').value,gender:$('voiceGender').value});
+    const d=await api('/api/ultimate/voices?'+qs);
+    const currentLocale=$('voiceLocale').value,locales=[...new Set(d.voices.map(v=>v.locale))];
+    $('voiceLocale').innerHTML=locales.map(x=>`<option value="${x}">${x}</option>`).join('');if(locales.includes(currentLocale))$('voiceLocale').value=currentLocale;
+    const selectedLocale=$('voiceLocale').value,items=d.voices.filter(v=>!selectedLocale||v.locale===selectedLocale);
+    $('voiceId').innerHTML=items.map(v=>`<option value="${v.id}">${uiLang==='ar'?v.name_ar:v.name_en}</option>`).join('');
+    voiceReady=items.length>0;$('voiceGenerate').disabled=!voiceReady;$('matchDot').className='dot'+(voiceReady?' ok':'');
+    $('matchText').textContent=voiceReady?tr('voicesMatched'):tr('noVoices');$('voiceNote').textContent=provider==='openai'?tr('openaiNeutral'):'';
+  }catch(e){$('matchText').textContent=e.message;$('voiceNote').textContent=''}
+}
+function renderConnection(){
+  if(!providers.length)return;const p=providers.find(x=>x.id===$('connectionProvider').value)||providers.find(x=>x.config_fields.length);if(!p)return;
+  $('connectionProvider').value=p.id;
+  $('connectionFields').innerHTML=p.config_fields.map(f=>`<div class="field ${f==='api_key'?'full':''}"><label>${tr(f)}</label><input id="cfg_${f}" class="control" type="${f==='api_key'?'password':'text'}" autocomplete="off" placeholder="${p.settings&&p.settings[f]||''}"></div>`).join('');
+  const set=p.configured?tr('configured'):tr('notConfigured');
+  $('connectionInfo').innerHTML=`<div class="provider"><div class="tags"><span class="tag ${p.category}">${tr(p.category)}</span><span class="tag">${set}</span></div><h4>${providerName(p)}</h4><p>${uiLang==='ar'?p.cost_ar:p.cost_en}</p><p>${p.strict_gender?tr('voicesMatched'):tr('openaiNeutral')}</p><a href="${p.docs}" target="_blank" rel="noopener">${tr('docs')} ↗</a></div>`;
+  $('saveConnection').disabled=!p.config_fields.length;$('clearSecret').disabled=!p.config_fields.includes('api_key');clearStatus('connectionStatus');
+}
+async function loadCatalog(){
+  try{const d=await api('/api/ultimate/providers');providers=d.providers;tones=d.tones;renderProviders();setTones();renderConnection();await refreshVoices()}
+  catch(e){status('voiceStatus',e.message,'err')}
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$('page-'+b.dataset.page).classList.add('active')});
+$('langAr').onclick=()=>applyLanguage('ar');$('langEn').onclick=()=>applyLanguage('en');
+$('voiceProvider').onchange=refreshVoices;$('voiceLanguage').onchange=refreshVoices;$('voiceGender').onchange=refreshVoices;$('voiceLocale').onchange=refreshVoices;
+$('voiceSpeed').oninput=()=>$('speedValue').textContent=Number($('voiceSpeed').value).toFixed(2)+'×';
+$('dialogueSpeed').oninput=()=>$('dialogueSpeedValue').textContent=Number($('dialogueSpeed').value).toFixed(2)+'×';
+$('voiceText').oninput=()=>{$('voiceCount').textContent=$('voiceText').value.length+' / 12000';localStorage.setItem('ultimate_voice_draft',$('voiceText').value)};
+$('voiceGenerate').onclick=async()=>{
+  const text=$('voiceText').value.trim();if(!text)return status('voiceStatus',tr('needText'),'err');if(!voiceReady)return status('voiceStatus',tr('noVoices'),'err');
+  loading($('voiceGenerate'),true,'generating');status('voiceStatus',tr('generating'),'wait');$('voiceResult').classList.add('hidden');
+  try{const d=await api('/api/ultimate/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,provider:$('voiceProvider').value,language:$('voiceLanguage').value,gender:$('voiceGender').value,locale:$('voiceLocale').value||null,voice_id:$('voiceId').value,tone:$('voiceTone').value,speed:Number($('voiceSpeed').value),effect:$('voiceEffect').value})});$('voiceAudio').src=d.url;$('voiceDownload').href=d.url;$('voiceResult').classList.remove('hidden');status('voiceStatus',tr('successVoice'),'ok')}
+  catch(e){status('voiceStatus',e.message,'err')}finally{loading($('voiceGenerate'),false,'generateVoice');$('voiceGenerate').textContent=tr('generateVoice');$('voiceGenerate').disabled=!voiceReady}
+};
+$('writerGenerate').onclick=async()=>{
+  loading($('writerGenerate'),true,'writing');status('writerStatus',tr('writing'),'wait');
+  try{const d=await api('/api/ultimate/creative',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:$('writerMode').value,subject:$('writerSubject').value,source_text:$('writerSource').value,language:$('writerLanguage').value,dialect:$('writerDialect').value,content_type:$('contentType').value,tone:$('writerTone').value,audience:$('writerAudience').value,duration_minutes:Number($('writerDuration').value),speakers:Number($('writerSpeakers').value),writer_provider:$('writerProvider').value})});$('writerOutput').value=d.text;$('writerUsed').textContent=d.writer_used;status('writerStatus',tr('successWriter'),'ok');localStorage.setItem('ultimate_writer_draft',d.text)}
+  catch(e){status('writerStatus',e.message,'err')}finally{loading($('writerGenerate'),false,'writeNow');$('writerGenerate').textContent=tr('writeNow')}
+};
+$('writerOutput').oninput=()=>localStorage.setItem('ultimate_writer_draft',$('writerOutput').value);
+$('copyScript').onclick=async()=>{await navigator.clipboard.writeText($('writerOutput').value);status('writerStatus',tr('copied'),'ok')};
+$('toVoice').onclick=()=>{$('voiceText').value=$('writerOutput').value;$('voiceCount').textContent=$('voiceText').value.length+' / 12000';document.querySelector('[data-page="voice"]').click()};
+$('toDialogue').onclick=()=>{$('dialogueText').value=$('writerOutput').value;document.querySelector('[data-page="dialogue"]').click()};
+$('sampleDialogue').onclick=()=>{$('dialogueText').value=$('dialogueLanguage').value==='ar'?'المذيع_رجل: أهلًا بكم. ما السؤال الذي يستحق أن نبدأ به اليوم؟\\n\\nالضيفة_امرأة: نبدأ بالسؤال الذي يغيّر قرار المستمع، لا بالسؤال الأسهل.\\n\\nالخبير_رجل: والجواب الجيد يفرق بين الدليل والانطباع، ثم يقترح خطوة قابلة للقياس.\\n\\nالمذيع_رجل: ما الخطوة الأولى التي يمكن تنفيذها اليوم؟':'HOST_MALE: Welcome. Which question is truly worth asking today?\\n\\nGUEST_FEMALE: The question that changes the listener’s decision, not simply the easiest one.\\n\\nEXPERT_MALE: A useful answer separates evidence from assumption and proposes a measurable next step.\\n\\nHOST_MALE: What is the first step someone can take today?'};
+$('dialogueGenerate').onclick=async()=>{
+  const script=$('dialogueText').value.trim();if(!script)return status('dialogueStatus',tr('needScript'),'err');loading($('dialogueGenerate'),true,'dialogueGenerating');status('dialogueStatus',tr('dialogueGenerating'),'wait');$('dialogueResult').classList.add('hidden');
+  try{const d=await api('/api/ultimate/dialogue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script,provider:$('dialogueProvider').value,language:$('dialogueLanguage').value,tone:$('dialogueTone').value,speed:Number($('dialogueSpeed').value),pause_ms:Number($('dialoguePause').value),effect:$('dialogueEffect').value})});$('dialogueAudio').src=d.url;$('dialogueDownload').href=d.url;$('roleMap').innerHTML=Object.entries(d.roles).map(([r,v])=>`<span class="tag">${r}: ${v.voice_id} (${v.gender})</span>`).join('');$('dialogueResult').classList.remove('hidden');status('dialogueStatus',tr('successDialogue'),'ok')}
+  catch(e){status('dialogueStatus',e.message,'err')}finally{loading($('dialogueGenerate'),false,'generateDialogue');$('dialogueGenerate').textContent=tr('generateDialogue')}
+};
+$('connectionProvider').onchange=renderConnection;
+$('saveConnection').onclick=async()=>{
+  const p=providers.find(x=>x.id===$('connectionProvider').value),payload={};p.config_fields.forEach(f=>{const el=$('cfg_'+f);if(el&&el.value)payload[f]=el.value});
+  loading($('saveConnection'),true,'saveSettings');try{await api(`/api/ultimate/providers/${p.id}/configure`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});status('connectionStatus',tr('successConnection'),'ok');await loadCatalog()}catch(e){status('connectionStatus',e.message,'err')}finally{loading($('saveConnection'),false,'saveSettings');$('saveConnection').textContent=tr('saveSettings')}
+};
+$('testConnection').onclick=async()=>{const p=$('connectionProvider').value;loading($('testConnection'),true,'testConnection');try{await api(`/api/ultimate/providers/${p}/test`,{method:'POST'});status('connectionStatus',tr('successTest'),'ok')}catch(e){status('connectionStatus',e.message,'err')}finally{loading($('testConnection'),false,'testConnection');$('testConnection').textContent=tr('testConnection')}};
+$('clearSecret').onclick=async()=>{const p=$('connectionProvider').value;try{await api(`/api/ultimate/providers/${p}/configure`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clear_secret:true})});status('connectionStatus',tr('successConnection'),'ok');await loadCatalog()}catch(e){status('connectionStatus',e.message,'err')}};
+$('voiceText').value=localStorage.getItem('ultimate_voice_draft')||'';$('writerOutput').value=localStorage.getItem('ultimate_writer_draft')||'';$('voiceCount').textContent=$('voiceText').value.length+' / 12000';
+applyLanguage(uiLang);loadCatalog();
+</script>
+</body>
+</html>

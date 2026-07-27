@@ -1,24 +1,27 @@
 """اختبارات أساسية للمشروع."""
-import pytest
 
+import pytest
 
 
 def test_config_import():
     from backend.core.config import APP_NAME, APP_RELEASE, APP_VERSION, APP_PORT
+
     assert APP_NAME == "استوديو ابن الواقدي"
-    assert APP_VERSION == "5.1.0"
-    assert APP_RELEASE == "Free First"
+    assert APP_VERSION == "6.0.0"
+    assert APP_RELEASE == "Ultimate Voice"
     assert APP_PORT == 8000
 
 
 def test_logger_import():
     from backend.core.logger import get_logger
+
     logger = get_logger("test")
     assert logger is not None
 
 
 def test_audio_utils_import():
     from backend.core.audio_utils import generate_sine_wave
+
     data = generate_sine_wave(frequency=440, duration=0.1)
     assert len(data) > 0
     assert isinstance(data, bytes)
@@ -27,12 +30,14 @@ def test_audio_utils_import():
 def test_plugin_manager_import():
     from backend.core.plugin_manager import PluginManager
     from pathlib import Path
+
     pm = PluginManager(Path("."))
     assert pm is not None
 
 
 def test_tts_engine_import():
     from backend.core.tts_engine import TTSEngine
+
     engine = TTSEngine()
     engines = engine.list_engines()
     assert len(engines) > 0
@@ -41,6 +46,7 @@ def test_tts_engine_import():
 
 def test_health_checks():
     from backend.core.health import run_all_checks
+
     checks = run_all_checks(8001)
     assert len(checks) > 0
     assert all("name" in c for c in checks)
@@ -50,6 +56,7 @@ def test_health_checks():
 @pytest.mark.asyncio
 async def test_tts_fallback():
     from backend.core.tts_engine import tts
+
     result = await tts.synthesize(text="test", engine="fallback")
     assert result["success"] is False
     assert result["engine"] == "fallback"
@@ -58,7 +65,8 @@ async def test_tts_fallback():
 
 def test_fastapi_app():
     from main import app
+
     assert app is not None
     assert app.title == "استوديو ابن الواقدي"
-    assert app.version == "5.1.0"
-    assert app.state.release_channel == "free-first"
+    assert app.version == "6.0.0"
+    assert app.state.release_channel == "ultimate-voice"

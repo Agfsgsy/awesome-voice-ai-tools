@@ -1,4 +1,4 @@
-# استوديو ابن الواقدي — محدث موحد لكل ملفات المشروع
+﻿# استوديو ابن الواقدي — محدث موحد لكل ملفات المشروع
 # يقوم بتنزيل الفرع الكامل، مزامنته، التحقق منه، بناء المثبت وتثبيته.
 # لا يحذف بيانات المستخدم أو المفاتيح أو المخرجات الموجودة في LocalAppData.
 
@@ -59,16 +59,24 @@ try {
     Write-Host "مجلد المشروع: $project" -ForegroundColor Green
 
     New-Item -ItemType Directory -Force -Path $tempRoot, $extract | Out-Null
-    $url = "https://github.com/Agfsgsy/awesome-voice-ai-tools/archive/refs/heads/agent/professional-tts-engine.zip"
-
     Write-Host "[1/5] تنزيل جميع ملفات الإصدار الموحد من GitHub..." -ForegroundColor Cyan
-    try {
-        Import-Module BitsTransfer -ErrorAction SilentlyContinue
-        Start-BitsTransfer -Source $url -Destination $archive -ErrorAction Stop
-    } catch {
-        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive -TimeoutSec 600
+    $sourceRefs = @("codex/ultimate-voice-studio-6", "agent/professional-tts-engine")
+    $downloadedRef = ""
+    foreach ($sourceRef in $sourceRefs) {
+        $url = "https://github.com/Agfsgsy/awesome-voice-ai-tools/archive/refs/heads/$sourceRef.zip"
+        try {
+            Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+            Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive -TimeoutSec 600
+            if ((Test-Path -LiteralPath $archive) -and ((Get-Item -LiteralPath $archive).Length -gt 10000)) {
+                $downloadedRef = $sourceRef
+                break
+            }
+        } catch {
+            Write-Host "لم يتوفر المصدر $sourceRef؛ سأجرب المصدر المستقر التالي." -ForegroundColor Yellow
+        }
     }
-    if (-not (Test-Path -LiteralPath $archive)) { throw "لم يكتمل تنزيل المشروع." }
+    if (-not $downloadedRef) { throw "لم يكتمل تنزيل المشروع من أي مصدر موثوق." }
+    Write-Host "تم اختيار مصدر الإصدار: $downloadedRef" -ForegroundColor Green
 
     Write-Host "[2/5] فك الضغط ومزامنة المشروع كاملًا..." -ForegroundColor Cyan
     Expand-Archive -LiteralPath $archive -DestinationPath $extract -Force
@@ -109,7 +117,7 @@ try {
     }
 
     Start-Process -FilePath $exe
-    Title "تم تثبيت استوديو ابن الواقدي 5.1 — Free First"
+    Title "تم تثبيت استوديو ابن الواقدي 6.0 — Ultimate Voice"
     Write-Host "تم تحديث المشروع كاملًا من مصدر واحد، وليس ملفات متفرقة." -ForegroundColor Green
     Write-Host "تم الحفاظ على المفاتيح والجلسات والمخرجات وملفات المستخدم." -ForegroundColor Green
 }

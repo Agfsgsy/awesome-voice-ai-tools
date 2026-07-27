@@ -80,9 +80,9 @@ def _pm_info():
 
 @router.get("/")
 async def root():
-    studio_path = FRONTEND_DIR / "static" / "studio_shell.html"
+    studio_path = FRONTEND_DIR / "static" / "ultimate_studio.html"
     if studio_path.exists():
-        return RedirectResponse(url="/static/studio_shell.html", status_code=307)
+        return RedirectResponse(url="/static/ultimate_studio.html", status_code=307)
     index_path = FRONTEND_DIR / "templates" / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))

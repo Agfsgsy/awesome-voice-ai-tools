@@ -1,4 +1,5 @@
 """Regression tests for the packaged application's public JSON contracts."""
+
 from __future__ import annotations
 
 from fastapi.routing import APIRoute
@@ -15,6 +16,9 @@ BODY_ROUTES = {
     ("/api/interview-pro/render", "POST"),
     ("/api/studio/v1/interviews/scenario", "POST"),
     ("/api/studio/v1/interviews/render", "POST"),
+    ("/api/ultimate/synthesize", "POST"),
+    ("/api/ultimate/creative", "POST"),
+    ("/api/ultimate/dialogue", "POST"),
 }
 
 
@@ -29,9 +33,7 @@ def test_public_post_routes_accept_json_bodies() -> None:
                 continue
             found.add(key)
             assert route.dependant.body_params
-            assert not {"req", "payload", "body"}.intersection(
-                field.name for field in route.dependant.query_params
-            )
+            assert not {"req", "payload", "body"}.intersection(field.name for field in route.dependant.query_params)
     assert found == BODY_ROUTES
 
 
@@ -42,8 +44,7 @@ def test_openapi_marks_tts_requests_as_json_bodies() -> None:
         assert "requestBody" in operation
         assert "application/json" in operation["requestBody"]["content"]
         assert not any(
-            parameter["in"] == "query" and parameter["name"] == "req"
-            for parameter in operation.get("parameters", [])
+            parameter["in"] == "query" and parameter["name"] == "req" for parameter in operation.get("parameters", [])
         )
 
 
@@ -86,7 +87,7 @@ def test_invalid_tts_body_never_reports_query_req() -> None:
 def test_root_opens_the_unified_studio() -> None:
     response = TestClient(app, follow_redirects=False).get("/")
     assert response.status_code == 307
-    assert response.headers["location"] == "/static/studio_shell.html"
+    assert response.headers["location"] == "/static/ultimate_studio.html"
 
 
 def test_free_first_health_contract() -> None:

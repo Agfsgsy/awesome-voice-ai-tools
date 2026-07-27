@@ -75,7 +75,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: IbnWaqadiStudio-5.1-Windows-Setup
+          name: IbnWaqadiStudio-6.0-Windows-Setup
           path: dist-installer/VoiceAIStudioSetup.exe
           if-no-files-found: error
           retention-days: 30
@@ -83,7 +83,7 @@ jobs:
       - name: Upload portable folder
         uses: actions/upload-artifact@v4
         with:
-          name: IbnWaqadiStudio-5.1-Windows-Portable
+          name: IbnWaqadiStudio-6.0-Windows-Portable
           path: dist/VoiceAIStudioArabic
           if-no-files-found: error
           retention-days: 14

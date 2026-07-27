@@ -1,4 +1,5 @@
-"""Build-time validation for the unified free-first desktop release."""
+"""Build-time validation for the Ultimate Voice desktop release."""
+
 from __future__ import annotations
 
 import json
@@ -18,7 +19,7 @@ from fastapi.routing import APIRoute
 from backend.core.config import APP_VERSION, CLOUD_ENGINES, ENGINE_PRIORITY, FREE_ENGINES
 from main import app
 
-EXPECTED_VERSION = "5.1.0"
+EXPECTED_VERSION = "6.0.0"
 
 
 def fail(message: str) -> None:
@@ -45,10 +46,15 @@ def _validate_versions() -> None:
         "setup.py": f'version="{EXPECTED_VERSION}"',
         "installer/VoiceAIStudio.iss": f'#define MyAppVersion "{EXPECTED_VERSION}"',
         "frontend/static/studio_shell.html": f"VERSION='{EXPECTED_VERSION}'",
+        "frontend/static/ultimate_studio.html": "Ultimate Voice 6.0",
+        ".github/workflows/build-windows-installer.yml": "IbnWaqadiStudio-6.0-Windows-Setup",
     }
     for path, marker in version_contracts.items():
         if marker not in _text(path):
             fail(f"{path} does not use version {EXPECTED_VERSION}")
+    workflow = _text(".github/workflows/build-windows-installer.yml")
+    if "IbnWaqadiStudio-6.0-Windows-Portable" not in workflow:
+        fail("Windows portable artifact does not use the unified version")
 
 
 def _validate_free_first_policy() -> None:
@@ -84,6 +90,9 @@ def _validate_api_contracts() -> None:
         ("/api/interview-pro/render", "POST"),
         ("/api/studio/v1/interviews/scenario", "POST"),
         ("/api/studio/v1/interviews/render", "POST"),
+        ("/api/ultimate/synthesize", "POST"),
+        ("/api/ultimate/creative", "POST"),
+        ("/api/ultimate/dialogue", "POST"),
     }
     found: set[tuple[str, str]] = set()
     duplicates: dict[tuple[str, str], list[str]] = defaultdict(list)
@@ -116,10 +125,7 @@ def _validate_api_contracts() -> None:
         if "requestBody" not in operation:
             fail(f"OpenAPI has no requestBody for {method} {path}")
         parameters = operation.get("parameters", [])
-        if any(
-            item.get("in") == "query" and item.get("name") in {"req", "payload", "body"}
-            for item in parameters
-        ):
+        if any(item.get("in") == "query" and item.get("name") in {"req", "payload", "body"} for item in parameters):
             fail(f"OpenAPI exposes an invalid query payload for {method} {path}")
 
 
@@ -127,10 +133,20 @@ def _validate_frontend_contracts() -> None:
     shell = _text("frontend/static/studio_shell.html")
     if "studio:navigate" not in shell or "addEventListener('message'" not in shell:
         fail("The dashboard navigation bridge is missing")
+    ultimate = _text("frontend/static/ultimate_studio.html")
+    for marker in (
+        "/api/ultimate/synthesize",
+        "/api/ultimate/creative",
+        "/api/ultimate/dialogue",
+        "/api/ultimate/providers",
+        "ultimate_ui_lang",
+    ):
+        if marker not in ultimate:
+            fail(f"Ultimate studio is missing frontend contract: {marker}")
+    if "/static/ultimate_studio.html" not in _text("desktop_app.py"):
+        fail("The packaged desktop launcher does not open Ultimate Voice")
 
-    old_badges = re.compile(
-        r"(Producer 2\.8|Studio 2\.7|الإصدار 3\.4|Strict Cloud 3\.8|Smart Probe 4\.2)"
-    )
+    old_badges = re.compile(r"(Producer 2\.8|Studio 2\.7|الإصدار 3\.4|Strict Cloud 3\.8|Smart Probe 4\.2)")
     for path in (
         "frontend/static/dashboard.html",
         "frontend/static/producer.html",
@@ -147,8 +163,8 @@ def main() -> None:
     _validate_free_first_policy()
     _validate_api_contracts()
     _validate_frontend_contracts()
-    print("[SUCCESS] Unified Studio 5.1 contracts validated.")
-    print("[SUCCESS] Versions, JSON bodies, navigation, and free-first audio are consistent.")
+    print("[SUCCESS] Ultimate Voice 6.0 contracts validated.")
+    print("[SUCCESS] Versions, strict JSON bodies, bilingual UI, and free-first audio are consistent.")
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@
 <body>
 <div class="app" id="app"><div class="shade" id="shade"></div>
   <aside class="sidebar">
-    <div class="brand"><div class="logo">🎙️</div><div class="brandCopy"><div class="brandName">استوديو ابن الواقدي</div><div class="brandVersion" id="brandVersion">Professional Studio 5.1 — Free First</div></div></div>
+    <div class="brand"><div class="logo">🎙️</div><div class="brandCopy"><div class="brandName">استوديو ابن الواقدي</div><div class="brandVersion" id="brandVersion">Professional Studio 6.0 — Ultimate Voice</div></div></div>
     <div class="search"><span>⌕</span><input id="search" placeholder="ابحث عن أداة..."></div>
     <div class="navScroll">
       <div class="group">الرئيسية</div>
@@ -46,9 +46,9 @@
 </div>
 <script>
   const app=document.getElementById('app'),frame=document.getElementById('frame'),loading=document.getElementById('loading'),items=[...document.querySelectorAll('.navItem[data-page]')];
-  let token=0,VERSION='5.1.0';
+  let token=0,VERSION='6.0.0';
   function plain(v){if(v==null)return'';if(typeof v==='string')return v;if(typeof v==='number'||typeof v==='boolean')return String(v);if(Array.isArray(v))return v.map(plain).filter(Boolean).join(' | ');if(typeof v==='object'){for(const k of ['message','detail','error','reason','status']){if(v[k]!=null){const t=plain(v[k]);if(t)return t}}try{return JSON.stringify(v)}catch{return String(v)}}return String(v)}
-  async function loadVersion(){try{const r=await fetch('/api/studio/version'),d=await r.json();if(r.ok&&d.version){VERSION=d.version;document.getElementById('brandVersion').textContent=`Professional Studio ${d.version} — ${d.release||'Free First'}`}}catch{}}
+  async function loadVersion(){try{const r=await fetch('/api/studio/version'),d=await r.json();if(r.ok&&d.version){VERSION=d.version;document.getElementById('brandVersion').textContent=`Professional Studio ${d.version} — ${d.release||'Ultimate Voice'}`}}catch{}}
   function openPage(page,title,desc='',remember=true){items.forEach(b=>b.classList.toggle('active',b.dataset.page===page));document.getElementById('title').textContent=title||'استوديو ابن الواقدي';document.getElementById('crumb').textContent='استوديو ابن الواقدي / '+(desc||title||'');loading.classList.add('show');const current=++token;frame.src='about:blank';setTimeout(()=>{if(current===token)frame.src=page+'?v='+encodeURIComponent(VERSION)+'&t='+Date.now()},30);if(remember)localStorage.setItem('studio:lastPage',page);app.classList.remove('mobile');resumeSession()}
   function polish(w){try{const doc=w.document;if(!doc.getElementById('studio-polish')){const s=doc.createElement('style');s.id='studio-polish';s.textContent='html,body{scrollbar-color:#315171 #07111e}body{background:#07111e!important}.wrap{max-width:none!important;padding:18px!important}.card,.box,.hero{border-color:#203750!important;box-shadow:0 14px 34px rgba(0,0,0,.13)!important}.btn,.primary,button{transition:.16s}.btn:hover,.primary:hover,button:hover{filter:brightness(1.07)}';doc.head.appendChild(s)}w.__studioPlain=plain;if(typeof w.plain==='function')w.plain=plain;w.addEventListener('unhandledrejection',e=>console.error('Studio page error:',plain(e.reason)))}catch(e){console.warn(e)}}
   frame.addEventListener('load',()=>{try{const w=frame.contentWindow;if(!w||String(w.location.href)==='about:blank')return;const nativeFetch=w.fetch.bind(w);w.fetch=(input,init)=>{let url=typeof input==='string'?input:(input&&input.url)||input;if(typeof url==='string'&&url.includes('/api/dialogue-ultra/render'))url=url.replace('/api/dialogue-ultra/render','/api/dialogue-safe/render');return nativeFetch(url,init)};polish(w)}catch(e){console.warn(e)}loading.classList.remove('show');resumeSession()});
