@@ -15,7 +15,7 @@ if errorlevel 1 (
   if errorlevel 1 (
     echo [ERROR] Python 3.11 is missing and Windows Package Manager was not found.
     echo Install Python 3.11, then run this file again.
-    pause
+    if not defined CI pause
     exit /b 1
   )
   echo Installing Python 3.11 automatically...
@@ -23,7 +23,7 @@ if errorlevel 1 (
   %PY% -V >nul 2>&1
   if errorlevel 1 (
     echo [ERROR] Python 3.11 installation did not complete. Restart Windows and try again.
-    pause
+    if not defined CI pause
     exit /b 1
   )
 )
@@ -63,7 +63,7 @@ if not defined ISCC (
 if not defined ISCC (
   echo [ERROR] Inno Setup 6 was installed but ISCC.exe could not be located.
   echo Close this window, open a new Command Prompt, and run the builder again.
-  pause
+  if not defined CI pause
   exit /b 1
 )
 
@@ -76,8 +76,8 @@ if not exist "dist-installer\VoiceAIStudioSetup.exe" goto :failed
 echo.
 echo [SUCCESS] Yemeni Creative 6.1 installer created:
 echo %CD%\dist-installer\VoiceAIStudioSetup.exe
-start "" explorer.exe "%CD%\dist-installer"
-pause
+if not defined CI start "" explorer.exe "%CD%\dist-installer"
+if not defined CI pause
 exit /b 0
 
 :find_iscc
@@ -97,5 +97,5 @@ exit /b 0
 :failed
 echo.
 echo [ERROR] Build validation or packaging failed. Review the message above.
-pause
+if not defined CI pause
 exit /b 1
