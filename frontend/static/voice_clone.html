@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>استنساخ الصوت Pro</title>
+  <style>
+    :root{--bg:#07111e;--panel:#0c1b2e;--line:#24415f;--text:#f5f8ff;--muted:#92a8bf;--green:#24c6a4;--blue:#258fff;--gold:#d9ad43;--red:#ef6c78}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 85% 0,#173f65 0,#081522 35%,#050a12 100%);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif}body{padding:18px}.wrap{max-width:1500px;margin:auto}.hero{display:flex;justify-content:space-between;align-items:center;gap:16px;border:1px solid #2d5977;background:linear-gradient(135deg,#11344d,#10223a 58%,#2e2613);padding:20px 22px;border-radius:20px;box-shadow:0 18px 45px #0004}.hero h1{margin:0;font-size:27px}.hero p{margin:8px 0 0;color:#acc1d5;line-height:1.8}.badge{white-space:nowrap;background:#302812;border:1px solid #806629;color:#ffe28f;border-radius:999px;padding:10px 14px;font-weight:900}.grid{display:grid;grid-template-columns:minmax(360px,.9fr) minmax(500px,1.1fr);gap:16px;margin-top:16px}.card{background:linear-gradient(180deg,#0c1b2e,#091522);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:0 14px 35px #0003}.card h2{margin:0 0 14px;font-size:20px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:11px}.full{grid-column:1/-1}label{display:block;font-weight:800;font-size:13px;color:#dce8f4;margin-bottom:6px}input,select,textarea{width:100%;border:1px solid #2a4867;background:#071522;color:#fff;border-radius:12px;padding:11px 12px;outline:none;font:inherit}textarea{min-height:220px;resize:vertical;line-height:1.9}input:focus,select:focus,textarea:focus{border-color:#2caf9f;box-shadow:0 0 0 3px #24c6a41d}.filebox{border:1px dashed #42617e;border-radius:13px;padding:13px;background:#081725}.check{display:flex;gap:9px;align-items:flex-start;border:1px solid #37526e;background:#091827;padding:11px;border-radius:12px;line-height:1.7}.check input{width:auto;margin-top:5px}.row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.btn{border:1px solid #31516e;background:#16314d;color:#fff;border-radius:12px;padding:11px 15px;font-weight:900;cursor:pointer}.btn:hover{filter:brightness(1.08)}.primary{border:0;background:linear-gradient(135deg,var(--green),var(--blue))}.gold{background:linear-gradient(135deg,#7e5a13,#c79828);border:0}.danger{background:#57232d;border-color:#8a3948}.btn:disabled{opacity:.45;cursor:not-allowed}.status{display:none;margin-top:12px;padding:12px 14px;border:1px solid #31506e;background:#081523;border-radius:13px;color:#bed0e1;line-height:1.75}.status.show{display:block}.status.ok{border-color:#267a63;background:#09271f;color:#9af1d8}.status.err{border-color:#8c3f49;background:#2b151a;color:#ffc6ca}.status.wait{border-color:#82672d;background:#302711;color:#ffe3a1}.progress{height:8px;background:#07111b;border-radius:999px;overflow:hidden;margin-top:10px;display:none}.progress.show{display:block}.bar{height:100%;width:32%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:999px;animation:move 1s ease-in-out infinite alternate}@keyframes move{from{transform:translateX(-100%)}to{transform:translateX(300%)}}.engine{border:1px solid #2c4a67;background:#091827;border-radius:14px;padding:13px;margin-bottom:12px}.engineHead{display:flex;justify-content:space-between;gap:10px;align-items:center}.engineTitle{font-weight:950}.chip{font-size:11px;border:1px solid #49617a;border-radius:999px;padding:6px 9px;color:#c6d6e5}.chip.ok{border-color:#287d65;color:#9bf1da}.chip.bad{border-color:#82662b;color:#ffe19a}.engine p{color:var(--muted);font-size:12px;line-height:1.7;margin:8px 0}.profiles{display:grid;gap:9px;max-height:380px;overflow:auto}.profile{border:1px solid #2b4864;background:#081624;border-radius:13px;padding:12px;cursor:pointer}.profile.active{border-color:#2fc7ae;background:#0b2c2a}.profileTop{display:flex;justify-content:space-between;gap:8px}.profileName{font-weight:950}.quality{font-size:11px;color:#8ce7d3}.profileMeta{font-size:11px;color:#8fa5bc;margin-top:6px}.notes{font-size:11px;color:#e6cc8d;margin-top:6px}.rangeRow{display:grid;grid-template-columns:1fr 78px;gap:9px;align-items:center}.value{background:#10243a;border:1px solid #294765;border-radius:10px;padding:8px;text-align:center;color:#86e8d6;font-weight:900}.result{display:none;margin-top:14px;border:1px solid #2c765f;background:#0a2922;border-radius:15px;padding:14px}.result.show{display:block}.result audio{width:100%;margin:8px 0}.path{direction:ltr;text-align:left;word-break:break-all;background:#06131e;border:1px solid #21415d;border-radius:10px;padding:9px;color:#8dc8bd;font-size:12px}.notice{margin-top:13px;border:1px solid #765f28;background:#302711;color:#f3da96;border-radius:13px;padding:11px 13px;line-height:1.75;font-size:12px}.mini{font-size:11px;color:#8096ad}.footer{text-align:center;color:#71869e;font-size:11px;padding:18px}.hidden{display:none!important}
+    @media(max-width:1050px){body{padding:10px}.grid{grid-template-columns:1fr}.hero{align-items:flex-start}.fields{grid-template-columns:1fr}.full{grid-column:auto}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div><h1>🧬 استنساخ الصوت Pro</h1><p>أنشئ ملفًا صوتيًا مصرحًا به من عينة نظيفة، ثم استخدم XTTS المحلي أو Human Pro لإنتاج صوت قريب من صاحب العينة مع ماستر احترافي.</p></div>
+    <div class="badge">الإصدار 6.2.0 • Voice Clone Pro</div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <section class="card">
+        <h2>⚙️ المحركات</h2>
+        <div class="engine">
+          <div class="engineHead"><div class="engineTitle">XTTS-v2 المحلي — مجاني</div><span id="localChip" class="chip bad">غير مجهز</span></div>
+          <p>يعمل داخل بيئة مستقلة على جهازك. التجهيز مرة واحدة قد يحمل ملفات كبيرة، وأول إنتاج يحمل نموذج XTTS.</p>
+          <label class="check"><input id="licenseConsent" type="checkbox"> أوافق على ترخيص نموذج XTTS وأفهم أن استخدام الصوت يجب أن يكون بإذن صاحبه.</label>
+          <div class="row"><button id="setupLocal" class="btn primary">تجهيز المحرك المحلي مرة واحدة</button></div>
+          <div class="progress" id="setupProgress"><div class="bar"></div></div><div id="setupStatus" class="status"></div>
+        </div>
+        <div class="engine">
+          <div class="engineHead"><div class="engineTitle">Human Pro — ElevenLabs</div><span id="cloudChip" class="chip bad">المفتاح غير موجود</span></div>
+          <p>يستخدم Instant Voice Cloning عندما تسمح به خطة حسابك. مفتاح Human Pro يُقرأ من إعدادات الاستوديو ولا يظهر هنا.</p>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <h2>🎙️ إنشاء ملف صوت مصرح به</h2>
+        <div class="fields">
+          <div><label>اسم ملف الصوت</label><input id="profileName" placeholder="مثال: صوت علي"></div>
+          <div><label>اسم صاحب الصوت</label><input id="ownerName" placeholder="اسم صاحب العينة"></div>
+          <div class="full filebox"><label>عينات الصوت — من ملف إلى خمسة ملفات</label><input id="samples" type="file" accept="audio/*" multiple><div class="mini">الأفضل 30–120 ثانية كلام واضح، بلا موسيقى أو صدى أو أصوات أشخاص آخرين.</div></div>
+          <label class="check full"><input id="consent" type="checkbox"> أؤكد أنني صاحب الصوت أو أملك إذنًا صريحًا موثقًا من صاحبه لاستخدامه في الاستنساخ.</label>
+          <div class="full"><label>نص تأكيد الموافقة</label><input id="consentStatement" placeholder="مثال: أنا صاحب الصوت وأوافق على استخدامه داخل استوديو ابن الواقدي."></div>
+        </div>
+        <div class="row"><button id="createProfile" class="btn primary">فحص العينات وإنشاء الملف</button></div>
+        <div class="progress" id="profileProgress"><div class="bar"></div></div><div id="profileStatus" class="status"></div>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <div class="engineHead"><h2>👤 ملفات الأصوات</h2><button id="refreshProfiles" class="btn">تحديث</button></div>
+        <div id="profiles" class="profiles"><div class="mini">لا توجد ملفات بعد.</div></div>
+        <div class="row"><button id="deleteProfile" class="btn danger" disabled>حذف الملف المحدد</button></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>🎧 إنتاج الصوت المستنسخ</h2>
+      <div class="fields">
+        <div><label>المحرك</label><select id="provider"><option value="local">XTTS المحلي</option><option value="elevenlabs">Human Pro — ElevenLabs</option></select></div>
+        <div><label>اللغة</label><select id="language"><option value="ar">العربية</option><option value="en">English</option><option value="tr">Türkçe</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option></select></div>
+        <div><label>أسلوب الأداء</label><select id="style"><option value="natural">طبيعي واضح</option><option value="warm">دافئ وقريب</option><option value="emotional">عاطفي مؤثر</option><option value="broadcast">إذاعي قوي</option><option value="story">سرد قصصي</option></select></div>
+        <div><label>السرعة</label><div class="rangeRow"><input id="speed" type="range" min="0.75" max="1.20" step="0.01" value="1"><div id="speedValue" class="value">×1.00</div></div></div>
+        <div class="full"><label>النص</label><textarea id="text" maxlength="12000" placeholder="اكتب النص الذي تريد إنتاجه بصوت ملف العينة المحدد..."></textarea><div class="mini"><span id="count">0</span> / 12000 حرف</div></div>
+      </div>
+      <div class="row"><button id="generate" class="btn primary">إنشاء الصوت المستنسخ بدقة عالية</button></div>
+      <div class="progress" id="generateProgress"><div class="bar"></div></div><div id="generateStatus" class="status"></div>
+      <div id="result" class="result"><h3>الملف جاهز</h3><audio id="audio" controls></audio><div class="row"><a id="download" class="btn" download>تحميل MP3</a><button id="openFolder" class="btn gold">فتح مجلد المشروع</button></div><div id="projectPath" class="path"></div></div>
+      <div class="notice">لا يوجد محرك يضمن تطابقًا صوتيًا 100%. الجودة تعتمد على وضوح العينات، طولها، اللهجة، ونوع المحرك. يمنع استخدام هذه الأداة للانتحال أو التضليل أو استنساخ صوت شخص دون موافقته.</div>
+    </section>
+  </div>
+  <div class="footer">استوديو ابن الواقدي • +967771550103 • استنساخ صوت مصرح به فقط</div>
+</div>
+<script>
+  const $=id=>document.getElementById(id);let selectedProfile='',lastProject='';
+  function plain(v){if(v==null)return'';if(typeof v==='string')return v;if(Array.isArray(v))return v.map(plain).join(' | ');if(typeof v==='object'){for(const k of ['message','detail','error','reason'])if(v[k])return plain(v[k]);try{return JSON.stringify(v)}catch{return String(v)}}return String(v)}
+  async function api(url,opt={}){const r=await fetch(url,opt);let d={};try{d=await r.json()}catch{d={detail:await r.text()}}if(!r.ok||d.success===false)throw new Error(plain(d.detail||d.message||d));return d}
+  function status(id,text,type=''){const e=$(id);e.textContent=text;e.className='status show '+type}
+  function busy(prefix,on){$(prefix+'Progress').classList.toggle('show',on);const map={setup:'setupLocal',profile:'createProfile',generate:'generate'};$(map[prefix]).disabled=on}
+  function renderProfiles(items){const box=$('profiles');if(!items.length){box.innerHTML='<div class="mini">لا توجد ملفات صوت مصرح بها بعد.</div>';selectedProfile='';$('deleteProfile').disabled=true;return}box.innerHTML=items.map(p=>`<div class="profile ${p.id===selectedProfile?'active':''}" data-id="${p.id}"><div class="profileTop"><span class="profileName">${p.name}</span><span class="quality">${p.quality_label} ${p.quality_score}%</span></div><div class="profileMeta">صاحب الصوت: ${p.owner_name} • ${p.sample_count} عينة • ${Number(p.total_duration).toFixed(1)} ثانية</div>${(p.quality_notes||[]).length?`<div class="notes">${p.quality_notes.join(' • ')}</div>`:''}</div>`).join('');box.querySelectorAll('.profile').forEach(el=>el.onclick=()=>{selectedProfile=el.dataset.id;renderProfiles(items);$('deleteProfile').disabled=false;localStorage.setItem('clone:selected',selectedProfile)})}
+  async function refresh(){try{const d=await api('/api/voice-clone/status');const local=d.local_engine_ready;$('localChip').textContent=local?'جاهز':'غير مجهز';$('localChip').className='chip '+(local?'ok':'bad');$('cloudChip').textContent=d.elevenlabs_key_set?'المفتاح موجود':'المفتاح غير موجود';$('cloudChip').className='chip '+(d.elevenlabs_key_set?'ok':'bad');const s=d.local_setup||{};if(s.state==='installing'){busy('setup',true);status('setupStatus',`${s.message} ${s.progress||0}%`,'wait')}else{busy('setup',false);if(s.state==='ready')status('setupStatus',s.message,'ok');else if(s.state==='failed')status('setupStatus',`${s.message} ${s.error||''}`,'err')}selectedProfile=selectedProfile||localStorage.getItem('clone:selected')||'';renderProfiles(d.profiles||[])}catch(e){status('setupStatus',e.message,'err')}}
+  $('setupLocal').onclick=async()=>{if(!$('licenseConsent').checked)return status('setupStatus','وافق على ترخيص XTTS أولًا.','err');try{busy('setup',true);const fd=new FormData();fd.append('accept_model_license','true');const d=await api('/api/voice-clone/setup-local',{method:'POST',body:fd});status('setupStatus',d.message,'wait');setTimeout(refresh,1500)}catch(e){busy('setup',false);status('setupStatus',e.message,'err')}};
+  $('createProfile').onclick=async()=>{const files=[...$('samples').files];if(!files.length)return status('profileStatus','اختر عينة صوت واحدة على الأقل.','err');if(!$('consent').checked)return status('profileStatus','يجب تأكيد موافقة صاحب الصوت.','err');try{busy('profile',true);status('profileStatus','جاري رفع العينات وتنقيتها وفحص جودتها...','wait');const fd=new FormData();files.forEach(f=>fd.append('samples',f));fd.append('name',$('profileName').value||'صوتي');fd.append('owner_name',$('ownerName').value||'صاحب الصوت');fd.append('consent','true');fd.append('consent_statement',$('consentStatement').value);const d=await api('/api/voice-clone/profiles',{method:'POST',body:fd});selectedProfile=d.profile.id;localStorage.setItem('clone:selected',selectedProfile);status('profileStatus',`${d.message} الجودة: ${d.profile.quality_label} ${d.profile.quality_score}%`,'ok');await refresh()}catch(e){status('profileStatus',e.message,'err')}finally{busy('profile',false)}};
+  $('refreshProfiles').onclick=refresh;
+  $('deleteProfile').onclick=async()=>{if(!selectedProfile)return;if(!confirm('حذف ملف الصوت والعينات المحلية؟ لن تُحذف الأصوات الناتجة سابقًا.'))return;try{await api('/api/voice-clone/profiles/'+selectedProfile,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:true})});selectedProfile='';localStorage.removeItem('clone:selected');status('profileStatus','تم حذف ملف الصوت المحلي.','ok');await refresh()}catch(e){status('profileStatus',e.message,'err')}};
+  $('generate').onclick=async()=>{if(!selectedProfile)return status('generateStatus','حدد ملف صوت من القائمة أولًا.','err');const text=$('text').value.trim();if(text.length<2)return status('generateStatus','اكتب النص المطلوب.','err');try{busy('generate',true);$('result').classList.remove('show');status('generateStatus',$('provider').value==='local'?'جاري تشغيل XTTS وإنتاج الصوت...':'جاري إنشاء أو استخدام نسخة Human Pro ثم إنتاج الصوت...','wait');const d=await api('/api/voice-clone/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile_id:selectedProfile,text,provider:$('provider').value,language:$('language').value,speed:Number($('speed').value),style:$('style').value})});$('audio').src=d.url+'?t='+Date.now();$('download').href=d.url;$('projectPath').textContent=d.desktop_project;lastProject=d.desktop_project;$('result').classList.add('show');status('generateStatus',d.message+' الجودة: '+d.quality,'ok')}catch(e){status('generateStatus',e.message,'err')}finally{busy('generate',false)}};
+  $('openFolder').onclick=async()=>{if(!lastProject)return;try{const fd=new FormData();fd.append('path',lastProject);await api('/api/voice-clone/open-project',{method:'POST',body:fd})}catch(e){status('generateStatus',e.message,'err')}};
+  $('text').oninput=()=>$('count').textContent=$('text').value.length;$('speed').oninput=()=>$('speedValue').textContent='×'+Number($('speed').value).toFixed(2);
+  refresh();setInterval(refresh,2500);
+</script>
+</body>
+</html>
