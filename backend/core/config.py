@@ -41,7 +41,8 @@ for directory in [DATA_DIR, MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, 
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "استوديو ابن الواقدي"
-APP_VERSION = "4.3.0"
+APP_VERSION = "5.0.0"
+APP_RELEASE = "Unified Stable"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
@@ -56,4 +57,8 @@ ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "80"))
 SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
-ENGINE_PRIORITY = ["gemini", "elevenlabs", "edge", "piper", "coqui", "kokoro", "melotts", "styletts2"]
+
+# Automatic selection is cloud-only. Free/local engines remain installed and can be
+# selected manually from their explicit UI options, but they are never automatic fallbacks.
+ENGINE_PRIORITY = ["gemini", "elevenlabs"]
+MANUAL_ONLY_ENGINES = ["edge", "piper", "coqui", "kokoro", "melotts", "styletts2"]
