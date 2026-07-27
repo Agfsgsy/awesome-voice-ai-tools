@@ -1,4 +1,4 @@
-"""نقطة تشغيل التطبيق الرئيسية."""
+"""نقطة تشغيل استوديو ابن الواقدي — الإصدار الموحد الثابت."""
 from __future__ import annotations
 
 import sys
@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.routes import router
@@ -15,7 +16,6 @@ from backend.api.gemini_routes import router as gemini_router
 from backend.api.studio_routes import router as studio_router
 from backend.api.studio_pro_routes import router as studio_pro_router
 from backend.api.producer_routes import router as producer_router
-from backend.api.interview_pro_routes import router as interview_pro_router
 from backend.api.dialogue_ultra_routes import router as dialogue_ultra_router
 from backend.api import dialogue_audio_runtime as _dialogue_audio_runtime
 from backend.api.dialogue_safe_routes import router as dialogue_safe_router
@@ -29,6 +29,10 @@ from backend.api import gemini_session_runtime as _gemini_session_runtime
 from backend.api import gemini_session_patch as _gemini_session_patch
 from backend.api import gemini_single_probe_runtime as _gemini_single_probe_runtime
 from backend.api.gemini_session_runtime import router as gemini_session_router
+from backend.api.unified_studio_routes import (
+    interview_router as unified_interview_router,
+    studio_router as unified_studio_router,
+)
 from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
 from backend.core.logger import get_logger
 
@@ -37,19 +41,23 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting %s v%s", APP_NAME, APP_VERSION)
+    logger.info("Starting %s v%s — Unified Stable", APP_NAME, APP_VERSION)
     yield
     logger.info("Shutting down %s", APP_NAME)
 
 
 app = FastAPI(
     title=APP_NAME,
-    description="استوديو ابن الواقدي: إنتاج صوت عربي احترافي بسياسة Cloud-Only، جلسة Gemini ثابتة، فحص صوت واحد منخفض الاستهلاك، اعتماد المفتاح من أول إنتاج ناجح، وحماية من كثرة الطلبات.",
+    description=(
+        "استوديو ابن الواقدي: إصدار موحد ثابت، Cloud-Only، جلسات Gemini محفوظة، "
+        "مقابلات قابلة للاستكمال، وعقود JSON صريحة تمنع أخطاء query.req."
+    ),
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+app.state.release_channel = "unified-stable"
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,6 +66,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.include_router(router)
 app.include_router(human_pro_router)
 app.include_router(gemini_router)
@@ -65,10 +74,49 @@ app.include_router(gemini_session_router)
 app.include_router(studio_router)
 app.include_router(studio_pro_router)
 app.include_router(producer_router)
-app.include_router(interview_pro_router)
+# The unified interview router replaces the old router registration while keeping
+# the same public URLs and implementation. Its Body(...) declarations prevent the
+# packaged application from interpreting payloads as query parameters.
+app.include_router(unified_interview_router)
+app.include_router(unified_studio_router)
 app.include_router(dialogue_ultra_router)
 app.include_router(dialogue_safe_router)
 app.include_router(dashboard_router)
+
+
+def _validate_api_contracts() -> None:
+    """Fail fast if a future change reintroduces duplicate or query-body routes."""
+    seen: set[tuple[str, str]] = set()
+    required_body_routes = {
+        ("/api/interview-pro/scenario", "POST"),
+        ("/api/interview-pro/render", "POST"),
+        ("/api/studio/v1/interviews/scenario", "POST"),
+        ("/api/studio/v1/interviews/render", "POST"),
+    }
+    found: set[tuple[str, str]] = set()
+
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        for method in route.methods or set():
+            key = (route.path, method.upper())
+            if key in seen:
+                raise RuntimeError(f"Duplicate API route detected: {method} {route.path}")
+            seen.add(key)
+            if key in required_body_routes:
+                found.add(key)
+                query_names = {field.name for field in route.dependant.query_params}
+                if "req" in query_names or "payload" in query_names:
+                    raise RuntimeError(f"Invalid query-body contract: {method} {route.path}")
+                if not route.dependant.body_params:
+                    raise RuntimeError(f"Missing JSON body contract: {method} {route.path}")
+
+    missing = required_body_routes - found
+    if missing:
+        raise RuntimeError(f"Missing unified API routes: {sorted(missing)}")
+
+
+_validate_api_contracts()
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
@@ -78,4 +126,10 @@ if static_dir.exists():
 if __name__ == "__main__":
     logger.info("Running on http://%s:%s", APP_HOST, APP_PORT)
     target = app if getattr(sys, "frozen", False) else "main:app"
-    uvicorn.run(target, host=APP_HOST, port=APP_PORT, reload=APP_DEBUG and not getattr(sys, "frozen", False), log_level="info")
+    uvicorn.run(
+        target,
+        host=APP_HOST,
+        port=APP_PORT,
+        reload=APP_DEBUG and not getattr(sys, "frozen", False),
+        log_level="info",
+    )
