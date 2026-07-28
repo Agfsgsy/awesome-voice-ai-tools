@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import sys
 from contextlib import asynccontextmanager
 
@@ -28,14 +27,14 @@ from backend.api.yemeni_creative_routes import router as yemeni_creative_router
 from backend.api.yemeni_creative_hotfix import router as yemeni_creative_safe_router
 from backend.api.yemeni_ui_runtime import router as yemeni_ui_router
 from backend.api.voice_clone_routes import router as voice_clone_router
-_voice_clone_repair_runtime = importlib.import_module("backend.api.voice_clone_repair_runtime")
+import backend.api.voice_clone_repair_runtime as _voice_clone_repair_runtime
 from backend.api.voice_clone_fast_routes import router as voice_clone_fast_router
 from backend.api.voice_clone_xtts_runtime import router as voice_clone_runtime_router
-_voice_clone_download_resume_patch = importlib.import_module("backend.api.voice_clone_download_resume_patch")
-_voice_clone_download_source_fix = importlib.import_module("backend.api.voice_clone_download_source_fix")
-_voice_clone_98_finalize_patch = importlib.import_module("backend.api.voice_clone_98_finalize_patch")
-_voice_clone_auto_finalize_patch = importlib.import_module("backend.api.voice_clone_auto_finalize_patch")
-_voice_clone_fast_runtime_patch = importlib.import_module("backend.api.voice_clone_fast_runtime_patch")
+import backend.api.voice_clone_download_resume_patch as _voice_clone_download_resume_patch
+import backend.api.voice_clone_download_source_fix as _voice_clone_download_source_fix
+import backend.api.voice_clone_98_finalize_patch as _voice_clone_98_finalize_patch
+import backend.api.voice_clone_auto_finalize_patch as _voice_clone_auto_finalize_patch
+import backend.api.voice_clone_fast_runtime_patch as _voice_clone_fast_runtime_patch
 from backend.api.voice_clone_ui_runtime import router as voice_clone_ui_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
