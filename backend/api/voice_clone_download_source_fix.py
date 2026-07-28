@@ -1,11 +1,12 @@
 """Correct generated XTTS source and activate safe model finalization."""
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
-from backend.api import voice_clone_download_resume_patch as resume
-from backend.api import voice_clone_routes as clone
-from backend.api import voice_clone_xtts_runtime as xtts
+resume = importlib.import_module("backend.api.voice_clone_download_resume_patch")
+clone = importlib.import_module("backend.api.voice_clone_routes")
+xtts = importlib.import_module("backend.api.voice_clone_xtts_runtime")
 
 
 def _patched_model_source(source: str, model_dir: Path) -> str:
@@ -30,5 +31,5 @@ clone._worker_source = resume._worker_source_resumable
 xtts._server_source = resume._server_source_resumable
 
 # Imported last so these additive patches wrap the corrected generated source.
-from backend.api import voice_clone_98_finalize_patch as _voice_clone_98_finalize_patch  # noqa: E402,F401
-from backend.api import voice_clone_auto_finalize_patch as _voice_clone_auto_finalize_patch  # noqa: E402,F401
+_voice_clone_98_finalize_patch = importlib.import_module("backend.api.voice_clone_98_finalize_patch")
+_voice_clone_auto_finalize_patch = importlib.import_module("backend.api.voice_clone_auto_finalize_patch")
