@@ -25,10 +25,12 @@ from backend.api.dashboard_routes import router as dashboard_router
 from backend.api.ultimate_studio_routes import router as ultimate_studio_router
 from backend.api.yemeni_creative_routes import router as yemeni_creative_router
 from backend.api.yemeni_creative_hotfix import router as yemeni_creative_safe_router
+from backend.api.yemeni_ui_runtime import router as yemeni_ui_router
 from backend.api.voice_clone_routes import router as voice_clone_router
 from backend.api import voice_clone_repair_runtime as _voice_clone_repair_runtime
 from backend.api.voice_clone_fast_routes import router as voice_clone_fast_router
 from backend.api.voice_clone_xtts_runtime import router as voice_clone_runtime_router
+from backend.api import voice_clone_download_resume_patch as _voice_clone_download_resume_patch
 from backend.api import voice_clone_fast_runtime_patch as _voice_clone_fast_runtime_patch
 from backend.api.voice_clone_ui_runtime import router as voice_clone_ui_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
@@ -101,11 +103,12 @@ app.include_router(dashboard_router)
 app.include_router(ultimate_studio_router)
 app.include_router(yemeni_creative_router)
 app.include_router(yemeni_creative_safe_router)
+# These explicit UI routes are registered before StaticFiles. They preserve the saved
+# 6.2.0 HTML and inject only safe JavaScript helpers at response time.
+app.include_router(yemeni_ui_router)
 app.include_router(voice_clone_router)
 app.include_router(voice_clone_fast_router)
 app.include_router(voice_clone_runtime_router)
-# This explicit route is registered before StaticFiles. It serves the saved 6.2.0
-# HTML unchanged and injects only the fast-clone JavaScript patch at runtime.
 app.include_router(voice_clone_ui_router)
 
 # Replace only the existing GET audio-download handler. No generated file is
