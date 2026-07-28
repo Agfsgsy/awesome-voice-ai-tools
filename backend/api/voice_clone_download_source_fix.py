@@ -1,4 +1,4 @@
-"""Correct indentation when the resumable patch rewrites generated XTTS workers."""
+"""Correct generated XTTS source and activate safe model finalization."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,3 +28,7 @@ def _patched_model_source(source: str, model_dir: Path) -> str:
 resume._patched_model_source = _patched_model_source
 clone._worker_source = resume._worker_source_resumable
 xtts._server_source = resume._server_source_resumable
+
+# Imported last so it wraps the corrected generated source and changes only the
+# stuck 98% finalization plus low-VRAM device selection.
+from backend.api import voice_clone_98_finalize_patch as _voice_clone_98_finalize_patch  # noqa: E402,F401
