@@ -31,6 +31,7 @@ from backend.api import voice_clone_repair_runtime as _voice_clone_repair_runtim
 from backend.api.voice_clone_fast_routes import router as voice_clone_fast_router
 from backend.api.voice_clone_xtts_runtime import router as voice_clone_runtime_router
 from backend.api import voice_clone_download_resume_patch as _voice_clone_download_resume_patch
+from backend.api import voice_clone_download_source_fix as _voice_clone_download_source_fix
 from backend.api import voice_clone_fast_runtime_patch as _voice_clone_fast_runtime_patch
 from backend.api.voice_clone_ui_runtime import router as voice_clone_ui_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
