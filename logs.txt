@@ -1,0 +1,23 @@
+INFO: Discovered 4 plugins: ['religious_content', 'audio_effects', 'example_plugin', 'stt_plugin']
+INFO: Loaded plugin: religious_content
+INFO: Loaded plugin: audio_effects
+INFO: Loaded plugin: example_plugin
+INFO: Loaded plugin: stt_plugin
+INFO: Registered TTS plugin: piper
+INFO: Registered TTS plugin: coqui
+INFO: Registered TTS plugin: kokoro
+INFO: Registered TTS plugin: melotts
+INFO: Registered TTS plugin: styletts2
+INFO: TTS Registry initialized with 5 plugins: ['piper', 'coqui', 'kokoro', 'melotts', 'styletts2']
+INFO: Running on http://0.0.0.0:8000
+INFO:     Started server process [70507]
+INFO:     Waiting for application startup.
+INFO: Starting Voice AI Studio Arabic v2.0.0
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:33036 - "GET / HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO: Shutting down Voice AI Studio Arabic
+INFO:     Application shutdown complete.
+INFO:     Finished server process [70507]
