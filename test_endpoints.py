@@ -49,8 +49,8 @@ def run_post_tests():
     # Simple JSON POSTs
     json_endpoints = [
         ("/api/settings", {"gemini_tts_model": "test-model"}),
-        ("/api/tts", {"text": "مرحبا", "engine": "fallback"}),
-        ("/api/speech", {"text": "مرحبا", "engine": "fallback"}),
+        ("/api/tts", {"text": "مرحبا", "engine": "auto"}),
+        ("/api/speech", {"text": "مرحبا", "engine": "auto"}),
         ("/api/plugins/check", {"engine": "piper"}),
         ("/api/plugins/install", {"engine": "piper"})
     ]

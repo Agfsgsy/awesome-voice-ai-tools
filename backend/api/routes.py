@@ -213,7 +213,7 @@ async def api_settings():
     return {
         "gemini_api_key_set": bool(GEMINI_API_KEY),
         "gemini_tts_model": GEMINI_TTS_MODEL,
-        "default_engine": tts_registry.auto_select_engine() or "fallback",
+        "default_engine": tts_registry.auto_select_engine() or "auto",
         "is_termux": IS_TERMUX,
         "is_colab": IS_COLAB,
         "app_host": APP_HOST,
@@ -364,7 +364,7 @@ async def api_tts(req: TTSRequest):
         if selected:
             req.engine = selected
         else:
-            req.engine = "fallback"
+            req.engine = selected or "auto"
 
     # Try TTS plugin system first
     plugin = tts_registry.get_plugin(req.engine)
