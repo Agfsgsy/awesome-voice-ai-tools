@@ -1,9 +1,11 @@
 """Create the XTTS ready marker automatically when all downloaded files are valid."""
 from __future__ import annotations
 
-from backend.api import voice_clone_98_finalize_patch as finalizer
-from backend.api import voice_clone_download_resume_patch as resume
-from backend.api import voice_clone_repair_runtime as repair
+import importlib
+
+finalizer = importlib.import_module("backend.api.voice_clone_98_finalize_patch")
+resume = importlib.import_module("backend.api.voice_clone_download_resume_patch")
+repair = importlib.import_module("backend.api.voice_clone_repair_runtime")
 
 
 def _finalize_existing_download() -> None:
