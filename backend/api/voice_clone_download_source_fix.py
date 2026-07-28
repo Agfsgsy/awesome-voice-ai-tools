@@ -29,6 +29,6 @@ resume._patched_model_source = _patched_model_source
 clone._worker_source = resume._worker_source_resumable
 xtts._server_source = resume._server_source_resumable
 
-# Imported last so it wraps the corrected generated source and changes only the
-# stuck 98% finalization plus low-VRAM device selection.
+# Imported last so these additive patches wrap the corrected generated source.
 from backend.api import voice_clone_98_finalize_patch as _voice_clone_98_finalize_patch  # noqa: E402,F401
+from backend.api import voice_clone_auto_finalize_patch as _voice_clone_auto_finalize_patch  # noqa: E402,F401
