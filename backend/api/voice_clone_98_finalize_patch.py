@@ -7,15 +7,16 @@ generated audio file and existing interface. It changes only two runtime details
 """
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from backend.api import voice_clone_download_resume_patch as resume
-from backend.api import voice_clone_routes as clone
-from backend.api import voice_clone_xtts_runtime as xtts
+resume = importlib.import_module("backend.api.voice_clone_download_resume_patch")
+clone = importlib.import_module("backend.api.voice_clone_routes")
+xtts = importlib.import_module("backend.api.voice_clone_xtts_runtime")
 
 _ORIGINAL_RUN_SETUP = resume._run_resumable_model_setup
 _ORIGINAL_SERVER_SOURCE = xtts._server_source
@@ -39,8 +40,6 @@ def _validate_downloaded_model(model_dir: Path) -> str:
         raise RuntimeError(f"XTTS configuration validation failed: {type(exc).__name__}: {exc}") from exc
     if not isinstance(parsed_config, dict) or not parsed_config:
         raise RuntimeError("XTTS config.json is empty or invalid.")
-    # Modern PyTorch checkpoints are ZIP archives. Older checkpoints can be pickle
-    # streams, so a non-ZIP file is accepted after the strong size checks above.
     if zipfile.is_zipfile(model):
         try:
             with zipfile.ZipFile(model) as archive:
@@ -115,7 +114,6 @@ def _run_setup_without_heavy_load(python: str) -> tuple[Path, str]:
             )
             return model_dir, detail
         except Exception:
-            # Let snapshot_download repair a corrupt or incomplete file in place.
             pass
     model_dir, detail = _ORIGINAL_RUN_SETUP(python)
     validated = _validate_downloaded_model(model_dir)
@@ -131,7 +129,6 @@ def _low_vram_server_source() -> str:
             gpu_bytes = int(torch.cuda.get_device_properties(0).total_memory)
         except Exception:
             gpu_bytes = 0
-    # XTTS can be unstable on 4 GB laptop GPUs. Use CUDA only with at least 6 GB.
     device = "cuda" if torch.cuda.is_available() and gpu_bytes >= 6 * 1024**3 else "cpu"
     if device == "cpu":
         try:
@@ -143,7 +140,6 @@ def _low_vram_server_source() -> str:
     return source.replace(old, replacement)
 
 
-# Apply only runtime functions. No user file or UI file is touched.
 resume._download_worker_source = _light_download_worker_source
 resume._run_resumable_model_setup = _run_setup_without_heavy_load
 xtts._server_source = _low_vram_server_source
