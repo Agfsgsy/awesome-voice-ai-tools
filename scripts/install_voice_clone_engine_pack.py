@@ -21,6 +21,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from backend.api import voice_clone_v7_setup_runtime as _voice_clone_v7_setup_runtime  # noqa: E402,F401
 from backend.core.config import DATA_DIR  # noqa: E402
 
 PACK_ROOT = DATA_DIR / "voice_engine_pack_v7"
