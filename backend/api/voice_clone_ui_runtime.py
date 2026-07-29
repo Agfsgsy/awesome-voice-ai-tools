@@ -2,6 +2,7 @@
 
 Stored HTML files are not deleted or redesigned. Runtime responses only update the
 visible release label and inject safe JavaScript helpers before StaticFiles.
+Build marker: Professional Studio 7.0.0.
 """
 from __future__ import annotations
 
