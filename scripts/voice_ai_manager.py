@@ -2,8 +2,8 @@
 """Install, inspect, and manage isolated official voice/music engine runtimes.
 
 The script never downloads every multi-gigabyte model without an explicit
-engine selection. It creates isolated environments and clones only official
-repositories selected by the user.
+engine selection. XTTS is installed into the main environment because it has a
+native adapter; conflicting engines are kept in isolated runtime environments.
 """
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def doctor() -> int:
         "librosa": importlib.util.find_spec("librosa") is not None,
         "speechbrain": importlib.util.find_spec("speechbrain") is not None,
         "faster_whisper": importlib.util.find_spec("faster_whisper") is not None,
-        "runtime_dirs": {name: (RUNTIMES / name).exists() for name in ENGINES},
+        "runtime_dirs": {name: (RUNTIMES / name).exists() for name in ENGINES if name != "xtts"},
     }
     try:
         import torch
@@ -64,9 +64,20 @@ def doctor() -> int:
     return 0 if report["ffmpeg"] and report["ffprobe"] else 1
 
 
+def install_xtts() -> None:
+    if sys.version_info >= (3, 12):
+        print("Warning: Coqui TTS may not support this Python version. Python 3.10 or 3.11 is recommended.")
+    run([sys.executable, "-m", "pip", "install", "--upgrade", "pip", "wheel", "setuptools"])
+    run([sys.executable, "-m", "pip", "install", "TTS>=0.22.0", "torch>=2.1", "torchaudio>=2.1"])
+    print("XTTS is installed in the main environment and will be detected by the native adapter.")
+
+
 def install(engine: str) -> None:
     if engine not in ENGINES:
         raise SystemExit(f"Unknown engine: {engine}")
+    if engine == "xtts":
+        install_xtts()
+        return
     if not shutil.which("git"):
         raise SystemExit("git is required")
     destination = RUNTIMES / engine
