@@ -4,7 +4,7 @@ services:
   voice-ai:
     build: .
     ports:
-      - "7860:8000"
+      - "8000:8000"
     volumes:
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs

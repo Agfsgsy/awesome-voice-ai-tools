@@ -1,55 +1,20 @@
 #!/bin/bash
-# Voice AI Studio Arabic - Installation Script
-set -e
+# install.sh for Linux and macOS
 
-echo "=== Voice AI Studio Arabic - Installation ==="
-
-# Check Python
-if ! command -v python3 &> /dev/null; then
-    echo "[ERROR] Python 3 not found"
-    exit 1
+echo "Installing ffmpeg..."
+if [ "$(uname)" == "Darwin" ]; then
+    brew install ffmpeg
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    sudo apt update && sudo apt install -y ffmpeg python3-venv
 fi
 
-PYTHON=python3
-echo "[OK] Python: $($PYTHON --version)"
+echo "Setting up Python virtual environment..."
+python3 -m venv .venv
+source .venv/bin/activate
 
-# Check if Termux
-IS_TERMUX=false
-if [ -d "/data/data/com.termux/files/usr" ]; then
-    IS_TERMUX=true
-    echo "[INFO] Termux detected"
-    REQ_FILE="requirements-termux.txt"
-else
-    REQ_FILE="requirements.txt"
-fi
+echo "Installing Python dependencies..."
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install -r requirements-ai.txt
 
-# Create venv
-if [ ! -d ".venv" ]; then
-    echo "[INFO] Creating virtual environment..."
-    $PYTHON -m venv .venv
-fi
-
-# Activate venv
-if [ "$IS_TERMUX" = true ]; then
-    source .venv/bin/activate
-else
-    source .venv/bin/activate
-fi
-
-# Upgrade pip
-echo "[INFO] Upgrading pip..."
-pip install --upgrade pip wheel setuptools
-
-# Install requirements
-echo "[INFO] Installing requirements from $REQ_FILE..."
-pip install -r "$REQ_FILE"
-
-# Create directories
-for dir in uploads outputs cache logs models voices downloads config; do
-    mkdir -p "$dir"
-done
-
-echo ""
-echo "=== Installation Complete ==="
-echo "Run: ./scripts/run.sh"
-echo "URL: http://localhost:8000"
+echo "Setup complete! Run 'source .venv/bin/activate && python main.py' to start the server."
