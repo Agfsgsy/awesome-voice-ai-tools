@@ -41,8 +41,8 @@ for directory in [DATA_DIR, MODELS_DIR, VOICES_DIR, DOWNLOADS_DIR, UPLOADS_DIR, 
     directory.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "استوديو ابن الواقدي"
-APP_VERSION = "6.2.0"
-APP_RELEASE = "Voice Clone Pro"
+APP_VERSION = "7.0.0"
+APP_RELEASE = "Voice Clone Multi-Engine Pro"
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() == "true"
@@ -56,10 +56,10 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "80"))
-SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
+SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".webm"]
 
-# The default path never requires a paid API key. Edge provides the most natural
-# Arabic voices, while Piper is the local/offline fallback after its model is cached.
-FREE_ENGINES = ["edge", "piper"]
+FREE_ENGINES = ["edge", "piper", "xtts"]
 CLOUD_ENGINES = ["gemini", "elevenlabs", "azure", "google_cloud", "openai"]
+VOICE_CLONE_ENGINES = ["xtts", "openvoice", "f5tts", "gpt_sovits", "cosyvoice", "elevenlabs"]
+SINGING_ENGINES = ["rvc", "ace_step", "yue"]
 ENGINE_PRIORITY = [*FREE_ENGINES, *CLOUD_ENGINES]
