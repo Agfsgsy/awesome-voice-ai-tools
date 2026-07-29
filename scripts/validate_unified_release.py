@@ -1,4 +1,4 @@
-"""Build-time validation for Voice Clone Pro 6.2.0 and additive repairs."""
+"""Build-time validation for Voice Clone Multi-Engine Pro 7.0 and preserved tools."""
 from __future__ import annotations
 
 import json
@@ -14,10 +14,10 @@ if str(ROOT) not in sys.path:
 
 from fastapi.routing import APIRoute
 
-from backend.core.config import APP_VERSION, CLOUD_ENGINES, ENGINE_PRIORITY, FREE_ENGINES
+from backend.core.config import APP_RELEASE, APP_VERSION, CLOUD_ENGINES, ENGINE_PRIORITY, FREE_ENGINES
 from main import app
 
-EXPECTED_VERSION = "6.2.0"
+EXPECTED_VERSION = "7.0.0"
 
 
 def fail(message: str) -> None:
@@ -34,6 +34,8 @@ def _text(path: str) -> str:
 def _validate_versions() -> None:
     if APP_VERSION != EXPECTED_VERSION:
         fail(f"APP_VERSION is {APP_VERSION}, expected {EXPECTED_VERSION}")
+    if APP_RELEASE != "Voice Clone Multi-Engine Pro":
+        fail(f"APP_RELEASE is {APP_RELEASE}, expected Voice Clone Multi-Engine Pro")
     project = tomllib.loads(_text("pyproject.toml"))
     if project.get("project", {}).get("version") != EXPECTED_VERSION:
         fail("pyproject.toml does not use the release version")
@@ -42,11 +44,14 @@ def _validate_versions() -> None:
     contracts = {
         "setup.py": f'version="{EXPECTED_VERSION}"',
         "installer/VoiceAIStudio.iss": f'#define MyAppVersion "{EXPECTED_VERSION}"',
-        "frontend/static/studio_shell.html": f"VERSION='{EXPECTED_VERSION}'",
+        # The stored 6.2 visual files remain preserved. Runtime routes inject the
+        # current 7.0 label without deleting or redesigning the original interface.
+        "frontend/static/studio_shell.html": "VERSION='6.2.0'",
         "frontend/static/studio_shell_preserved.html": "Professional Studio 6.2.0 — Preserved UI",
         "frontend/static/voice_clone.html": "الإصدار 6.2.0",
         "desktop_app.py": "/static/studio_shell_preserved.html",
-        "backend/core/config.py": 'APP_RELEASE = "Voice Clone Pro"',
+        "backend/core/config.py": 'APP_RELEASE = "Voice Clone Multi-Engine Pro"',
+        "backend/api/voice_clone_ui_runtime.py": "Professional Studio 7.0.0",
     }
     for path, marker in contracts.items():
         if marker not in _text(path):
@@ -89,8 +94,14 @@ def _validate_api_contracts() -> None:
         ("/api/voice-clone-runtime/status", "GET"),
         ("/api/voice-clone-runtime/warm", "POST"),
         ("/static/voice_clone.html", "GET"),
+        ("/static/studio_shell_preserved.html", "GET"),
         ("/api/studio-pro/clone", "POST"),
         ("/api/yemeni-creative-safe/health", "GET"),
+        ("/api/voice-ai/engines", "GET"),
+        ("/api/voice-ai/setup/xtts", "POST"),
+        ("/api/voice-ai/setup/all", "POST"),
+        ("/api/voice-ai/audio/clone/ensemble", "POST"),
+        ("/api/voice-ai/song/generate", "POST"),
     }
     found: set[tuple[str, str]] = set()
     duplicates: dict[tuple[str, str], list[str]] = defaultdict(list)
@@ -126,7 +137,10 @@ def _validate_voice_clone() -> None:
     fast = _text("backend/api/voice_clone_fast_routes.py")
     fast_patch = _text("backend/api/voice_clone_fast_runtime_patch.py")
     xtts_runtime = _text("backend/api/voice_clone_xtts_runtime.py")
+    setup_v7 = _text("backend/api/voice_clone_v7_setup_runtime.py")
+    engine_suite = _text("backend/api/voice_engine_suite_routes.py")
     ui_patch = _text("frontend/static/voice_clone_fast_patch.js")
+    ui_v7 = _text("frontend/static/voice_clone_v7_patch.js")
     ui_runtime = _text("backend/api/voice_clone_ui_runtime.py")
     frontend = _text("frontend/static/voice_clone.html")
     shell = _text("frontend/static/studio_shell.html")
@@ -134,6 +148,8 @@ def _validate_voice_clone() -> None:
     legacy = _text("backend/api/studio_pro_routes.py")
     coqui = _text("backend/plugins/coqui_plugin.py")
     main = _text("main.py")
+    installer = _text("scripts/install_voice_clone_engine_pack.py")
+    updater = _text("UPDATE_AND_INSTALL_VOICE_CLONE_PRO_7.bat")
 
     for marker in (
         "consent_confirmed",
@@ -193,6 +209,27 @@ def _validate_voice_clone() -> None:
             fail(f"Persistent XTTS runtime is missing: {marker}")
 
     for marker in (
+        "cu124",
+        "nvidia-smi",
+        "coqui-tts==0.27.5",
+        "model-ready",
+        "vc._setup_local_engine = _setup_local_engine_v7",
+    ):
+        if marker not in setup_v7:
+            fail(f"Voice Clone Pro 7 XTTS setup is missing: {marker}")
+
+    for marker in (
+        "ENGINE_NOT_AVAILABLE",
+        "status_code=503",
+        "/api/voice-ai/setup/xtts",
+        "candidate_count",
+        "REMOTE_ENGINES",
+        "exact_match_guaranteed",
+    ):
+        if marker not in engine_suite:
+            fail(f"Voice Clone Pro 7 engine orchestration is missing: {marker}")
+
+    for marker in (
         "/api/voice-clone-fast/generate",
         "/api/voice-clone-runtime/warm",
         "gemini_vertex",
@@ -202,8 +239,17 @@ def _validate_voice_clone() -> None:
         if marker not in ui_patch:
             fail(f"Fast clone UI patch is missing: {marker}")
 
-    if "voice_clone_fast_patch.js" not in ui_runtime or "html.replace" not in ui_runtime:
-        fail("The preserved clone page is not receiving the additive fast patch")
+    for marker in (
+        "/api/voice-ai/engines",
+        "/api/voice-ai/setup/xtts",
+        "/api/voice-ai/setup/all",
+        "Voice Clone Multi-Engine Pro 7.0",
+    ):
+        if marker not in ui_v7:
+            fail(f"Voice Clone Pro 7 UI patch is missing: {marker}")
+
+    if "voice_clone_fast_patch.js" not in ui_runtime or "voice_clone_v7_patch.js" not in ui_runtime:
+        fail("The preserved clone page is not receiving the additive fast and v7 patches")
 
     for marker in (
         "/api/voice-clone/status",
@@ -224,6 +270,8 @@ def _validate_voice_clone() -> None:
         "voice_clone_fast_router",
         "voice_clone_runtime_router",
         "voice_clone_ui_router",
+        "voice_engine_suite_router",
+        "voice_clone_v7_setup_runtime",
     ):
         if marker not in main:
             fail(f"A required clone router/runtime is not mounted: {marker}")
@@ -233,6 +281,27 @@ def _validate_voice_clone() -> None:
         fail("Coqui plugin still ignores the reference audio")
     if "async def clone(" not in coqui:
         fail("Coqui plugin does not expose a real clone method")
+
+    for marker in (
+        "OpenVoice.git",
+        "F5-TTS.git",
+        "GPT-SoVITS.git",
+        "CosyVoice.git",
+        "Retrieval-based-Voice-Conversion-WebUI.git",
+        "ACE-Step.git",
+        "YuE.git",
+        "--accept-licenses",
+    ):
+        if marker not in installer:
+            fail(f"The isolated engine installer is missing: {marker}")
+    for marker in (
+        "git stash push -u",
+        "agent/voice-clone-pro-v7",
+        "install_voice_clone_engine_pack.py",
+        "verify_voice_clone_v7.py",
+    ):
+        if marker not in updater:
+            fail(f"The Windows updater is missing: {marker}")
 
 
 def _validate_yemeni_features() -> None:
@@ -291,9 +360,9 @@ def main() -> None:
     _validate_api_contracts()
     _validate_voice_clone()
     _validate_yemeni_features()
-    print("[SUCCESS] Voice Clone Pro 6.2.0 fast routing and persistent XTTS are connected.")
-    print("[SUCCESS] The designed interface and all old tools remain available.")
-    print("[SUCCESS] Current shila/zamil music contracts and clone consent protections are valid.")
+    print("[SUCCESS] Voice Clone Multi-Engine Pro 7.0 routes and isolated XTTS setup are connected.")
+    print("[SUCCESS] The preserved 6.2 interface and all old tools remain available.")
+    print("[SUCCESS] Shila/zamil contracts and clone consent protections remain valid.")
 
 
 if __name__ == "__main__":
