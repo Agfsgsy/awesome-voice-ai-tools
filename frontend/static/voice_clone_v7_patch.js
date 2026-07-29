@@ -1,6 +1,12 @@
 (() => {
   "use strict";
 
+  // Documented API contracts for Voice Clone Multi-Engine Pro 7.0:
+  // GET /api/voice-ai/engines
+  // POST /api/voice-ai/setup/xtts
+  // POST /api/voice-ai/setup/all
+  // POST /api/voice-ai/audio/clone/ensemble
+  // POST /api/voice-ai/song/generate
   const API = "/api/voice-ai";
   const PANEL_ID = "voice-clone-v7-engine-panel";
 
