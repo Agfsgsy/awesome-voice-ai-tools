@@ -11,6 +11,7 @@ import os
 import tempfile
 import wave
 from array import array
+from functools import lru_cache
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -32,12 +33,12 @@ def _pcm(path: Path) -> tuple[array, int]:
 
 
 def estimate_pitch_hz(path: Path) -> float | None:
-    """Estimate median F0 from a bounded set of voiced frames using autocorrelation."""
+    """Estimate median F0 from a small, bounded set of voiced frames."""
     samples, rate = _pcm(path)
     if rate <= 0 or len(samples) < rate // 2:
         return None
-    frame_size = max(480, int(rate * 0.040))
-    hop = max(frame_size, len(samples) // 48)
+    frame_size = max(480, int(rate * 0.030))
+    hop = max(frame_size, len(samples) // 18)
     minimum_lag = max(1, int(rate / 420.0))
     maximum_lag = min(frame_size - 2, int(rate / 65.0))
     pitches: list[float] = []
@@ -90,12 +91,20 @@ def _pitch_similarity(left: float | None, right: float | None) -> float | None:
     return max(0.0, 1.0 - semitone_distance / 12.0)
 
 
-def _reference_profile(paths: list[Path]) -> dict[str, float | None]:
+def _cache_key(paths: list[Path]) -> tuple[tuple[str, int, int], ...]:
+    return tuple(
+        (str(path.resolve()), int(path.stat().st_mtime_ns), int(path.stat().st_size))
+        for path in paths
+        if path.exists()
+    )
+
+
+@lru_cache(maxsize=64)
+def _reference_profile_cached(key: tuple[tuple[str, int, int], ...]) -> dict[str, float | None]:
+    paths = [Path(item[0]) for item in key]
     metrics = []
     pitches = []
     for path in paths:
-        if not path.exists():
-            continue
         report = analyze_wav(path)
         metrics.append(report)
         pitch = estimate_pitch_hz(path)
@@ -104,8 +113,8 @@ def _reference_profile(paths: list[Path]) -> dict[str, float | None]:
     if not metrics:
         raise ValueError("No canonical references are available.")
 
-    def med(key: str) -> float:
-        return float(median(float(item.get(key) or 0.0) for item in metrics))
+    def med(name: str) -> float:
+        return float(median(float(item.get(name) or 0.0) for item in metrics))
 
     return {
         "pitch_hz": float(median(pitches)) if pitches else None,
@@ -116,6 +125,13 @@ def _reference_profile(paths: list[Path]) -> dict[str, float | None]:
         "crest_factor_db": med("crest_factor_db"),
         "snr_db_estimate": med("snr_db_estimate"),
     }
+
+
+def _reference_profile(paths: list[Path]) -> dict[str, float | None]:
+    key = _cache_key(paths)
+    if not key:
+        raise ValueError("No canonical references are available.")
+    return dict(_reference_profile_cached(key))
 
 
 def score_candidate_against_profile(result: dict[str, Any]) -> float:
