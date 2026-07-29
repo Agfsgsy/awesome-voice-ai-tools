@@ -2,7 +2,7 @@
 
 Stored HTML files are not deleted or redesigned. Runtime responses only update the
 visible release label and inject safe JavaScript helpers before StaticFiles.
-Build marker: Professional Studio 7.0.0.
+Build marker: Professional Studio 7.0.0 Precision Reference Update.
 """
 from __future__ import annotations
 
@@ -36,9 +36,10 @@ async def voice_clone_preserved_ui():
     scripts = (
         '<script src="/static/response_body_guard.js?v=700-body-guard"></script>\n'
         '<script src="/static/voice_clone_fast_patch.js?v=700-fast-clone-resume"></script>\n'
-        '<script src="/static/voice_clone_v7_patch.js?v=700-engine-pack"></script>'
+        '<script src="/static/voice_clone_v7_patch.js?v=700-engine-pack"></script>\n'
+        '<script src="/static/voice_clone_v71_precision_patch.js?v=710-reference-precision"></script>'
     )
-    if "voice_clone_v7_patch.js" not in html:
+    if "voice_clone_v71_precision_patch.js" not in html:
         html = html.replace("</body>", scripts + "\n</body>")
     return HTMLResponse(html, headers={"Cache-Control": "no-store, max-age=0"})
 
