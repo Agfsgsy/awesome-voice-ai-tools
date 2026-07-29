@@ -62,6 +62,10 @@ line_length = 120
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning:speech_recognition.*",
+    "ignore::RuntimeWarning:pydub.utils.*"
+]
 
 pythonpath = [
   "."

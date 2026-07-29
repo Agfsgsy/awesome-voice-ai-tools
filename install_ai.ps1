@@ -56,7 +56,13 @@ pip install soundfile librosa pydub
 # Run the python installer script to auto-register and download models
 Write-Host "`n[5/5] Downloading models and verifying installation..." -ForegroundColor Cyan
 python install_models.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[WARNING] An error occurred during model downloading. The server may still run." -ForegroundColor Yellow
+}
 python verify_windows_install.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[WARNING] An error occurred during verification. The server may still run." -ForegroundColor Yellow
+}
 
 Write-Host "`n=================================================="
 Write-Host "Installation Complete!" -ForegroundColor Green

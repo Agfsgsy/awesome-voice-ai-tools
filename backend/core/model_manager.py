@@ -37,6 +37,7 @@ class ModelManager:
         if not plugin:
             return {"success": False, "message": f"Engine '{engine}' not found"}
         try:
+            (self.models_dir / engine).mkdir(parents=True, exist_ok=True)
             return plugin.download_models(model_name)
         except Exception as e:
             return {"success": False, "message": str(e)}

@@ -4,6 +4,15 @@ echo Voice AI Studio Arabic - Windows Installer
 echo ==================================================
 echo.
 
+REM Check if Git is installed
+git --version >nul 2>&1
+IF %ERRORLEVEL% NEQ 0 (
+    echo [WARNING] Git is not installed or not in PATH.
+    echo Some models and plugins ^(like MeloTTS^) may fail to install.
+    echo Please install Git from https://git-scm.com/downloads
+    echo.
+)
+
 REM Check if Python is installed
 python --version >nul 2>&1
 IF %ERRORLEVEL% NEQ 0 (
