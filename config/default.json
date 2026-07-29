@@ -1,18 +1,20 @@
 {
   "app_name": "استوديو ابن الواقدي",
-  "version": "6.2.0",
+  "version": "7.0.0",
   "default_engine": "edge",
   "default_language": "ar",
   "default_voice": "default",
   "default_speed": 1.0,
   "default_pitch": 0.0,
   "max_upload_mb": 80,
-  "supported_formats": [".wav", ".mp3", ".flac", ".ogg", ".m4a"],
-  "engine_priority": ["edge", "piper", "gemini", "elevenlabs", "coqui", "kokoro", "melotts", "styletts2"],
+  "supported_formats": [".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".webm"],
+  "engine_priority": ["edge", "piper", "xtts", "gemini", "elevenlabs", "coqui", "kokoro", "melotts", "styletts2"],
   "yemeni_creative_enabled": true,
   "yemeni_master_quality": "mp3_320k_48khz",
   "voice_clone_pro_enabled": true,
   "voice_clone_consent_required": true,
   "voice_clone_local_engine": "coqui-tts-xtts-v2",
-  "voice_clone_cloud_engine": "elevenlabs-ivc"
+  "voice_clone_cloud_engine": "elevenlabs-ivc",
+  "voice_clone_release": "Voice Clone Multi-Engine Pro",
+  "voice_clone_external_engines": ["openvoice", "f5tts", "gpt_sovits", "cosyvoice", "rvc", "ace_step", "yue"]
 }
