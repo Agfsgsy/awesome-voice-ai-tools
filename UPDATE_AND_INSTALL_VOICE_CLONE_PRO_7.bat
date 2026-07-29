@@ -5,7 +5,7 @@ color 0B
 
 echo =============================================================
 echo   Ibn Al-Waqadi Studio - Voice Clone Multi-Engine Pro 7.0
-echo   Safe updater + XTTS + optional full engine pack
+echo   Safe updater + XTTS + isolated full engine pack
 echo =============================================================
 echo.
 
@@ -83,24 +83,24 @@ python -m pip install --upgrade pip setuptools wheel
 if errorlevel 1 goto python_error
 
 if exist requirements.txt (
-  echo [6/9] تثبيت متطلبات الاستوديو الأساسية...
+  echo [6/9] تثبيت متطلبات الاستوديو الأساسية فقط...
   python -m pip install -r requirements.txt
   if errorlevel 1 goto python_error
 )
-if exist requirements-ai.txt (
-  echo [6/9] تثبيت متطلبات الصوت الأساسية المتوافقة...
-  python -m pip install -r requirements-ai.txt
-)
+python -m pip install "httpx>=0.27,<1" "python-multipart>=0.0.9" >nul
 
-echo [7/9] تجهيز XTTS-v2 المحلي وكل مصادر المحركات في بيئات مستقلة...
-py -3.11 scripts\install_voice_clone_engine_pack.py --all --include-music --accept-licenses
+rem لا يتم تثبيت requirements-ai.txt هنا؛ لأن Torch وXTTS والمحركات الثقيلة
+rem تُثبت في بيئات مستقلة لمنع تعارض الإصدارات داخل الاستوديو الرئيسي.
+
+echo [7/9] تجهيز XTTS-v2 المحلي وكل المحركات في بيئات مستقلة...
+python scripts\install_voice_clone_engine_pack.py --all --include-music --accept-licenses
 if errorlevel 1 (
   echo.
-  echo [WARNING] فشل محرك اختياري أو أكثر. سيتم فحص XTTS بشكل مستقل.
+  echo [WARNING] فشل محرك اختياري أو أكثر. سيبقى XTTS قابلًا للفحص بصورة مستقلة.
 )
 
-echo [8/9] التحقق من الإصدار والمحرك المحلي...
-py -3.11 scripts\verify_voice_clone_v7.py
+echo [8/9] التحقق من الإصدار والمسارات والمحرك المحلي...
+python scripts\verify_voice_clone_v7.py
 if errorlevel 1 (
   echo.
   echo [WARNING] التحقق لم يكتمل. راجع التقرير الظاهر أعلاه.
@@ -109,7 +109,7 @@ if errorlevel 1 (
 echo [9/9] تشغيل استوديو ابن الواقدي Voice Clone Pro 7.0...
 echo افتح: http://127.0.0.1:8000/static/voice_clone.html
 echo.
-py -3.11 main.py
+python main.py
 exit /b %errorlevel%
 
 :git_error
