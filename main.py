@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import APP_NAME, APP_VERSION, APP_HOST, APP_PORT, APP_DEBUG, FRONTEND_DIR
 from backend.core.logger import get_logger
 from backend.api.routes import router
+from backend.api.voice_ai_routes import router as voice_ai_router
 
 logger = get_logger("main")
 
@@ -37,6 +38,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(voice_ai_router)
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
