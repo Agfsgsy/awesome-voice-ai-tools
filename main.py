@@ -36,6 +36,7 @@ import backend.api.voice_clone_98_finalize_patch as _voice_clone_98_finalize_pat
 import backend.api.voice_clone_auto_finalize_patch as _voice_clone_auto_finalize_patch
 import backend.api.voice_clone_fast_runtime_patch as _voice_clone_fast_runtime_patch
 from backend.api.voice_clone_ui_runtime import router as voice_clone_ui_router
+from backend.api.voice_engine_suite_routes import router as voice_engine_suite_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
@@ -81,7 +82,7 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
-app.state.release_channel = "voice-clone-pro"
+app.state.release_channel = "voice-clone-multi-engine-pro-v7"
 
 app.add_middleware(
     CORSMiddleware,
@@ -106,13 +107,14 @@ app.include_router(dashboard_router)
 app.include_router(ultimate_studio_router)
 app.include_router(yemeni_creative_router)
 app.include_router(yemeni_creative_safe_router)
-# These explicit UI routes are registered before StaticFiles. They preserve the saved
-# 6.2.0 HTML and inject only safe JavaScript helpers at response time.
+# Explicit UI routes are registered before StaticFiles. The preserved interface
+# remains intact while additive runtime helpers and Voice Clone Pro 7 APIs load.
 app.include_router(yemeni_ui_router)
 app.include_router(voice_clone_router)
 app.include_router(voice_clone_fast_router)
 app.include_router(voice_clone_runtime_router)
 app.include_router(voice_clone_ui_router)
+app.include_router(voice_engine_suite_router)
 
 # Replace only the existing GET audio-download handler. No generated file is
 # deleted, moved, renamed, or overwritten; a verified copy is added to Desktop.
