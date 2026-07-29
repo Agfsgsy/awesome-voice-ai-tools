@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>استوديو الذكاء الصوتي</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+    main{max-width:1000px;margin:auto}.card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:18px;margin-bottom:16px}
+    input,textarea,select,button{box-sizing:border-box;width:100%;padding:10px;margin:6px 0;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#fff}
+    button{background:#0f766e;border:0;font-weight:bold;cursor:pointer}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    pre{white-space:pre-wrap;word-break:break-word;background:#020617;padding:12px;border-radius:8px}.warn{color:#fbbf24}audio{width:100%;margin-top:10px}
+  </style>
+</head>
+<body>
+<main>
+  <h1>استوديو الذكاء الصوتي المتقدم</h1>
+  <p class="warn">الاستنساخ متاح فقط لصاحب الصوت أو بإذن صريح. لا يوجد تطابق مضمون 100%.</p>
+
+  <section class="card">
+    <h2>المحركات</h2>
+    <button onclick="loadEngines()">فحص المحركات</button>
+    <pre id="engines">لم يتم الفحص</pre>
+  </section>
+
+  <section class="card">
+    <h2>تحليل التسجيل</h2>
+    <input id="analysisFile" type="file" accept="audio/*">
+    <button onclick="analyzeAudio()">تحليل الصوت والترددات</button>
+    <pre id="analysis">ارفع تسجيلًا واضحًا</pre>
+  </section>
+
+  <section class="card">
+    <h2>استنساخ متعدد المحركات</h2>
+    <input id="cloneFiles" type="file" accept="audio/*" multiple>
+    <textarea id="cloneText" rows="5" placeholder="اكتب النص المراد قراءته"></textarea>
+    <div class="grid">
+      <select id="engine"><option value="auto">اختيار تلقائي</option><option value="xtts">XTTS-v2</option><option value="openvoice">OpenVoice</option><option value="f5tts">F5-TTS</option><option value="gpt_sovits">GPT-SoVITS</option><option value="cosyvoice">CosyVoice</option></select>
+      <select id="quality"><option value="fast">سريع</option><option value="balanced" selected>متوازن</option><option value="high">عالٍ</option><option value="ultra">فائق</option></select>
+      <input id="language" value="ar" placeholder="اللغة">
+      <input id="candidateCount" type="number" min="1" max="8" value="2">
+    </div>
+    <label><input id="consent" type="checkbox" style="width:auto"> أؤكد أنني صاحب الصوت أو لدي إذن صريح من صاحبه.</label>
+    <button onclick="cloneVoice()">بدء الاستنساخ والتقييم</button>
+    <audio id="resultAudio" controls hidden></audio>
+    <pre id="cloneResult">لم يبدأ</pre>
+  </section>
+
+  <section class="card">
+    <h2>قراءة الأرقام</h2>
+    <textarea id="numberText" rows="3" placeholder="مثال: موعدنا 29/07/2026 الساعة 04:35 والنسبة 15%"></textarea>
+    <button onclick="normalizeNumbers()">تحويل الأرقام إلى قراءة صوتية</button>
+    <pre id="numberResult"></pre>
+  </section>
+</main>
+<script>
+const parse = async response => { const data = await response.json(); if(!response.ok) throw new Error(JSON.stringify(data)); return data; };
+async function loadEngines(){try{document.getElementById('engines').textContent=JSON.stringify(await parse(await fetch('/api/voice-ai/engines')),null,2)}catch(e){document.getElementById('engines').textContent=e.message}}
+async function analyzeAudio(){const file=document.getElementById('analysisFile').files[0];if(!file)return;const form=new FormData();form.append('file',file);try{document.getElementById('analysis').textContent=JSON.stringify(await parse(await fetch('/api/voice-ai/audio/analyze',{method:'POST',body:form})),null,2)}catch(e){document.getElementById('analysis').textContent=e.message}}
+async function cloneVoice(){const files=[...document.getElementById('cloneFiles').files];if(!files.length)return alert('ارفع تسجيلًا');if(!document.getElementById('consent').checked)return alert('يلزم تأكيد الإذن');const form=new FormData();files.forEach(x=>form.append('files',x));form.append('text',document.getElementById('cloneText').value);form.append('engine',document.getElementById('engine').value);form.append('quality_mode',document.getElementById('quality').value);form.append('language',document.getElementById('language').value);form.append('candidate_count',document.getElementById('candidateCount').value);form.append('consent_confirmed','true');const box=document.getElementById('cloneResult');box.textContent='جارٍ التحليل والتوليد والتقييم...';try{const data=await parse(await fetch('/api/voice-ai/audio/clone/ensemble',{method:'POST',body:form}));box.textContent=JSON.stringify(data,null,2);if(data.url){const audio=document.getElementById('resultAudio');audio.src=data.url;audio.hidden=false}}catch(e){box.textContent=e.message}}
+async function normalizeNumbers(){const form=new FormData();form.append('text',document.getElementById('numberText').value);form.append('mode','context');try{document.getElementById('numberResult').textContent=JSON.stringify(await parse(await fetch('/api/voice-ai/text/numbers',{method:'POST',body:form})),null,2)}catch(e){document.getElementById('numberResult').textContent=e.message}}
+loadEngines();
+</script>
+</body>
+</html>
