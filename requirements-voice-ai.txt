@@ -1,0 +1,17 @@
+# Core advanced voice analysis and orchestration (models remain optional)
+httpx>=0.28.1
+numpy>=1.26,<3
+scipy>=1.11
+soundfile>=0.12
+librosa>=0.10
+pydub>=0.25
+num2words>=0.5.13
+pyloudnorm>=0.1.1
+
+# Optional real engines/evaluators; install only when required:
+# TTS>=0.22.0                 # XTTS-v2
+# torch>=2.1
+# torchaudio>=2.1
+# speechbrain>=1.0            # speaker similarity
+# faster-whisper>=1.1         # intelligibility scoring
+# silero-vad>=5.1             # speech activity detection
