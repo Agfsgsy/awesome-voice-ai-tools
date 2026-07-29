@@ -38,6 +38,7 @@ import backend.api.voice_clone_fast_runtime_patch as _voice_clone_fast_runtime_p
 from backend.api.voice_clone_ui_runtime import router as voice_clone_ui_router
 import backend.api.voice_clone_v7_setup_runtime as _voice_clone_v7_setup_runtime
 from backend.api.voice_engine_suite_routes import router as voice_engine_suite_router
+from backend.api.voice_reference_v71_runtime import router as voice_reference_v71_router
 from backend.api import gemini_stability_runtime as _gemini_stability_runtime
 from backend.api import gemini_retry_window_runtime as _gemini_retry_window_runtime
 from backend.api import gemini_cloud_control_runtime as _gemini_cloud_control_runtime
@@ -83,7 +84,7 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
-app.state.release_channel = "voice-clone-multi-engine-pro-v7"
+app.state.release_channel = "voice-clone-multi-engine-pro-v7-precision-reference"
 
 app.add_middleware(
     CORSMiddleware,
@@ -116,6 +117,7 @@ app.include_router(voice_clone_fast_router)
 app.include_router(voice_clone_runtime_router)
 app.include_router(voice_clone_ui_router)
 app.include_router(voice_engine_suite_router)
+app.include_router(voice_reference_v71_router)
 
 # Replace only the existing GET audio-download handler. No generated file is
 # deleted, moved, renamed, or overwritten; a verified copy is added to Desktop.
