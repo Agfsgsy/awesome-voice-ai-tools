@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:voice_ai_mobile/app/app.dart';
 import 'package:voice_ai_mobile/app/router.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
+import 'package:voice_ai_mobile/features/recorder/recorder_screen.dart';
 import 'package:voice_ai_mobile/models/mobile_models.dart';
 import 'package:voice_ai_mobile/services/api_service.dart';
 import 'package:voice_ai_mobile/services/audio_player_service.dart';
@@ -49,6 +50,9 @@ class _FakeRecorder extends AudioRecorderService {
 
   @override
   Future<void> delete() async {}
+
+  @override
+  Future<void> dispose() async {}
 }
 
 class _FakePicker extends DocumentPickerService {
@@ -82,6 +86,9 @@ class _FakePlayer extends AudioPlayerService {
 
   @override
   Future<void> playFile(String path) async => played = true;
+
+  @override
+  Future<void> dispose() async {}
 }
 
 List<Override> _overrides({_FakeRecorder? recorder, _FakePicker? picker, _FakePlayer? player}) => <Override>[
@@ -111,6 +118,16 @@ void _usePhoneViewport(WidgetTester tester) {
   });
 }
 
+Widget _recorderHarness(List<Override> overrides) => ProviderScope(
+      overrides: overrides,
+      child: const MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: RecorderScreen(),
+        ),
+      ),
+    );
+
 void main() {
   testWidgets('يشغّل التطبيق بالعربية RTL ويتنقل بين الصفحات', (tester) async {
     _usePhoneViewport(tester);
@@ -125,6 +142,8 @@ void main() {
     await tester.tap(find.text('الاستوديو').last);
     await _pumpUntilVisible(tester, find.text('توليد الصوت (Voice Studio)'));
     expect(find.text('توليد الصوت (Voice Studio)'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 
   testWidgets('يسجل ويوقف مؤقتًا ويستكمل ويحلل ويشغل التسجيل', (tester) async {
@@ -136,13 +155,7 @@ void main() {
     final player = _FakePlayer();
     addTearDown(() => directory.delete(recursive: true));
 
-    appRouter.go('/record');
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: _overrides(recorder: recorder, picker: _FakePicker(file.path), player: player),
-        child: const VoiceAiMobileApp(),
-      ),
-    );
+    await tester.pumpWidget(_recorderHarness(_overrides(recorder: recorder, picker: _FakePicker(file.path), player: player)));
     await _pumpUntilVisible(tester, find.text('بدء التسجيل'));
     await tester.tap(find.text('بدء التسجيل'));
     await tester.pump();
@@ -159,6 +172,8 @@ void main() {
     await tester.tap(find.text('معاينة'));
     await tester.pump();
     expect(player.played, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 
   testWidgets('يختار ملفًا من مدير الملفات ويعرض نتيجة التحليل', (tester) async {
@@ -168,17 +183,13 @@ void main() {
     await file.writeAsBytes(List<int>.filled(256, 2));
     addTearDown(() => directory.delete(recursive: true));
 
-    appRouter.go('/record');
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: _overrides(picker: _FakePicker(file.path)),
-        child: const VoiceAiMobileApp(),
-      ),
-    );
+    await tester.pumpWidget(_recorderHarness(_overrides(picker: _FakePicker(file.path))));
     await _pumpUntilVisible(tester, find.text('اختيار ملف'));
     await tester.tap(find.text('اختيار ملف'));
     await _pumpUntilVisible(tester, find.text('picked.mp3'));
     expect(find.text('picked.mp3'), findsOneWidget);
     expect(find.text('تحليل جودة التسجيل'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 }
