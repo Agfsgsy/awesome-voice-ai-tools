@@ -91,6 +91,7 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
   Future<void> _share(Map<String, dynamic> candidate) async {
     try {
       final path = await _ensureLocal(candidate);
+      if (!mounted) return;
       final box = context.findRenderObject() as RenderBox?;
       await SharePlus.instance.share(
         ShareParams(
@@ -135,7 +136,8 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
                             Text('المرشح ${entry.key + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
                             if (candidateId == best) const Text('النتيجة المقترحة تلقائيًا', style: TextStyle(color: Color(0xFF14B8A6))),
                           ],
-                        ],
+                          ],
+                        ),
                       ),
                       IconButton(tooltip: 'تشغيل', onPressed: () => _play(candidate), icon: const Icon(Icons.play_circle_fill_rounded)),
                       IconButton(tooltip: 'حفظ', onPressed: () => _save(candidate), icon: const Icon(Icons.download_rounded)),

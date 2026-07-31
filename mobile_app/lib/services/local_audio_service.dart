@@ -12,7 +12,7 @@ class LocalAudioService {
   Future<AudioAnalysis> analyze(String path) async {
     if (!await File(path).exists()) throw const AppException('الملف المحدد غير موجود.');
     final informationSession = await FFprobeKit.getMediaInformation(path);
-    final information = await informationSession.getMediaInformation();
+    final information = informationSession.getMediaInformation();
     if (information == null) throw const AppException('صيغة الملف غير قابلة للفك.');
     final duration = double.tryParse(information.getDuration() ?? '') ?? 0;
     final streams = information.getStreams();

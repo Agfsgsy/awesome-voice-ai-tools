@@ -107,6 +107,7 @@ class _FilesScreenState extends ConsumerState<FilesScreen> with SingleTickerProv
 
   Future<void> _share(MobileFileInfo file) => _withFile(file, () async {
         final local = await _downloadTemporary(file);
+        if (!mounted) return;
         final box = context.findRenderObject() as RenderBox?;
         await SharePlus.instance.share(
           ShareParams(

@@ -47,21 +47,18 @@ class ApiService {
 
   final Dio _dio;
   String? _baseUrl;
-  String? _token;
   Future<String?> Function()? _refresh;
 
   String get baseUrl => _baseUrl ?? '';
 
   void configure({required String serverUrl, String? accessToken, Future<String?> Function()? refresh}) {
     _baseUrl = normalizeServerUrl(serverUrl);
-    _token = accessToken;
     _refresh = refresh;
     _dio.options.baseUrl = '$_baseUrl${AppConstants.mobileApiPrefix}';
     _setToken(accessToken);
   }
 
   void updateToken(String token) {
-    _token = token;
     _setToken(token);
   }
 
