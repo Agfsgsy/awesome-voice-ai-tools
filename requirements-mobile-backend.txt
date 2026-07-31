@@ -1,0 +1,10 @@
+# Mobile API, pairing, QR, document reading and local discovery.
+# Kept separate so the existing desktop dependency sets remain unchanged.
+-r requirements-minimal.txt
+
+numpy>=1.26.4
+httpx>=0.28.1
+pypdf>=6.0.0
+python-docx>=1.2.0
+qrcode[pil]>=8.2
+zeroconf>=0.147.0

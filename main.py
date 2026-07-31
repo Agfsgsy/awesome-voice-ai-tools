@@ -1,13 +1,17 @@
 """نقطة تشغيل التطبيق الرئيسية"""
-import uvicorn
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 
-from backend.core.config import APP_NAME, APP_VERSION, APP_HOST, APP_PORT, APP_DEBUG, FRONTEND_DIR
-from backend.core.logger import get_logger
+from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from backend.api.routes import router
+from backend.core.config import APP_DEBUG, APP_HOST, APP_NAME, APP_PORT, APP_VERSION, FRONTEND_DIR
+from backend.core.logger import get_logger
+from backend.mobile import admin_router as mobile_admin_router
+from backend.mobile import router as mobile_router
 
 logger = get_logger("main")
 
@@ -37,6 +41,8 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(mobile_router)
+app.include_router(mobile_admin_router)
 
 static_dir = FRONTEND_DIR / "static"
 if static_dir.exists():
