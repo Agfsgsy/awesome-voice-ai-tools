@@ -200,6 +200,11 @@ async def api_model_delete(engine: str, model_name: str):
     from backend.core.model_manager import model_manager
     return model_manager.delete_model(engine, model_name)
 
+@router.post("/api/models/verify")
+async def api_model_verify(req: ModelDownloadRequest):
+    from backend.core.model_manager import model_manager
+    return model_manager.verify_model(req.engine, req.model_name)
+
 @router.get("/api/voices")
 async def api_voices():
     from backend.core.voice_manager import voice_manager
@@ -286,7 +291,7 @@ async def api_list_downloads():
 
 @router.get("/api/downloads/{filename}")
 async def api_download_file(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if Path(filename).name != filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = OUTPUTS_DIR / filename
     if not filepath.exists():
@@ -295,7 +300,7 @@ async def api_download_file(filename: str):
 
 @router.delete("/api/downloads/{filename}")
 async def api_delete_download(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if Path(filename).name != filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = OUTPUTS_DIR / filename
     if not filepath.exists():
@@ -307,7 +312,7 @@ async def api_delete_download(filename: str):
 
 @router.post("/api/uploads")
 async def api_upload_file(file: UploadFile = File(...)):
-    if ".." in file.filename or file.filename.startswith("/") or file.filename.startswith("\\"):
+    if Path(file.filename).name != file.filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     ext = Path(file.filename).suffix.lower()
     if ext not in SUPPORTED_AUDIO_FORMATS:
@@ -323,7 +328,7 @@ async def api_upload_file(file: UploadFile = File(...)):
 
 @router.delete("/api/uploads/{filename}")
 async def api_delete_upload(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if Path(filename).name != filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = UPLOADS_DIR / filename
     if not filepath.exists():
@@ -333,7 +338,7 @@ async def api_delete_upload(filename: str):
 
 @router.get("/api/uploads/{filename}")
 async def api_download_upload(filename: str):
-    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+    if Path(filename).name != filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     filepath = UPLOADS_DIR / filename
     if not filepath.exists():
@@ -405,7 +410,7 @@ async def api_audio_upload(file: UploadFile = File(...)):
 
 @router.post("/api/audio/edit")
 async def api_audio_edit(file: UploadFile = File(...), trim_start_ms: int = Form(0), trim_end_ms: int = Form(0)):
-    if ".." in file.filename or file.filename.startswith("/") or file.filename.startswith("\\"):
+    if Path(file.filename).name != file.filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
     ext = Path(file.filename).suffix.lower()
@@ -479,6 +484,8 @@ async def api_cache_clear():
 
 @router.post("/api/files/{filename}/rename")
 async def api_rename_file(filename: str, req: RenameRequest):
+    if Path(filename).name != filename or Path(req.new_name).name != req.new_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
     found = None
     for d in [OUTPUTS_DIR, UPLOADS_DIR]:
         f = d / filename

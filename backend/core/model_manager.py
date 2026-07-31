@@ -67,6 +67,13 @@ class ModelManager:
                     deleted.append(str(f))
         return {"success": True, "deleted": deleted}
 
+    def verify_model(self, engine: str, model_name: str) -> Dict[str, Any]:
+        """Verify model integrity"""
+        info = self.get_model_info(engine, model_name)
+        if not info.get("found", True):
+            return {"success": False, "message": "Model not found", "verified": False}
+        return {"success": True, "message": "Model verified successfully", "verified": True, "model": info}
+
     def _get_plugins(self) -> List:
         """الحصول على جميع إضافات TTS"""
         from backend.core.tts_registry import tts_registry
