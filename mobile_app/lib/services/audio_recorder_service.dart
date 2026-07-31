@@ -9,11 +9,13 @@ import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 enum RecorderState { idle, recording, paused, stopped }
 
 class AudioRecorderService {
-  AudioRecorderService({AudioRecorder? recorder}) : _recorder = recorder ?? AudioRecorder();
+  AudioRecorderService({AudioRecorder? recorder}) : _recorder = recorder;
 
-  final AudioRecorder _recorder;
+  AudioRecorder? _recorder;
   RecorderState _state = RecorderState.idle;
   String? _path;
+
+  AudioRecorder get _activeRecorder => _recorder ??= AudioRecorder();
 
   RecorderState get state => _state;
   String? get path => _path;
@@ -24,14 +26,14 @@ class AudioRecorderService {
     if (!permission.isGranted) {
       throw const AppException('يلزم السماح باستخدام الميكروفون لبدء التسجيل.');
     }
-    if (!await _recorder.hasPermission()) {
+    if (!await _activeRecorder.hasPermission()) {
       throw const AppException('تعذر الوصول إلى الميكروفون. راجع أذونات التطبيق.');
     }
     final directory = await getApplicationDocumentsDirectory();
     final recordings = Directory(p.join(directory.path, 'recordings'));
     await recordings.create(recursive: true);
     _path = p.join(recordings.path, 'recording_${DateTime.now().millisecondsSinceEpoch}.wav');
-    await _recorder.start(
+    await _activeRecorder.start(
       const RecordConfig(
         encoder: AudioEncoder.wav,
         bitRate: 256000,
@@ -49,19 +51,19 @@ class AudioRecorderService {
 
   Future<void> pause() async {
     if (_state != RecorderState.recording) return;
-    await _recorder.pause();
+    await _activeRecorder.pause();
     _state = RecorderState.paused;
   }
 
   Future<void> resume() async {
     if (_state != RecorderState.paused) return;
-    await _recorder.resume();
+    await _activeRecorder.resume();
     _state = RecorderState.recording;
   }
 
   Future<String?> stop() async {
     if (_state != RecorderState.recording && _state != RecorderState.paused) return _path;
-    final result = await _recorder.stop();
+    final result = await _activeRecorder.stop();
     _path = result ?? _path;
     _state = RecorderState.stopped;
     if (_path == null || !await File(_path!).exists() || await File(_path!).length() <= 44) {
@@ -71,7 +73,7 @@ class AudioRecorderService {
   }
 
   Future<void> delete() async {
-    if (_state == RecorderState.recording || _state == RecorderState.paused) await _recorder.cancel();
+    if (_state == RecorderState.recording || _state == RecorderState.paused) await _activeRecorder.cancel();
     final current = _path;
     if (current != null) {
       final file = File(current);
@@ -81,5 +83,8 @@ class AudioRecorderService {
     _state = RecorderState.idle;
   }
 
-  Future<void> dispose() => _recorder.dispose();
+  Future<void> dispose() async {
+    final recorder = _recorder;
+    if (recorder != null) await recorder.dispose();
+  }
 }

@@ -100,8 +100,20 @@ Future<void> _pumpUntilVisible(WidgetTester tester, Finder finder) async {
   fail('لم يظهر العنصر المطلوب خلال خمس ثوانٍ: $finder');
 }
 
+void _usePhoneViewport(WidgetTester tester) {
+  tester.view
+    ..physicalSize = const Size(390, 844)
+    ..devicePixelRatio = 1;
+  addTearDown(() {
+    tester.view
+      ..resetPhysicalSize()
+      ..resetDevicePixelRatio();
+  });
+}
+
 void main() {
   testWidgets('يشغّل التطبيق بالعربية RTL ويتنقل بين الصفحات', (tester) async {
+    _usePhoneViewport(tester);
     appRouter.go('/splash');
     await tester.pumpWidget(ProviderScope(overrides: _overrides(), child: const VoiceAiMobileApp()));
     await _pumpUntilVisible(tester, find.text('لوحة التحكم'));
@@ -116,6 +128,7 @@ void main() {
   });
 
   testWidgets('يسجل ويوقف مؤقتًا ويستكمل ويحلل ويشغل التسجيل', (tester) async {
+    _usePhoneViewport(tester);
     final directory = await Directory.systemTemp.createTemp('voice_ai_recorder_test');
     final file = File('${directory.path}/recorded.wav');
     await file.writeAsBytes(List<int>.filled(128, 1));
@@ -149,6 +162,7 @@ void main() {
   });
 
   testWidgets('يختار ملفًا من مدير الملفات ويعرض نتيجة التحليل', (tester) async {
+    _usePhoneViewport(tester);
     final directory = await Directory.systemTemp.createTemp('voice_ai_picker_test');
     final file = File('${directory.path}/picked.mp3');
     await file.writeAsBytes(List<int>.filled(256, 2));

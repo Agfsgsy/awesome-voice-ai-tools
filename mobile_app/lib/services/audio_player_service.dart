@@ -4,26 +4,31 @@ import 'package:just_audio/just_audio.dart';
 import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 
 class AudioPlayerService {
-  AudioPlayerService({AudioPlayer? player}) : _player = player ?? AudioPlayer();
+  AudioPlayerService({AudioPlayer? player}) : _player = player;
 
-  final AudioPlayer _player;
+  AudioPlayer? _player;
 
-  Stream<PlayerState> get playerState => _player.playerStateStream;
-  Stream<Duration> get position => _player.positionStream;
-  Stream<Duration?> get duration => _player.durationStream;
+  AudioPlayer get _activePlayer => _player ??= AudioPlayer();
+
+  Stream<PlayerState> get playerState => _activePlayer.playerStateStream;
+  Stream<Duration> get position => _activePlayer.positionStream;
+  Stream<Duration?> get duration => _activePlayer.durationStream;
 
   Future<void> playFile(String path) async {
     try {
-      await _player.setFilePath(path);
-      await _player.play();
+      await _activePlayer.setFilePath(path);
+      await _activePlayer.play();
     } on PlayerException catch (error) {
       throw AppException('تعذر تشغيل الصوت: ${error.message}');
     }
   }
 
-  Future<void> pause() => _player.pause();
-  Future<void> resume() => _player.play();
-  Future<void> stop() => _player.stop();
-  Future<void> seek(Duration position) => _player.seek(position);
-  Future<void> dispose() => _player.dispose();
+  Future<void> pause() => _activePlayer.pause();
+  Future<void> resume() => _activePlayer.play();
+  Future<void> stop() => _activePlayer.stop();
+  Future<void> seek(Duration position) => _activePlayer.seek(position);
+  Future<void> dispose() async {
+    final player = _player;
+    if (player != null) await player.dispose();
+  }
 }
