@@ -92,18 +92,26 @@ List<Override> _overrides({_FakeRecorder? recorder, _FakePicker? picker, _FakePl
       localAudioServiceProvider.overrideWithValue(_FakeLocalAudio()),
     ];
 
+Future<void> _pumpUntilVisible(WidgetTester tester, Finder finder) async {
+  for (var attempt = 0; attempt < 50; attempt++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    if (finder.evaluate().isNotEmpty) return;
+  }
+  fail('لم يظهر العنصر المطلوب خلال خمس ثوانٍ: $finder');
+}
+
 void main() {
   testWidgets('يشغّل التطبيق بالعربية RTL ويتنقل بين الصفحات', (tester) async {
     appRouter.go('/splash');
     await tester.pumpWidget(ProviderScope(overrides: _overrides(), child: const VoiceAiMobileApp()));
-    await tester.pumpAndSettle();
+    await _pumpUntilVisible(tester, find.text('لوحة التحكم'));
 
     expect(find.text('لوحة التحكم'), findsWidgets);
     final directionality = tester.widget<Directionality>(find.byType(Directionality).first);
     expect(directionality.textDirection, TextDirection.rtl);
 
     await tester.tap(find.text('الاستوديو').last);
-    await tester.pumpAndSettle();
+    await _pumpUntilVisible(tester, find.text('توليد الصوت (Voice Studio)'));
     expect(find.text('توليد الصوت (Voice Studio)'), findsOneWidget);
   });
 
@@ -122,7 +130,7 @@ void main() {
         child: const VoiceAiMobileApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilVisible(tester, find.text('بدء التسجيل'));
     await tester.tap(find.text('بدء التسجيل'));
     await tester.pump();
     expect(find.text('إيقاف مؤقت'), findsOneWidget);
@@ -132,7 +140,7 @@ void main() {
     await tester.tap(find.text('استكمال'));
     await tester.pump();
     await tester.tap(find.text('إنهاء التسجيل'));
-    await tester.pumpAndSettle();
+    await _pumpUntilVisible(tester, find.text('تحليل جودة التسجيل'));
     expect(find.text('تحليل جودة التسجيل'), findsOneWidget);
     expect(find.textContaining('91'), findsWidgets);
     await tester.tap(find.text('معاينة'));
@@ -153,9 +161,9 @@ void main() {
         child: const VoiceAiMobileApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilVisible(tester, find.text('اختيار ملف'));
     await tester.tap(find.text('اختيار ملف'));
-    await tester.pumpAndSettle();
+    await _pumpUntilVisible(tester, find.text('picked.mp3'));
     expect(find.text('picked.mp3'), findsOneWidget);
     expect(find.text('تحليل جودة التسجيل'), findsOneWidget);
   });

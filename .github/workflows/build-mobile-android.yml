@@ -94,7 +94,7 @@ jobs:
       - name: Analyze Flutter source
         run: flutter analyze --fatal-infos
       - name: Run Flutter tests
-        run: flutter test
+        run: timeout --signal=TERM 8m flutter test --reporter expanded
       - name: Detect complete signing configuration
         shell: bash
         run: |
