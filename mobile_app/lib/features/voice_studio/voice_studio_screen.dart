@@ -170,6 +170,7 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                           : constraints.maxWidth,
                       child: DropdownButtonFormField<String>(
                         initialValue: _engine,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'المحرك'),
                         items: <DropdownMenuItem<String>>[
                           const DropdownMenuItem(
