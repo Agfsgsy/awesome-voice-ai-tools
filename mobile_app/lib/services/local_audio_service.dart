@@ -10,33 +10,52 @@ import 'package:voice_ai_mobile/models/mobile_models.dart';
 
 class LocalAudioService {
   Future<AudioAnalysis> analyze(String path) async {
-    if (!await File(path).exists()) throw const AppException('الملف المحدد غير موجود.');
+    if (!await File(path).exists())
+      throw const AppException('الملف المحدد غير موجود.');
     final informationSession = await FFprobeKit.getMediaInformation(path);
     final information = informationSession.getMediaInformation();
-    if (information == null) throw const AppException('صيغة الملف غير قابلة للفك.');
+    if (information == null)
+      throw const AppException('صيغة الملف غير قابلة للفك.');
     final duration = double.tryParse(information.getDuration() ?? '') ?? 0;
     final streams = information.getStreams();
-    final audioStream = streams.where((stream) => stream.getType() == 'audio').firstOrNull;
-    if (duration <= 0 || audioStream == null) throw const AppException('الملف لا يحتوي صوتًا صالحًا.');
+    final audioStream = streams
+        .where((stream) => stream.getType() == 'audio')
+        .firstOrNull;
+    if (duration <= 0 || audioStream == null)
+      throw const AppException('الملف لا يحتوي صوتًا صالحًا.');
 
-    final command = '-hide_banner -i ${_quote(path)} -af '
+    final command =
+        '-hide_banner -i ${_quote(path)} -af '
         '"silencedetect=noise=-45dB:d=0.20,astats=metadata=1:reset=0" -f null -';
     final session = await FFmpegKit.execute(command);
     final returnCode = await session.getReturnCode();
     final output = await session.getOutput() ?? '';
-    if (!ReturnCode.isSuccess(returnCode)) throw const AppException('صيغة الملف غير قابلة للفك.');
+    if (!ReturnCode.isSuccess(returnCode))
+      throw const AppException('صيغة الملف غير قابلة للفك.');
 
     final sampleRate = int.tryParse(audioStream.getSampleRate() ?? '') ?? 0;
-    final rms = _lastNumber(output, RegExp(r'RMS level dB:\s*(-?[0-9.]+)')) ?? -90;
-    final peak = _lastNumber(output, RegExp(r'Peak level dB:\s*(-?[0-9.]+)')) ?? -90;
+    final rms =
+        _lastNumber(output, RegExp(r'RMS level dB:\s*(-?[0-9.]+)')) ?? -90;
+    final peak =
+        _lastNumber(output, RegExp(r'Peak level dB:\s*(-?[0-9.]+)')) ?? -90;
     final silenceDuration = RegExp(r'silence_duration:\s*([0-9.]+)')
         .allMatches(output)
-        .fold<double>(0, (sum, match) => sum + (double.tryParse(match.group(1) ?? '') ?? 0));
-    final silencePercent = (silenceDuration / duration * 100).clamp(0, 100).toDouble();
+        .fold<double>(
+          0,
+          (sum, match) => sum + (double.tryParse(match.group(1) ?? '') ?? 0),
+        );
+    final silencePercent = (silenceDuration / duration * 100)
+        .clamp(0, 100)
+        .toDouble();
     final clippingPercent = peak >= -0.1 ? 1.0 : 0.0;
     final noiseFloor = (rms - 18).clamp(-96, 0).toDouble();
-    final sampleScore = sampleRate >= 24000 ? 100 : (sampleRate >= 16000 ? 80 : 45);
-    final score = (100 - silencePercent * 0.4 - clippingPercent * 20 + sampleScore * 0.2).round().clamp(0, 100);
+    final sampleScore = sampleRate >= 24000
+        ? 100
+        : (sampleRate >= 16000 ? 80 : 45);
+    final score =
+        (100 - silencePercent * 0.4 - clippingPercent * 20 + sampleScore * 0.2)
+            .round()
+            .clamp(0, 100);
     final clear = duration >= 2 && silencePercent < 85 && rms > -55;
     final issues = <String>[
       if (!clear) 'التسجيل لا يحتوي كلامًا واضحًا',
@@ -50,31 +69,131 @@ class LocalAudioService {
       silencePercent: silencePercent,
       clippingPercent: clippingPercent,
       sampleRate: sampleRate,
-      sampleQuality: sampleRate >= 24000 ? 'ممتازة' : (sampleRate >= 16000 ? 'جيدة' : 'منخفضة'),
+      sampleQuality: sampleRate >= 24000
+          ? 'ممتازة'
+          : (sampleRate >= 16000 ? 'جيدة' : 'منخفضة'),
       distortion: clippingPercent > 0 ? 'ملحوظ' : 'منخفض',
       qualityScore: score,
       clearSpeech: clear,
       issues: issues,
-      recommendation: clear ? 'التسجيل مناسب للرفع والتحليل الدقيق على الخادم' : 'أعد التسجيل في مكان أهدأ وعلى بعد ثابت من الميكروفون',
+      recommendation: clear
+          ? 'التسجيل مناسب للرفع والتحليل الدقيق على الخادم'
+          : 'أعد التسجيل في مكان أهدأ وعلى بعد ثابت من الميكروفون',
     );
   }
 
   Future<String> convertToWav(String inputPath) async {
     final cache = await getTemporaryDirectory();
-    final output = p.join(cache.path, '${p.basenameWithoutExtension(inputPath)}_${DateTime.now().millisecondsSinceEpoch}.wav');
+    final output = p.join(
+      cache.path,
+      '${p.basenameWithoutExtension(inputPath)}_${DateTime.now().millisecondsSinceEpoch}.wav',
+    );
     final session = await FFmpegKit.execute(
       '-y -i ${_quote(inputPath)} -vn -ac 1 -ar 24000 -c:a pcm_s16le ${_quote(output)}',
     );
     final code = await session.getReturnCode();
-    if (!ReturnCode.isSuccess(code) || !await File(output).exists() || await File(output).length() <= 44) {
+    if (!ReturnCode.isSuccess(code) ||
+        !await File(output).exists() ||
+        await File(output).length() <= 44) {
       throw const AppException('فشل تحويل الملف إلى WAV.');
     }
     return output;
   }
 
+  Future<String> createSongMix({
+    required String vocalPath,
+    required String title,
+    String? instrumentalPath,
+    double tempo = 1,
+    double pitchSemitones = 0,
+    double reverb = 0.25,
+  }) async {
+    if (!await File(vocalPath).exists())
+      throw const AppException('الملف الصوتي المحلي غير موجود.');
+    if (instrumentalPath != null && !await File(instrumentalPath).exists()) {
+      throw const AppException('المسار الموسيقي المحدد غير موجود.');
+    }
+    final documents = await getApplicationDocumentsDirectory();
+    final directory = Directory(p.join(documents.path, 'voice_ai_outputs'));
+    await directory.create(recursive: true);
+    final safeTitle = title
+        .replaceAll(RegExp(r'[^\u0600-\u06FFa-zA-Z0-9_-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
+    final output = p.join(
+      directory.path,
+      '${safeTitle.isEmpty ? 'song' : safeTitle}_${DateTime.now().millisecondsSinceEpoch}.wav',
+    );
+    final pitchFactor = _powerOfTwo(pitchSemitones / 12);
+    final tempoCorrection = tempo / pitchFactor;
+    final filters = <String>[
+      'asetrate=24000*${pitchFactor.toStringAsFixed(6)}',
+      'aresample=24000',
+      ..._atempoFilters(tempoCorrection),
+      if (reverb > 0.01)
+        'aecho=0.8:0.88:60:${(reverb * 0.45).clamp(0.02, 0.45).toStringAsFixed(3)}',
+    ];
+    final String command;
+    if (instrumentalPath == null) {
+      command =
+          '-y -i ${_quote(vocalPath)} -af "${filters.join(',')}" -vn -ac 2 -ar 24000 -c:a pcm_s16le ${_quote(output)}';
+    } else {
+      command =
+          '-y -i ${_quote(vocalPath)} -stream_loop -1 -i ${_quote(instrumentalPath)} '
+          '-filter_complex "[0:a]${filters.join(',')},volume=1.0[v];[1:a]aresample=24000,volume=0.30[m];[v][m]amix=inputs=2:duration=first:dropout_transition=2[out]" '
+          '-map "[out]" -vn -ac 2 -ar 24000 -c:a pcm_s16le ${_quote(output)}';
+    }
+    final session = await FFmpegKit.execute(command);
+    final code = await session.getReturnCode();
+    if (!ReturnCode.isSuccess(code) ||
+        !await File(output).exists() ||
+        await File(output).length() <= 44) {
+      throw const AppException(
+        'تعذر إنشاء المشروع الصوتي المحلي. تأكد أن المسار الموسيقي قابل للفك.',
+      );
+    }
+    return output;
+  }
+
+  List<String> _atempoFilters(double value) {
+    final filters = <String>[];
+    var remaining = value;
+    while (remaining < 0.5) {
+      filters.add('atempo=0.5');
+      remaining /= 0.5;
+    }
+    while (remaining > 2) {
+      filters.add('atempo=2.0');
+      remaining /= 2;
+    }
+    filters.add('atempo=${remaining.clamp(0.5, 2).toStringAsFixed(6)}');
+    return filters;
+  }
+
+  double _powerOfTwo(double exponent) {
+    const values = <double>[
+      0.7071067812,
+      0.7491535384,
+      0.7937005260,
+      0.8408964153,
+      0.8908987181,
+      0.9438743127,
+      1,
+      1.0594630944,
+      1.1224620483,
+      1.1892071150,
+      1.2599210499,
+      1.3348398542,
+      1.4142135624,
+    ];
+    final semitone = (exponent * 12).round().clamp(-6, 6);
+    return values[semitone + 6];
+  }
+
   double? _lastNumber(String text, RegExp pattern) {
     final matches = pattern.allMatches(text).toList();
-    return matches.isEmpty ? null : double.tryParse(matches.last.group(1) ?? '');
+    return matches.isEmpty
+        ? null
+        : double.tryParse(matches.last.group(1) ?? '');
   }
 
   String _quote(String value) => "'${value.replaceAll("'", "'\\''")}'";

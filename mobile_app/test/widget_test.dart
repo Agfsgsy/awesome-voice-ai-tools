@@ -19,13 +19,13 @@ import 'package:voice_ai_mobile/services/secure_storage_service.dart';
 
 class _TestAppController extends AppController {
   _TestAppController(AppState initial)
-      : super(
-          SecureStorageService(),
-          ApiService(),
-          Connectivity(),
-          NotificationService(),
-          autoInitialize: false,
-        ) {
+    : super(
+        SecureStorageService(),
+        ApiService(),
+        Connectivity(),
+        NotificationService(),
+        autoInitialize: false,
+      ) {
     state = initial;
   }
 }
@@ -67,18 +67,18 @@ class _FakePicker extends DocumentPickerService {
 class _FakeLocalAudio extends LocalAudioService {
   @override
   Future<AudioAnalysis> analyze(String path) async => const AudioAnalysis(
-        durationSeconds: 4.2,
-        noiseFloorDbfs: -52,
-        silencePercent: 8,
-        clippingPercent: 0,
-        sampleRate: 48000,
-        sampleQuality: 'ممتازة',
-        distortion: 'منخفض',
-        qualityScore: 91,
-        clearSpeech: true,
-        issues: <String>[],
-        recommendation: 'التسجيل مناسب للاستنساخ',
-      );
+    durationSeconds: 4.2,
+    noiseFloorDbfs: -52,
+    silencePercent: 8,
+    clippingPercent: 0,
+    sampleRate: 48000,
+    sampleQuality: 'ممتازة',
+    distortion: 'منخفض',
+    qualityScore: 91,
+    clearSpeech: true,
+    issues: <String>[],
+    recommendation: 'التسجيل مناسب للاستنساخ',
+  );
 }
 
 class _FakePlayer extends AudioPlayerService {
@@ -91,13 +91,20 @@ class _FakePlayer extends AudioPlayerService {
   Future<void> dispose() async {}
 }
 
-List<Override> _overrides({_FakeRecorder? recorder, _FakePicker? picker, _FakePlayer? player}) => <Override>[
-      appControllerProvider.overrideWith((ref) => _TestAppController(const AppState(initialized: true, localMode: true))),
-      if (recorder != null) recorderServiceProvider.overrideWithValue(recorder),
-      if (picker != null) documentPickerProvider.overrideWithValue(picker),
-      if (player != null) playerServiceProvider.overrideWithValue(player),
-      localAudioServiceProvider.overrideWithValue(_FakeLocalAudio()),
-    ];
+List<Override> _overrides({
+  _FakeRecorder? recorder,
+  _FakePicker? picker,
+  _FakePlayer? player,
+}) => <Override>[
+  appControllerProvider.overrideWith(
+    (ref) =>
+        _TestAppController(const AppState(initialized: true, localMode: true)),
+  ),
+  if (recorder != null) recorderServiceProvider.overrideWithValue(recorder),
+  if (picker != null) documentPickerProvider.overrideWithValue(picker),
+  if (player != null) playerServiceProvider.overrideWithValue(player),
+  localAudioServiceProvider.overrideWithValue(_FakeLocalAudio()),
+];
 
 Future<void> _pumpUntilVisible(WidgetTester tester, Finder finder) async {
   for (var attempt = 0; attempt < 50; attempt++) {
@@ -119,14 +126,14 @@ void _usePhoneViewport(WidgetTester tester) {
 }
 
 Widget _recorderHarness(List<Override> overrides) => ProviderScope(
-      overrides: overrides,
-      child: const MaterialApp(
-        home: Directionality(
-          textDirection: TextDirection.rtl,
-          child: RecorderScreen(),
-        ),
-      ),
-    );
+  overrides: overrides,
+  child: const MaterialApp(
+    home: Directionality(
+      textDirection: TextDirection.rtl,
+      child: RecorderScreen(),
+    ),
+  ),
+);
 
 void _deleteDirectory(Directory directory) {
   if (directory.existsSync()) directory.deleteSync(recursive: true);
@@ -136,30 +143,46 @@ void main() {
   testWidgets('يشغّل التطبيق بالعربية RTL ويتنقل بين الصفحات', (tester) async {
     _usePhoneViewport(tester);
     appRouter.go('/splash');
-    await tester.pumpWidget(ProviderScope(overrides: _overrides(), child: const VoiceAiMobileApp()));
+    await tester.pumpWidget(
+      ProviderScope(overrides: _overrides(), child: const VoiceAiMobileApp()),
+    );
     await _pumpUntilVisible(tester, find.text('لوحة التحكم'));
 
     expect(find.text('لوحة التحكم'), findsWidgets);
-    final directionality = tester.widget<Directionality>(find.byType(Directionality).first);
+    final directionality = tester.widget<Directionality>(
+      find.byType(Directionality).first,
+    );
     expect(directionality.textDirection, TextDirection.rtl);
 
     await tester.tap(find.text('الاستوديو').last);
     await _pumpUntilVisible(tester, find.text('توليد الصوت (Voice Studio)'));
     expect(find.text('توليد الصوت (Voice Studio)'), findsOneWidget);
+    expect(find.text('محرك الهاتف — دون إنترنت'), findsOneWidget);
+    expect(find.text('إنشاء الصوت على الهاتف'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
 
   testWidgets('يسجل ويوقف مؤقتًا ويستكمل ويحلل ويشغل التسجيل', (tester) async {
     _usePhoneViewport(tester);
-    final directory = Directory.systemTemp.createTempSync('voice_ai_recorder_test');
+    final directory = Directory.systemTemp.createTempSync(
+      'voice_ai_recorder_test',
+    );
     final file = File('${directory.path}/recorded.wav');
     file.writeAsBytesSync(List<int>.filled(128, 1));
     final recorder = _FakeRecorder(file.path);
     final player = _FakePlayer();
     addTearDown(() => _deleteDirectory(directory));
 
-    await tester.pumpWidget(_recorderHarness(_overrides(recorder: recorder, picker: _FakePicker(file.path), player: player)));
+    await tester.pumpWidget(
+      _recorderHarness(
+        _overrides(
+          recorder: recorder,
+          picker: _FakePicker(file.path),
+          player: player,
+        ),
+      ),
+    );
     await _pumpUntilVisible(tester, find.text('بدء التسجيل'));
     await tester.tap(find.text('بدء التسجيل'));
     await tester.pump();
@@ -181,14 +204,20 @@ void main() {
     _deleteDirectory(directory);
   });
 
-  testWidgets('يختار ملفًا من مدير الملفات ويعرض نتيجة التحليل', (tester) async {
+  testWidgets('يختار ملفًا من مدير الملفات ويعرض نتيجة التحليل', (
+    tester,
+  ) async {
     _usePhoneViewport(tester);
-    final directory = Directory.systemTemp.createTempSync('voice_ai_picker_test');
+    final directory = Directory.systemTemp.createTempSync(
+      'voice_ai_picker_test',
+    );
     final file = File('${directory.path}/picked.mp3');
     file.writeAsBytesSync(List<int>.filled(256, 2));
     addTearDown(() => _deleteDirectory(directory));
 
-    await tester.pumpWidget(_recorderHarness(_overrides(picker: _FakePicker(file.path))));
+    await tester.pumpWidget(
+      _recorderHarness(_overrides(picker: _FakePicker(file.path))),
+    );
     await _pumpUntilVisible(tester, find.text('اختيار ملف'));
     await tester.tap(find.text('اختيار ملف'));
     await _pumpUntilVisible(tester, find.text('picked.mp3'));

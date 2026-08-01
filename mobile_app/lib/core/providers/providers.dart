@@ -13,12 +13,16 @@ import 'package:voice_ai_mobile/services/audio_player_service.dart';
 import 'package:voice_ai_mobile/services/audio_recorder_service.dart';
 import 'package:voice_ai_mobile/services/document_picker_service.dart';
 import 'package:voice_ai_mobile/services/local_audio_service.dart';
+import 'package:voice_ai_mobile/services/local_document_service.dart';
+import 'package:voice_ai_mobile/services/local_tts_service.dart';
 import 'package:voice_ai_mobile/services/notification_service.dart';
 import 'package:voice_ai_mobile/services/project_service.dart';
 import 'package:voice_ai_mobile/services/secure_storage_service.dart';
 import 'package:voice_ai_mobile/services/server_discovery_service.dart';
 
-final secureStorageProvider = Provider<SecureStorageService>((ref) => SecureStorageService());
+final secureStorageProvider = Provider<SecureStorageService>(
+  (ref) => SecureStorageService(),
+);
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 final recorderServiceProvider = Provider<AudioRecorderService>((ref) {
   final service = AudioRecorderService();
@@ -30,11 +34,29 @@ final playerServiceProvider = Provider<AudioPlayerService>((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
-final localAudioServiceProvider = Provider<LocalAudioService>((ref) => LocalAudioService());
-final documentPickerProvider = Provider<DocumentPickerService>((ref) => DocumentPickerService());
-final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService());
-final discoveryServiceProvider = Provider<ServerDiscoveryService>((ref) => ServerDiscoveryService());
-final projectServiceProvider = Provider<ProjectService>((ref) => ProjectService());
+final localAudioServiceProvider = Provider<LocalAudioService>(
+  (ref) => LocalAudioService(),
+);
+final localDocumentServiceProvider = Provider<LocalDocumentService>(
+  (ref) => LocalDocumentService(),
+);
+final localTtsServiceProvider = Provider<LocalTtsService>((ref) {
+  final service = LocalTtsService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+final documentPickerProvider = Provider<DocumentPickerService>(
+  (ref) => DocumentPickerService(),
+);
+final notificationServiceProvider = Provider<NotificationService>(
+  (ref) => NotificationService(),
+);
+final discoveryServiceProvider = Provider<ServerDiscoveryService>(
+  (ref) => ServerDiscoveryService(),
+);
+final projectServiceProvider = Provider<ProjectService>(
+  (ref) => ProjectService(),
+);
 final connectivityProvider = Provider<Connectivity>((ref) => Connectivity());
 
 class AppState {
@@ -42,7 +64,7 @@ class AppState {
     this.initialized = false,
     this.busy = false,
     this.online = false,
-    this.localMode = false,
+    this.localMode = true,
     this.themeMode = ThemeMode.dark,
     this.session,
     this.error,
@@ -66,16 +88,15 @@ class AppState {
     bool clearSession = false,
     String? error,
     bool clearError = false,
-  }) =>
-      AppState(
-        initialized: initialized ?? this.initialized,
-        busy: busy ?? this.busy,
-        online: online ?? this.online,
-        localMode: localMode ?? this.localMode,
-        themeMode: themeMode ?? this.themeMode,
-        session: clearSession ? null : (session ?? this.session),
-        error: clearError ? null : (error ?? this.error),
-      );
+  }) => AppState(
+    initialized: initialized ?? this.initialized,
+    busy: busy ?? this.busy,
+    online: online ?? this.online,
+    localMode: localMode ?? this.localMode,
+    themeMode: themeMode ?? this.themeMode,
+    session: clearSession ? null : (session ?? this.session),
+    error: clearError ? null : (error ?? this.error),
+  );
 }
 
 class AppController extends StateNotifier<AppState> {
@@ -98,8 +119,11 @@ class AppController extends StateNotifier<AppState> {
 
   Future<void> initialize() async {
     final theme = await _storage.readPreference('theme');
-    final local = await _storage.readPreference('local_mode') == 'true';
     final session = await _storage.readSession();
+    final local =
+        session == null ||
+        await _storage.readPreference('local_mode') == 'true';
+    if (session == null) await _storage.writePreference('local_mode', 'true');
     state = state.copyWith(
       themeMode: theme == 'light' ? ThemeMode.light : ThemeMode.dark,
       localMode: local,
@@ -107,9 +131,16 @@ class AppController extends StateNotifier<AppState> {
       clearError: true,
     );
     if (session != null) {
-      _api.configure(serverUrl: session.serverUrl, accessToken: session.accessToken, refresh: refreshAccessToken);
+      _api.configure(
+        serverUrl: session.serverUrl,
+        accessToken: session.accessToken,
+        refresh: refreshAccessToken,
+      );
       try {
-        if (session.expiresAt.isBefore(DateTime.now().add(const Duration(minutes: 2)))) await refreshAccessToken();
+        if (session.expiresAt.isBefore(
+          DateTime.now().add(const Duration(minutes: 2)),
+        ))
+          await refreshAccessToken();
         await _api.status();
         state = state.copyWith(online: true);
       } on Object {
@@ -117,12 +148,21 @@ class AppController extends StateNotifier<AppState> {
       }
     }
     await _notifications.initialize();
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((results) {
-      final connected = results.any((result) => result != ConnectivityResult.none);
-      if (!connected) {
-        state = state.copyWith(online: false, error: 'انقطع الإنترنت. ستُستأنف المهام عند عودة الاتصال.');
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
+      results,
+    ) {
+      final connected = results.any(
+        (result) => result != ConnectivityResult.none,
+      );
+      if (!connected && state.session != null) {
+        state = state.copyWith(
+          online: false,
+          error: 'انقطع الإنترنت. ستُستأنف المهام عند عودة الاتصال.',
+        );
       } else if (state.session != null) {
         unawaited(checkConnection());
+      } else {
+        state = state.copyWith(online: false, clearError: true);
       }
     });
     state = state.copyWith(initialized: true);
@@ -142,8 +182,17 @@ class AppController extends StateNotifier<AppState> {
         deviceName: PlatformName.deviceName,
       );
       await _storage.saveSession(session);
-      _api.configure(serverUrl: session.serverUrl, accessToken: session.accessToken, refresh: refreshAccessToken);
-      state = state.copyWith(session: session, online: true, busy: false, localMode: false);
+      _api.configure(
+        serverUrl: session.serverUrl,
+        accessToken: session.accessToken,
+        refresh: refreshAccessToken,
+      );
+      state = state.copyWith(
+        session: session,
+        online: true,
+        busy: false,
+        localMode: false,
+      );
       await _storage.writePreference('local_mode', 'false');
       await _notifications.requestPermission();
     } on AppException catch (error) {
@@ -164,7 +213,10 @@ class AppController extends StateNotifier<AppState> {
     final session = state.session;
     if (session == null) return null;
     try {
-      final result = await _api.authenticate(session.deviceId, session.deviceToken);
+      final result = await _api.authenticate(
+        session.deviceId,
+        session.deviceToken,
+      );
       final updated = session.copyWith(
         accessToken: result['access_token'] as String,
         expiresAt: DateTime.parse(result['expires_at'] as String),
@@ -193,18 +245,28 @@ class AppController extends StateNotifier<AppState> {
 
   Future<void> setTheme(ThemeMode mode) async {
     state = state.copyWith(themeMode: mode);
-    await _storage.writePreference('theme', mode == ThemeMode.light ? 'light' : 'dark');
+    await _storage.writePreference(
+      'theme',
+      mode == ThemeMode.light ? 'light' : 'dark',
+    );
   }
 
   Future<void> setLocalMode(bool value) async {
-    state = state.copyWith(localMode: value);
-    await _storage.writePreference('local_mode', value.toString());
+    final enabled = state.session == null || value;
+    state = state.copyWith(localMode: enabled, clearError: enabled);
+    await _storage.writePreference('local_mode', enabled.toString());
   }
 
   Future<void> disconnect() async {
     await _storage.clearSession();
     _api.configure(serverUrl: 'http://localhost');
-    state = state.copyWith(clearSession: true, online: false, clearError: true);
+    await _storage.writePreference('local_mode', 'true');
+    state = state.copyWith(
+      clearSession: true,
+      online: false,
+      localMode: true,
+      clearError: true,
+    );
   }
 
   @override
@@ -221,7 +283,9 @@ abstract final class PlatformName {
   }
 }
 
-final appControllerProvider = StateNotifierProvider<AppController, AppState>((ref) {
+final appControllerProvider = StateNotifierProvider<AppController, AppState>((
+  ref,
+) {
   return AppController(
     ref.watch(secureStorageProvider),
     ref.watch(apiServiceProvider),
@@ -231,7 +295,8 @@ final appControllerProvider = StateNotifierProvider<AppController, AppState>((re
 });
 
 class JobController extends StateNotifier<Map<String, MobileJob>> {
-  JobController(this._api, this._storage, this._notifications) : super(const <String, MobileJob>{}) {
+  JobController(this._api, this._storage, this._notifications)
+    : super(const <String, MobileJob>{}) {
     unawaited(_restore());
   }
 
@@ -275,7 +340,11 @@ class JobController extends StateNotifier<Map<String, MobileJob>> {
         try {
           final current = await _api.job(id);
           state = <String, MobileJob>{...state, id: current};
-          await _notifications.showProgress(id, current.message, current.progress);
+          await _notifications.showProgress(
+            id,
+            current.message,
+            current.progress,
+          );
           if (current.finished) {
             await _notifications.showCompleted(id, current.message);
             await _persist();
@@ -284,7 +353,9 @@ class JobController extends StateNotifier<Map<String, MobileJob>> {
           retryDelay = AppConstants.jobPollInterval;
         } on AppException catch (error) {
           if (!error.retryable) return;
-          retryDelay = Duration(seconds: (retryDelay.inSeconds * 2).clamp(2, 30));
+          retryDelay = Duration(
+            seconds: (retryDelay.inSeconds * 2).clamp(2, 30),
+          );
         }
         await Future<void>.delayed(retryDelay);
       }
@@ -306,8 +377,8 @@ class JobController extends StateNotifier<Map<String, MobileJob>> {
   }
 
   Future<void> _persist() => _storage.savePendingJobs(
-        state.values.where((job) => !job.finished).map((job) => job.id),
-      );
+    state.values.where((job) => !job.finished).map((job) => job.id),
+  );
 
   @override
   void dispose() {
@@ -316,17 +387,22 @@ class JobController extends StateNotifier<Map<String, MobileJob>> {
   }
 }
 
-final jobControllerProvider = StateNotifierProvider<JobController, Map<String, MobileJob>>((ref) {
-  return JobController(
-    ref.watch(apiServiceProvider),
-    ref.watch(secureStorageProvider),
-    ref.watch(notificationServiceProvider),
-  );
-});
+final jobControllerProvider =
+    StateNotifierProvider<JobController, Map<String, MobileJob>>((ref) {
+      return JobController(
+        ref.watch(apiServiceProvider),
+        ref.watch(secureStorageProvider),
+        ref.watch(notificationServiceProvider),
+      );
+    });
 
-final selectedReferenceProvider = StateProvider<SelectedReference?>((ref) => null);
+final selectedReferenceProvider = StateProvider<SelectedReference?>(
+  (ref) => null,
+);
 
-final providerHeadersProvider = FutureProvider<Map<String, String>>((ref) async {
+final providerHeadersProvider = FutureProvider<Map<String, String>>((
+  ref,
+) async {
   final storage = ref.watch(secureStorageProvider);
   final api = ref.watch(apiServiceProvider);
   return api.providerHeaders(

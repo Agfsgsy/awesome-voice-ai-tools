@@ -135,6 +135,11 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
     setState(() => _busy = true);
     try {
       final analysis = await ref.read(localAudioServiceProvider).analyze(path);
+      ref.read(selectedReferenceProvider.notifier).state = SelectedReference(
+        localPath: path,
+        fileId: '',
+        analysis: analysis,
+      );
       if (mounted) setState(() => _localAnalysis = analysis);
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
@@ -148,14 +153,21 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
     if (path == null) return;
     setState(() => _busy = true);
     try {
-      final converted = await ref.read(localAudioServiceProvider).convertToWav(path);
+      final converted = await ref
+          .read(localAudioServiceProvider)
+          .convertToWav(path);
       setState(() {
         _path = converted;
         _ownedFile = true;
         _localAnalysis = null;
       });
       await _analyzeLocal();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التحويل محليًا إلى WAV بجودة 24 kHz.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم التحويل محليًا إلى WAV بجودة 24 kHz.'),
+          ),
+        );
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     } finally {
@@ -167,7 +179,10 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
     final path = _path;
     if (path == null) return;
     if (ref.read(appControllerProvider).session == null) {
-      context.go('/pair');
+      showArabicError(
+        context,
+        'التحليل المحلي جاهز ولا يحتاج ربطًا. الرفع الدقيق اختياري ويتطلب خادمًا.',
+      );
       return;
     }
     setState(() {
@@ -184,7 +199,8 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
           path,
           cancelToken: _uploadCancelToken,
           onProgress: (sent, total) {
-            if (mounted) setState(() => _uploadProgress = total > 0 ? sent / total : null);
+            if (mounted)
+              setState(() => _uploadProgress = total > 0 ? sent / total : null);
           },
         );
         reference = await api.analyzeReferenceId(fileId, path);
@@ -193,7 +209,8 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
           path,
           cancelToken: _uploadCancelToken,
           onProgress: (sent, total) {
-            if (mounted) setState(() => _uploadProgress = total > 0 ? sent / total : null);
+            if (mounted)
+              setState(() => _uploadProgress = total > 0 ? sent / total : null);
           },
         );
       }
@@ -229,7 +246,12 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedPath = _path;
-    final supportedFormats = AppConstants.supportedAudioExtensions.map((value) => value.toUpperCase()).join('، ');
+    final hasServer = ref.watch(
+      appControllerProvider.select((state) => state.session != null),
+    );
+    final supportedFormats = AppConstants.supportedAudioExtensions
+        .map((value) => value.toUpperCase())
+        .join('، ');
     return ResponsivePage(
       children: <Widget>[
         SectionCard(
@@ -241,25 +263,47 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
               if (_recording)
                 Column(
                   children: <Widget>[
-                    Icon(_paused ? Icons.pause_circle_filled_rounded : Icons.fiber_manual_record_rounded, size: 72, color: _paused ? Colors.orange : Colors.red),
-                    Text(formatDuration(Duration(seconds: _elapsedSeconds)), style: Theme.of(context).textTheme.headlineMedium),
-                    Text(_paused ? 'التسجيل متوقف مؤقتًا ويمكن استكماله' : 'جارٍ التسجيل من الميكروفون'),
+                    Icon(
+                      _paused
+                          ? Icons.pause_circle_filled_rounded
+                          : Icons.fiber_manual_record_rounded,
+                      size: 72,
+                      color: _paused ? Colors.orange : Colors.red,
+                    ),
+                    Text(
+                      formatDuration(Duration(seconds: _elapsedSeconds)),
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    Text(
+                      _paused
+                          ? 'التسجيل متوقف مؤقتًا ويمكن استكماله'
+                          : 'جارٍ التسجيل من الميكروفون',
+                    ),
                   ],
                 )
               else if (selectedPath != null)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(child: Icon(Icons.audio_file_rounded)),
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.audio_file_rounded),
+                  ),
                   title: Text(p.basename(selectedPath)),
                   subtitle: FutureBuilder<int>(
                     future: File(selectedPath).length(),
-                    builder: (context, snapshot) => Text(snapshot.hasData ? formatBytes(snapshot.data!) : 'جارٍ قراءة الحجم...'),
+                    builder: (context, snapshot) => Text(
+                      snapshot.hasData
+                          ? formatBytes(snapshot.data!)
+                          : 'جارٍ قراءة الحجم...',
+                    ),
                   ),
                 )
               else
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Text('سجّل مباشرة أو اختر أي ملف يستطيع FFmpeg فكّه، بما في ذلك $supportedFormats.', textAlign: TextAlign.center),
+                  child: Text(
+                    'سجّل مباشرة أو اختر أي ملف يستطيع FFmpeg فكّه، بما في ذلك $supportedFormats.',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               const SizedBox(height: 12),
               Wrap(
@@ -268,26 +312,63 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
                 runSpacing: 10,
                 children: <Widget>[
                   if (!_recording && selectedPath == null)
-                    FilledButton.icon(onPressed: _start, icon: const Icon(Icons.mic_rounded), label: const Text('بدء التسجيل')),
+                    FilledButton.icon(
+                      onPressed: _start,
+                      icon: const Icon(Icons.mic_rounded),
+                      label: const Text('بدء التسجيل'),
+                    ),
                   if (_recording)
-                    FilledButton.tonalIcon(onPressed: _pauseOrResume, icon: Icon(_paused ? Icons.play_arrow_rounded : Icons.pause_rounded), label: Text(_paused ? 'استكمال' : 'إيقاف مؤقت')),
+                    FilledButton.tonalIcon(
+                      onPressed: _pauseOrResume,
+                      icon: Icon(
+                        _paused
+                            ? Icons.play_arrow_rounded
+                            : Icons.pause_rounded,
+                      ),
+                      label: Text(_paused ? 'استكمال' : 'إيقاف مؤقت'),
+                    ),
                   if (_recording)
-                    FilledButton.icon(onPressed: _stop, icon: const Icon(Icons.stop_rounded), label: const Text('إنهاء التسجيل')),
+                    FilledButton.icon(
+                      onPressed: _stop,
+                      icon: const Icon(Icons.stop_rounded),
+                      label: const Text('إنهاء التسجيل'),
+                    ),
                   if (!_recording)
-                    OutlinedButton.icon(onPressed: _busy ? null : _pick, icon: const Icon(Icons.folder_open_rounded), label: const Text('اختيار ملف')),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _pick,
+                      icon: const Icon(Icons.folder_open_rounded),
+                      label: const Text('اختيار ملف'),
+                    ),
                   if (selectedPath != null && !_recording)
-                    OutlinedButton.icon(onPressed: _play, icon: const Icon(Icons.play_arrow_rounded), label: const Text('معاينة')),
+                    OutlinedButton.icon(
+                      onPressed: _play,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('معاينة'),
+                    ),
                   if (selectedPath != null)
-                    OutlinedButton.icon(onPressed: _delete, icon: const Icon(Icons.delete_outline_rounded), label: Text(_ownedFile ? 'حذف التسجيل' : 'إزالة الاختيار')),
+                    OutlinedButton.icon(
+                      onPressed: _delete,
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      label: Text(
+                        _ownedFile ? 'حذف التسجيل' : 'إزالة الاختيار',
+                      ),
+                    ),
                 ],
               ),
-              if (_busy) const Padding(padding: EdgeInsets.only(top: 14), child: LinearProgressIndicator()),
+              if (_busy)
+                const Padding(
+                  padding: EdgeInsets.only(top: 14),
+                  child: LinearProgressIndicator(),
+                ),
               if (_uploadProgress != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Column(
                     children: <Widget>[
-                      Text('رفع الملف: ${(_uploadProgress! * 100).toStringAsFixed(0)}٪', textAlign: TextAlign.center),
+                      Text(
+                        'رفع الملف: ${(_uploadProgress! * 100).toStringAsFixed(0)}٪',
+                        textAlign: TextAlign.center,
+                      ),
                       TextButton.icon(
                         onPressed: _cancelUpload,
                         icon: const Icon(Icons.cancel_outlined),
@@ -299,7 +380,10 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
             ],
           ),
         ),
-        if (_localAnalysis != null) ...<Widget>[const SizedBox(height: 12), AudioAnalysisCard(analysis: _localAnalysis!)],
+        if (_localAnalysis != null) ...<Widget>[
+          const SizedBox(height: 12),
+          AudioAnalysisCard(analysis: _localAnalysis!),
+        ],
         if (selectedPath != null && !_recording) ...<Widget>[
           const SizedBox(height: 12),
           SectionCard(
@@ -309,9 +393,22 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
               spacing: 10,
               runSpacing: 10,
               children: <Widget>[
-                FilledButton.tonalIcon(onPressed: _busy ? null : _analyzeLocal, icon: const Icon(Icons.phone_android_rounded), label: const Text('تحليل محلي')),
-                FilledButton.tonalIcon(onPressed: _busy ? null : _convert, icon: const Icon(Icons.transform_rounded), label: const Text('تحويل محلي إلى WAV')),
-                FilledButton.icon(onPressed: _busy ? null : _analyzeOnServer, icon: const Icon(Icons.cloud_upload_rounded), label: const Text('رفع وتحليل دقيق')),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _analyzeLocal,
+                  icon: const Icon(Icons.phone_android_rounded),
+                  label: const Text('تحليل محلي'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _convert,
+                  icon: const Icon(Icons.transform_rounded),
+                  label: const Text('تحويل محلي إلى WAV'),
+                ),
+                if (hasServer)
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _analyzeOnServer,
+                    icon: const Icon(Icons.cloud_upload_rounded),
+                    label: const Text('رفع وتحليل دقيق اختياري'),
+                  ),
               ],
             ),
           ),
@@ -320,7 +417,11 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
           const SizedBox(height: 12),
           AudioAnalysisCard(analysis: _serverReference!.analysis),
           const SizedBox(height: 12),
-          FilledButton.icon(onPressed: () => context.go('/clone'), icon: const Icon(Icons.record_voice_over_rounded), label: const Text('استخدامه في استنساخ الصوت Pro')),
+          FilledButton.icon(
+            onPressed: () => context.go('/clone'),
+            icon: const Icon(Icons.record_voice_over_rounded),
+            label: const Text('استخدامه في استنساخ الصوت Pro'),
+          ),
         ],
         const SizedBox(height: 90),
       ],

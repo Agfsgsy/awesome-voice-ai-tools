@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 
@@ -23,6 +24,16 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
   double? _progress;
 
   List<Map<String, dynamic>> get _candidates {
+    final localPath = widget.result['local_path'];
+    if (localPath is String && localPath.isNotEmpty) {
+      return <Map<String, dynamic>>[
+        <String, dynamic>{
+          'candidate_id': 'local',
+          'local_path': localPath,
+          'name': widget.result['name'] as String? ?? p.basename(localPath),
+        },
+      ];
+    }
     final raw = widget.result['candidates'];
     if (raw is List<dynamic>) {
       return raw.whereType<Map<String, dynamic>>().toList();
@@ -41,17 +52,29 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
   }
 
   Future<String> _ensureLocal(Map<String, dynamic> candidate) async {
+    final localPath = candidate['local_path'];
+    if (localPath is String) {
+      if (await File(localPath).exists() && await File(localPath).length() > 44)
+        return localPath;
+      throw const AppException('الملف الناتج غير صالح أو لم يعد موجودًا.');
+    }
     final id = candidate['file_id'] as String;
     final cached = _localFiles[id];
     if (cached != null && await File(cached).exists()) return cached;
     final directory = await getTemporaryDirectory();
-    final name = p.basename(candidate['name'] as String? ?? 'voice_ai_${DateTime.now().millisecondsSinceEpoch}.wav');
+    final name = p.basename(
+      candidate['name'] as String? ??
+          'voice_ai_${DateTime.now().millisecondsSinceEpoch}.wav',
+    );
     final destination = p.join(directory.path, name);
-    final path = await ref.read(apiServiceProvider).downloadFile(
+    final path = await ref
+        .read(apiServiceProvider)
+        .downloadFile(
           id,
           destination,
           onProgress: (received, total) {
-            if (mounted && total > 0) setState(() => _progress = received / total);
+            if (mounted && total > 0)
+              setState(() => _progress = received / total);
           },
         );
     if (mounted) setState(() => _progress = null);
@@ -61,7 +84,9 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
 
   Future<void> _play(Map<String, dynamic> candidate) async {
     try {
-      await ref.read(playerServiceProvider).playFile(await _ensureLocal(candidate));
+      await ref
+          .read(playerServiceProvider)
+          .playFile(await _ensureLocal(candidate));
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     }
@@ -70,17 +95,31 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
   Future<void> _save(Map<String, dynamic> candidate) async {
     final destination = await ref
         .read(documentPickerProvider)
-        .chooseSavePath(p.basename(candidate['name'] as String? ?? 'voice_ai_result.wav'));
+        .chooseSavePath(
+          p.basename(candidate['name'] as String? ?? 'voice_ai_result.wav'),
+        );
     if (destination == null) return;
     try {
-      await ref.read(apiServiceProvider).downloadFile(
-            candidate['file_id'] as String,
-            destination,
-            onProgress: (received, total) {
-              if (mounted && total > 0) setState(() => _progress = received / total);
-            },
-          );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الملف بنجاح.')));
+      final localPath = candidate['local_path'];
+      if (localPath is String) {
+        if (!p.equals(localPath, destination))
+          await File(localPath).copy(destination);
+      } else {
+        await ref
+            .read(apiServiceProvider)
+            .downloadFile(
+              candidate['file_id'] as String,
+              destination,
+              onProgress: (received, total) {
+                if (mounted && total > 0)
+                  setState(() => _progress = received / total);
+              },
+            );
+      }
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم حفظ الملف بنجاح.')));
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     } finally {
@@ -97,7 +136,9 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
         ShareParams(
           files: <XFile>[XFile(path)],
           text: 'ملف صوتي من Voice AI Studio',
-          sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
         ),
       );
     } on Object catch (error) {
@@ -108,7 +149,8 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
   @override
   Widget build(BuildContext context) {
     final candidates = _candidates;
-    if (candidates.isEmpty) return const Text('اكتملت المهمة، لكن الخادم لم يُرجع ملفًا صوتيًا صالحًا.');
+    if (candidates.isEmpty)
+      return const Text('اكتملت العملية، لكن لم يُنتج ملف صوتي صالح.');
     final best = widget.result['best_candidate_id'] as String?;
     _selectedId ??= best ?? candidates.first['candidate_id'] as String?;
     return SectionCard(
@@ -119,10 +161,15 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
         onChanged: (value) => setState(() => _selectedId = value),
         child: Column(
           children: <Widget>[
-            if (_progress != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: LinearProgressIndicator(value: _progress)),
+            if (_progress != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(value: _progress),
+              ),
             ...candidates.asMap().entries.map((entry) {
               final candidate = entry.value;
-              final candidateId = candidate['candidate_id'] as String? ?? '${entry.key}';
+              final candidateId =
+                  candidate['candidate_id'] as String? ?? '${entry.key}';
               return Card.filled(
                 child: Padding(
                   padding: const EdgeInsets.all(8),
@@ -133,14 +180,37 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text('المرشح ${entry.key + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            if (candidateId == best) const Text('النتيجة المقترحة تلقائيًا', style: TextStyle(color: Color(0xFF14B8A6))),
+                            Text(
+                              candidates.length == 1
+                                  ? 'النتيجة جاهزة'
+                                  : 'المرشح ${entry.key + 1}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (candidateId == best)
+                              const Text(
+                                'النتيجة المقترحة تلقائيًا',
+                                style: TextStyle(color: Color(0xFF14B8A6)),
+                              ),
                           ],
                         ),
                       ),
-                      IconButton(tooltip: 'تشغيل', onPressed: () => _play(candidate), icon: const Icon(Icons.play_circle_fill_rounded)),
-                      IconButton(tooltip: 'حفظ', onPressed: () => _save(candidate), icon: const Icon(Icons.download_rounded)),
-                      IconButton(tooltip: 'مشاركة', onPressed: () => _share(candidate), icon: const Icon(Icons.share_rounded)),
+                      IconButton(
+                        tooltip: 'تشغيل',
+                        onPressed: () => _play(candidate),
+                        icon: const Icon(Icons.play_circle_fill_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'حفظ',
+                        onPressed: () => _save(candidate),
+                        icon: const Icon(Icons.download_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'مشاركة',
+                        onPressed: () => _share(candidate),
+                        icon: const Icon(Icons.share_rounded),
+                      ),
                     ],
                   ),
                 ),

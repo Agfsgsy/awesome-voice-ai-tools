@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
 import 'package:voice_ai_mobile/models/mobile_models.dart';
+import 'package:voice_ai_mobile/services/local_tts_service.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 import 'package:voice_ai_mobile/widgets/tracked_jobs_panel.dart';
 
@@ -18,6 +18,7 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
   bool _loading = true;
   String? _error;
   String? _preparingJobId;
+  LocalTtsStatus? _localStatus;
 
   @override
   void initState() {
@@ -27,7 +28,13 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
 
   Future<void> _load() async {
     if (ref.read(appControllerProvider).session == null) {
-      setState(() => _loading = false);
+      final status = await ref.read(localTtsServiceProvider).status();
+      if (mounted) {
+        setState(() {
+          _localStatus = status;
+          _loading = false;
+        });
+      }
       return;
     }
     setState(() {
@@ -66,8 +73,72 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (ref.watch(appControllerProvider).session == null) {
-      return Center(
-        child: FilledButton.icon(onPressed: () => context.go('/pair'), icon: const Icon(Icons.link_rounded), label: const Text('اقتران بخادم لعرض المحركات')),
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ResponsivePage(
+          children: <Widget>[
+            SectionCard(
+              title: 'محركات الهاتف المحلية',
+              icon: Icons.memory_rounded,
+              child: Column(
+                children: <Widget>[
+                  Card.filled(
+                    child: ListTile(
+                      leading: Icon(
+                        _localStatus?.installed == true
+                            ? Icons.check_circle_rounded
+                            : Icons.download_for_offline_rounded,
+                        color: _localStatus?.installed == true
+                            ? Colors.green
+                            : Colors.orange,
+                      ),
+                      title: const Text('محرك Android للصوت العربي'),
+                      subtitle: Text(
+                        _localStatus?.message ?? 'جارٍ فحص محرك الصوت...',
+                      ),
+                      trailing: _localStatus?.installed == true
+                          ? const Text(
+                              'جاهز',
+                              style: TextStyle(color: Colors.green),
+                            )
+                          : FilledButton.tonal(
+                              onPressed: () => ref
+                                  .read(localTtsServiceProvider)
+                                  .installVoiceData(),
+                              child: const Text('تنزيل'),
+                            ),
+                    ),
+                  ),
+                  const Card.filled(
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.check_circle_rounded,
+                        color: Colors.green,
+                      ),
+                      title: Text('FFmpeg المحلي'),
+                      subtitle: Text(
+                        'فك الصيغ والتحويل وتحليل الجودة والمزج الصوتي على الهاتف',
+                      ),
+                      trailing: Text(
+                        'جاهز',
+                        style: TextStyle(color: Colors.green),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: OutlinedButton.icon(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة الفحص'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 90),
+          ],
+        ),
       );
     }
     return RefreshIndicator(
@@ -77,32 +148,74 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
           if (_error != null)
             Card(
               color: Theme.of(context).colorScheme.errorContainer,
-              child: ListTile(title: const Text('تعذر تحميل حالة المحركات'), subtitle: Text(_error!), trailing: IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded))),
+              child: ListTile(
+                title: const Text('تعذر تحميل حالة المحركات'),
+                subtitle: Text(_error!),
+                trailing: IconButton(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ),
             ),
           SectionCard(
             title: 'المحركات والنماذج',
             icon: Icons.memory_rounded,
             child: Column(
               children: _engines.map((engine) {
-                final color = engine.downloading ? Colors.orange : (engine.ready ? Colors.green : Colors.redAccent);
-                final status = engine.downloading ? 'النموذج قيد التنزيل' : (engine.ready ? 'جاهز' : 'غير جاهز');
+                final color = engine.downloading
+                    ? Colors.orange
+                    : (engine.ready ? Colors.green : Colors.redAccent);
+                final status = engine.downloading
+                    ? 'النموذج قيد التنزيل'
+                    : (engine.ready ? 'جاهز' : 'غير جاهز');
                 return Card.filled(
                   child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: ListTile(
-                      leading: CircleAvatar(backgroundColor: color.withValues(alpha: 0.15), child: Icon(engine.external ? Icons.cloud_rounded : Icons.memory_rounded, color: color)),
-                      title: Text(engine.label, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      leading: CircleAvatar(
+                        backgroundColor: color.withValues(alpha: 0.15),
+                        child: Icon(
+                          engine.external
+                              ? Icons.cloud_rounded
+                              : Icons.memory_rounded,
+                          color: color,
+                        ),
+                      ),
+                      title: Text(
+                        engine.label,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text('$status${engine.external ? ' • خدمة خارجية' : ''}', style: TextStyle(color: color)),
-                          if (engine.models.isNotEmpty) Text('النماذج: ${engine.models.join('، ')}'),
-                          if (engine.error != null) Text(engine.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                          Text(
+                            '$status${engine.external ? ' • خدمة خارجية' : ''}',
+                            style: TextStyle(color: color),
+                          ),
+                          if (engine.models.isNotEmpty)
+                            Text('النماذج: ${engine.models.join('، ')}'),
+                          if (engine.error != null)
+                            Text(
+                              engine.error!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
                         ],
                       ),
                       trailing: !engine.external && !engine.ready
-                          ? FilledButton.tonal(onPressed: engine.downloading ? null : () => _prepare(engine), child: Text(engine.downloading ? 'جارٍ التنزيل' : 'تجهيز'))
-                          : const Icon(Icons.check_circle_rounded, color: Colors.green),
+                          ? FilledButton.tonal(
+                              onPressed: engine.downloading
+                                  ? null
+                                  : () => _prepare(engine),
+                              child: Text(
+                                engine.downloading ? 'جارٍ التنزيل' : 'تجهيز',
+                              ),
+                            )
+                          : const Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.green,
+                            ),
                     ),
                   ),
                 );

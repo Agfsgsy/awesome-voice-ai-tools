@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
+import 'package:voice_ai_mobile/services/local_tts_service.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -13,12 +14,18 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _geminiKey = TextEditingController();
-  final _geminiModel = TextEditingController(text: 'gemini-3.1-flash-tts-preview');
+  final _geminiModel = TextEditingController(
+    text: 'gemini-3.1-flash-tts-preview',
+  );
   final _elevenLabsKey = TextEditingController();
-  final _elevenLabsModel = TextEditingController(text: 'eleven_multilingual_v2');
+  final _elevenLabsModel = TextEditingController(
+    text: 'eleven_multilingual_v2',
+  );
   bool _loading = true;
   bool _saving = false;
   bool _showSecrets = false;
+  bool _checkingVoice = false;
+  LocalTtsStatus? _voiceStatus;
 
   @override
   void initState() {
@@ -38,10 +45,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _load() async {
     final storage = ref.read(secureStorageProvider);
     _geminiKey.text = await storage.readSecret('gemini_api_key') ?? '';
-    _geminiModel.text = await storage.readSecret('gemini_model') ?? _geminiModel.text;
+    _geminiModel.text =
+        await storage.readSecret('gemini_model') ?? _geminiModel.text;
     _elevenLabsKey.text = await storage.readSecret('elevenlabs_api_key') ?? '';
-    _elevenLabsModel.text = await storage.readSecret('elevenlabs_model') ?? _elevenLabsModel.text;
-    if (mounted) setState(() => _loading = false);
+    _elevenLabsModel.text =
+        await storage.readSecret('elevenlabs_model') ?? _elevenLabsModel.text;
+    if (!mounted) return;
+    setState(() => _loading = false);
+    await _checkLocalVoice();
+  }
+
+  Future<void> _checkLocalVoice() async {
+    if (mounted) setState(() => _checkingVoice = true);
+    final status = await ref.read(localTtsServiceProvider).status();
+    if (mounted) {
+      setState(() {
+        _voiceStatus = status;
+        _checkingVoice = false;
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -54,13 +76,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.invalidate(providerHeadersProvider);
     if (mounted) {
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حُفظت الإعدادات مشفرة داخل مخزن النظام الآمن.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حُفظت الإعدادات مشفرة داخل مخزن النظام الآمن.'),
+        ),
+      );
     }
   }
 
   Future<void> _disconnect() async {
     await ref.read(appControllerProvider.notifier).disconnect();
-    if (mounted) context.go('/pair');
+    if (mounted) context.go('/dashboard');
   }
 
   @override
@@ -70,28 +96,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return ResponsivePage(
       children: <Widget>[
         SectionCard(
-          title: 'الاتصال بالخادم',
+          title: 'الخادم الاختياري للمحركات الثقيلة',
           icon: Icons.dns_rounded,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(appState.online ? Icons.cloud_done_rounded : Icons.cloud_off_rounded, color: appState.online ? Colors.green : Colors.orange),
-                title: Text(appState.online ? 'الخادم متصل' : 'الخادم غير متصل'),
-                subtitle: Text(appState.session?.serverUrl ?? 'لم يُقترن هذا الهاتف بخادم', textDirection: TextDirection.ltr),
-                trailing: IconButton(tooltip: 'اختبار الاتصال', onPressed: () => ref.read(appControllerProvider.notifier).checkConnection(), icon: const Icon(Icons.refresh_rounded)),
+                leading: Icon(
+                  appState.online
+                      ? Icons.cloud_done_rounded
+                      : Icons.cloud_off_rounded,
+                  color: appState.online ? Colors.green : Colors.orange,
+                ),
+                title: Text(
+                  appState.online
+                      ? 'الخادم متصل'
+                      : (appState.session == null
+                            ? 'لا حاجة إلى خادم'
+                            : 'الخادم غير متصل'),
+                ),
+                subtitle: Text(
+                  appState.session?.serverUrl ??
+                      'التطبيق يعمل محليًا على الهاتف',
+                  textDirection: appState.session == null
+                      ? TextDirection.rtl
+                      : TextDirection.ltr,
+                ),
+                trailing: appState.session == null
+                    ? const Icon(
+                        Icons.offline_bolt_rounded,
+                        color: Color(0xFF14B8A6),
+                      )
+                    : IconButton(
+                        tooltip: 'اختبار الاتصال',
+                        onPressed: () => ref
+                            .read(appControllerProvider.notifier)
+                            .checkConnection(),
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
               ),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: <Widget>[
-                  FilledButton.tonalIcon(onPressed: () => context.go('/pair'), icon: const Icon(Icons.qr_code_scanner_rounded), label: Text(appState.session == null ? 'اقتران بخادم' : 'إعادة الاقتران بخادم آخر')),
-                  if (appState.session != null) OutlinedButton.icon(onPressed: _disconnect, icon: const Icon(Icons.link_off_rounded), label: const Text('فصل هذا الهاتف')),
+                  FilledButton.tonalIcon(
+                    onPressed: () => context.go('/pair'),
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: Text(
+                      appState.session == null
+                          ? 'اقتران بخادم'
+                          : 'إعادة الاقتران بخادم آخر',
+                    ),
+                  ),
+                  if (appState.session != null)
+                    OutlinedButton.icon(
+                      onPressed: _disconnect,
+                      icon: const Icon(Icons.link_off_rounded),
+                      label: const Text('فصل هذا الهاتف'),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
-              const Text('يُسمح بـ HTTP لعناوين الشبكة المحلية فقط. يلزم HTTPS لأي عنوان خارجي.', style: TextStyle(fontSize: 12)),
+              const Text(
+                'اختياري فقط لـ XTTS والمحركات الضخمة. يُسمح بـ HTTP داخل الشبكة المحلية، ويلزم HTTPS لأي عنوان خارجي.',
+                style: TextStyle(fontSize: 12),
+              ),
             ],
           ),
         ),
@@ -105,14 +175,81 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 contentPadding: EdgeInsets.zero,
                 value: appState.themeMode == ThemeMode.dark,
                 title: const Text('الوضع الداكن'),
-                onChanged: (value) => ref.read(appControllerProvider.notifier).setTheme(value ? ThemeMode.dark : ThemeMode.light),
+                onChanged: (value) => ref
+                    .read(appControllerProvider.notifier)
+                    .setTheme(value ? ThemeMode.dark : ThemeMode.light),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                value: appState.localMode,
-                title: const Text('تفعيل الأدوات المحلية الخفيفة'),
-                subtitle: const Text('التسجيل والمعاينة والتحليل والتحويل على الهاتف؛ تبقى XTTS والمحركات الثقيلة على الخادم.'),
-                onChanged: (value) => ref.read(appControllerProvider.notifier).setLocalMode(value),
+                value: appState.localMode || appState.session == null,
+                title: const Text('الوضع المحلي المستقل'),
+                subtitle: const Text(
+                  'التسجيل والمعاينة وFFmpeg والتحليل والتحويل وتوليد الصوت العربي وقراءة المستندات على الهاتف.',
+                ),
+                onChanged: appState.session == null
+                    ? null
+                    : (value) => ref
+                          .read(appControllerProvider.notifier)
+                          .setLocalMode(value),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SectionCard(
+          title: 'محرك الصوت العربي على الهاتف',
+          icon: Icons.record_voice_over_rounded,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: _checkingVoice
+                    ? const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        _voiceStatus?.installed == true
+                            ? Icons.check_circle_rounded
+                            : Icons.download_for_offline_rounded,
+                        color: _voiceStatus?.installed == true
+                            ? Colors.green
+                            : Colors.orange,
+                      ),
+                title: Text(
+                  _voiceStatus?.installed == true
+                      ? 'الصوت العربي المحلي جاهز'
+                      : 'يلزم تجهيز الصوت العربي',
+                ),
+                subtitle: Text(
+                  _voiceStatus?.message ??
+                      'اضغط الفحص لمعرفة حالة محرك Android.',
+                ),
+              ),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: <Widget>[
+                  FilledButton.tonalIcon(
+                    onPressed: _checkingVoice ? null : _checkLocalVoice,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('فحص المحرك'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () =>
+                        ref.read(localTtsServiceProvider).installVoiceData(),
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('تنزيل الصوت العربي'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        ref.read(localTtsServiceProvider).openSystemSettings(),
+                    icon: const Icon(Icons.settings_voice_rounded),
+                    label: const Text('إعدادات الصوت'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -124,7 +261,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              const Text('لا تُخزن المفاتيح في الكود أو الخادم. تُحفظ مشفرة في Android Keystore وتُرسل عبر HTTPS فقط عند استخدام المحرك.'),
+              const Text(
+                'لا تُخزن المفاتيح في الكود أو الخادم. تُحفظ مشفرة في Android Keystore وتُرسل عبر HTTPS فقط عند استخدام المحرك.',
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _geminiKey,
@@ -135,7 +274,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 decoration: const InputDecoration(labelText: 'Gemini API Key'),
               ),
               const SizedBox(height: 10),
-              TextField(controller: _geminiModel, textDirection: TextDirection.ltr, decoration: const InputDecoration(labelText: 'Gemini TTS Model')),
+              TextField(
+                controller: _geminiModel,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'Gemini TTS Model',
+                ),
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: _elevenLabsKey,
@@ -143,19 +288,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 enableSuggestions: false,
                 autocorrect: false,
                 textDirection: TextDirection.ltr,
-                decoration: const InputDecoration(labelText: 'ElevenLabs API Key'),
+                decoration: const InputDecoration(
+                  labelText: 'ElevenLabs API Key',
+                ),
               ),
               const SizedBox(height: 10),
-              TextField(controller: _elevenLabsModel, textDirection: TextDirection.ltr, decoration: const InputDecoration(labelText: 'ElevenLabs Model')),
+              TextField(
+                controller: _elevenLabsModel,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'ElevenLabs Model',
+                ),
+              ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _showSecrets,
-                onChanged: (value) => setState(() => _showSecrets = value ?? false),
+                onChanged: (value) =>
+                    setState(() => _showSecrets = value ?? false),
                 title: const Text('إظهار المفاتيح على هذه الشاشة مؤقتًا'),
               ),
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
-                icon: _saving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.lock_rounded),
+                icon: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.lock_rounded),
                 label: const Text('حفظ الإعدادات بأمان'),
               ),
             ],

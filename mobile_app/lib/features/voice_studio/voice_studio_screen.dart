@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:path/path.dart' as p;
+import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
 import 'package:voice_ai_mobile/models/mobile_models.dart';
 import 'package:voice_ai_mobile/widgets/audio_result_list.dart';
@@ -18,7 +19,7 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
   final _textController = TextEditingController();
   final _voiceController = TextEditingController(text: 'default');
   List<EngineInfo> _engines = const <EngineInfo>[];
-  String _engine = 'auto';
+  String _engine = 'local';
   double _speed = 1;
   int _candidates = 2;
   bool _loading = false;
@@ -49,10 +50,6 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
   }
 
   Future<void> _generate() async {
-    if (ref.read(appControllerProvider).session == null) {
-      context.go('/pair');
-      return;
-    }
     if (_textController.text.trim().isEmpty) {
       showArabicError(context, 'أدخل النص المراد تحويله إلى صوت.');
       return;
@@ -60,13 +57,38 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
     setState(() {
       _loading = true;
       _result = null;
+      _jobId = null;
     });
     try {
+      if (_engine == 'local') {
+        final output = await ref
+            .read(localTtsServiceProvider)
+            .synthesizeToFile(_textController.text.trim(), speed: _speed);
+        if (mounted) {
+          setState(
+            () => _result = <String, dynamic>{
+              'local_path': output,
+              'name': p.basename(output),
+              'engine': 'android-local',
+            },
+          );
+        }
+        return;
+      }
+      if (ref.read(appControllerProvider).session == null) {
+        throw const AppException(
+          'المحرك المختار يحتاج خادمًا اختياريًا. اختر «محرك الهاتف» للعمل دون ربط.',
+        );
+      }
       final headers = await ref.read(providerHeadersProvider.future);
-      final job = await ref.read(apiServiceProvider).synthesize(
+      final job = await ref
+          .read(apiServiceProvider)
+          .synthesize(
             text: _textController.text.trim(),
             engine: _engine,
-            voice: _voiceController.text.trim().isEmpty ? 'default' : _voiceController.text.trim(),
+            voice: _voiceController.text.trim().isEmpty
+                ? 'default'
+                : _voiceController.text.trim(),
             speed: _speed,
             candidateCount: _candidates,
             providerHeaders: headers,
@@ -82,9 +104,39 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final wordCount = _textController.text.trim().isEmpty ? 0 : _textController.text.trim().split(RegExp(r'\s+')).length;
+    final wordCount = _textController.text.trim().isEmpty
+        ? 0
+        : _textController.text.trim().split(RegExp(r'\s+')).length;
+    final localSelected = _engine == 'local';
+    final hasServer = ref.watch(
+      appControllerProvider.select((state) => state.session != null),
+    );
     return ResponsivePage(
       children: <Widget>[
+        Card(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.offline_bolt_rounded),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'محرك الهاتف هو الافتراضي ويُنشئ الملف محليًا. إذا لم تكن العربية مثبتة، نزّل بياناتها مرة واحدة من إعدادات Android.',
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await ref.read(localTtsServiceProvider).installVoiceData();
+                  },
+                  child: const Text('تنزيل العربية'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         SectionCard(
           title: 'توليد الصوت (Voice Studio)',
           icon: Icons.graphic_eq_rounded,
@@ -96,10 +148,16 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                 minLines: 6,
                 maxLines: 14,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(labelText: 'النص العربي', hintText: 'اكتب أو الصق النص هنا...'),
+                decoration: const InputDecoration(
+                  labelText: 'النص العربي',
+                  hintText: 'اكتب أو الصق النص هنا...',
+                ),
               ),
               const SizedBox(height: 6),
-              Text('${_textController.text.length} حرف • $wordCount كلمة • نحو ${(wordCount / 2.2).ceil()} ثانية', style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                '${_textController.text.length} حرف • $wordCount كلمة • نحو ${(wordCount / 2.2).ceil()} ثانية',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 14),
               LayoutBuilder(
                 builder: (context, constraints) => Wrap(
@@ -107,33 +165,86 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                   runSpacing: 12,
                   children: <Widget>[
                     SizedBox(
-                      width: constraints.maxWidth > 620 ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth,
+                      width: constraints.maxWidth > 620
+                          ? (constraints.maxWidth - 12) / 2
+                          : constraints.maxWidth,
                       child: DropdownButtonFormField<String>(
                         initialValue: _engine,
                         decoration: const InputDecoration(labelText: 'المحرك'),
                         items: <DropdownMenuItem<String>>[
-                          const DropdownMenuItem(value: 'auto', child: Text('اختيار تلقائي')),
-                          ..._engines.map((engine) => DropdownMenuItem(value: engine.name, child: Text('${engine.label}${engine.ready ? '' : ' — غير جاهز'}'))),
+                          const DropdownMenuItem(
+                            value: 'local',
+                            child: Text('محرك الهاتف — دون إنترنت'),
+                          ),
+                          if (hasServer)
+                            const DropdownMenuItem(
+                              value: 'auto',
+                              child: Text('خادم — اختيار تلقائي'),
+                            ),
+                          if (hasServer)
+                            ..._engines.map(
+                              (engine) => DropdownMenuItem(
+                                value: engine.name,
+                                child: Text(
+                                  '${engine.label}${engine.ready ? '' : ' — غير جاهز'}',
+                                ),
+                              ),
+                            ),
                         ],
-                        onChanged: (value) => setState(() => _engine = value ?? 'auto'),
+                        onChanged: (value) =>
+                            setState(() => _engine = value ?? 'local'),
                       ),
                     ),
-                    SizedBox(
-                      width: constraints.maxWidth > 620 ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth,
-                      child: TextField(controller: _voiceController, decoration: const InputDecoration(labelText: 'الصوت', helperText: 'اسم الصوت في المحرك المختار')),
-                    ),
+                    if (!localSelected)
+                      SizedBox(
+                        width: constraints.maxWidth > 620
+                            ? (constraints.maxWidth - 12) / 2
+                            : constraints.maxWidth,
+                        child: TextField(
+                          controller: _voiceController,
+                          decoration: const InputDecoration(
+                            labelText: 'الصوت',
+                            helperText: 'اسم الصوت في المحرك المختار',
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
               Text('السرعة: ${_speed.toStringAsFixed(1)}×'),
-              Slider(value: _speed, min: 0.5, max: 2, divisions: 15, onChanged: (value) => setState(() => _speed = value)),
-              Text('عدد المرشحين: $_candidates'),
-              Slider(value: _candidates.toDouble(), min: 1, max: 5, divisions: 4, onChanged: (value) => setState(() => _candidates = value.round())),
+              Slider(
+                value: _speed,
+                min: 0.5,
+                max: 2,
+                divisions: 15,
+                onChanged: (value) => setState(() => _speed = value),
+              ),
+              if (!localSelected) ...<Widget>[
+                Text('عدد المرشحين: $_candidates'),
+                Slider(
+                  value: _candidates.toDouble(),
+                  min: 1,
+                  max: 5,
+                  divisions: 4,
+                  onChanged: (value) =>
+                      setState(() => _candidates = value.round()),
+                ),
+              ],
               FilledButton.icon(
                 onPressed: _loading ? null : _generate,
-                icon: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome_rounded),
-                label: const Text('توليد الصوت'),
+                icon: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome_rounded),
+                label: Text(
+                  localSelected
+                      ? 'إنشاء الصوت على الهاتف'
+                      : 'توليد الصوت من الخادم',
+                ),
               ),
             ],
           ),
@@ -143,11 +254,15 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
           TrackedJobsPanel(
             onlyJobId: _jobId,
             onCompleted: (job) {
-              if (_result == null && job.result != null) setState(() => _result = job.result);
+              if (_result == null && job.result != null)
+                setState(() => _result = job.result);
             },
           ),
         ],
-        if (_result != null) ...<Widget>[const SizedBox(height: 12), AudioResultList(result: _result!)],
+        if (_result != null) ...<Widget>[
+          const SizedBox(height: 12),
+          AudioResultList(result: _result!),
+        ],
         const SizedBox(height: 90),
       ],
     );
