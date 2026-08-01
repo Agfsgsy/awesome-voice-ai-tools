@@ -116,6 +116,8 @@ jobs:
             "keyPassword=$ANDROID_KEY_PASSWORD" \
             "keyAlias=$ANDROID_KEY_ALIAS" \
             "storeFile=upload-keystore.jks" > android/key.properties
+      - name: Build installable debug APK
+        run: flutter build apk --debug
       - name: Build release APK
         run: flutter build apk --release
       - name: Build release AAB
@@ -124,6 +126,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ../dist/mobile/android
+          cp build/app/outputs/flutter-apk/app-debug.apk ../dist/mobile/android/voice-ai-mobile-debug.apk
           if [[ "$MOBILE_SIGNING_ENABLED" == "true" ]]; then
             cp build/app/outputs/flutter-apk/app-release.apk ../dist/mobile/android/voice-ai-mobile-release-signed.apk
             cp build/app/outputs/bundle/release/app-release.aab ../dist/mobile/android/voice-ai-mobile-release-signed.aab
@@ -135,7 +138,7 @@ jobs:
       - name: Remove signing material
         if: always()
         run: rm -f android/app/upload-keystore.jks android/key.properties
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: voice-ai-mobile-apk
