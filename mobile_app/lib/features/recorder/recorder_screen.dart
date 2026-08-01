@@ -3,14 +3,17 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 import 'package:voice_ai_mobile/core/constants/app_constants.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
 import 'package:voice_ai_mobile/core/utils/formatters.dart';
+import 'package:voice_ai_mobile/models/cloud_provider_models.dart';
 import 'package:voice_ai_mobile/models/mobile_models.dart';
 import 'package:voice_ai_mobile/widgets/audio_analysis_card.dart';
+import 'package:voice_ai_mobile/widgets/audio_result_list.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 
 class RecorderScreen extends ConsumerStatefulWidget {
@@ -32,12 +35,63 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
   SelectedReference? _serverReference;
   Timer? _timer;
   CancelToken? _uploadCancelToken;
+  CancelToken? _cloudCancelToken;
+  double? _cloudProgress;
+  String? _transcript;
+  Map<String, dynamic>? _processedResult;
+  String _effectPreset = 'studio';
+  String _selectedElevenVoice = '';
+  bool _removeVoiceNoise = false;
+  List<CloudVoice> _cloudVoices = const <CloudVoice>[];
+  final _trimStartController = TextEditingController(text: '0');
+  final _trimEndController = TextEditingController(text: '0');
+  CloudProviderConfig _cloudConfig = const CloudProviderConfig(
+    geminiApiKey: '',
+    geminiModel: 'gemini-3.1-flash-tts-preview',
+    geminiVoice: 'Kore',
+    elevenLabsApiKey: '',
+    elevenLabsModel: 'eleven_multilingual_v2',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_loadCloudConfig);
+  }
 
   @override
   void dispose() {
     _timer?.cancel();
     _uploadCancelToken?.cancel('ألغى المستخدم عملية الرفع');
+    _cloudCancelToken?.cancel();
+    _trimStartController.dispose();
+    _trimEndController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCloudConfig() async {
+    try {
+      final config = await ref.read(cloudProviderConfigProvider.future);
+      var voices = const <CloudVoice>[];
+      if (config.hasElevenLabs) {
+        try {
+          voices = await ref
+              .read(cloudProviderServiceProvider)
+              .listElevenLabsVoices(apiKey: config.elevenLabsApiKey);
+        } on Object {
+          voices = const <CloudVoice>[];
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _cloudConfig = config;
+          _cloudVoices = voices;
+          if (voices.isNotEmpty) _selectedElevenVoice = voices.first.id;
+        });
+      }
+    } on Object {
+      // تعرض أداة التفريغ رسالة الإعداد عند تشغيلها.
+    }
   }
 
   void _startTimer() {
@@ -58,6 +112,8 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
         _elapsedSeconds = 0;
         _localAnalysis = null;
         _serverReference = null;
+        _transcript = null;
+        _processedResult = null;
       });
       _startTimer();
     } on Object catch (error) {
@@ -106,6 +162,8 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
         _paused = false;
         _localAnalysis = null;
         _serverReference = null;
+        _transcript = null;
+        _processedResult = null;
       });
       await _analyzeLocal();
     } on Object catch (error) {
@@ -115,8 +173,14 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
 
   Future<void> _delete() async {
     _timer?.cancel();
+    final selected = _path;
+    final recorder = ref.read(recorderServiceProvider);
     if (_recording || _paused || _ownedFile) {
-      await ref.read(recorderServiceProvider).delete();
+      if (selected != null && recorder.path != selected && _ownedFile) {
+        final file = File(selected);
+        if (await file.exists()) await file.delete();
+      }
+      await recorder.delete();
     }
     setState(() {
       _path = null;
@@ -126,6 +190,8 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
       _elapsedSeconds = 0;
       _localAnalysis = null;
       _serverReference = null;
+      _transcript = null;
+      _processedResult = null;
     });
   }
 
@@ -153,13 +219,17 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
     if (path == null) return;
     setState(() => _busy = true);
     try {
-      final converted = await ref
-          .read(localAudioServiceProvider)
-          .convertToWav(path);
+      final converted =
+          await ref.read(localAudioServiceProvider).convertToWav(path);
       setState(() {
         _path = converted;
         _ownedFile = true;
         _localAnalysis = null;
+        _processedResult = <String, dynamic>{
+          'local_path': converted,
+          'name': p.basename(converted),
+          'engine': 'ffmpeg-local-convert',
+        };
       });
       await _analyzeLocal();
       if (mounted) {
@@ -239,6 +309,180 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
       await ref.read(playerServiceProvider).playFile(path);
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
+    }
+  }
+
+  Future<void> _transcribe() async {
+    final path = _path;
+    if (path == null) return;
+    if (!_cloudConfig.hasGemini) {
+      showArabicError(
+        context,
+        'أضف مفتاح Gemini من الإعدادات لتحويل الصوت إلى نص مباشرة من الهاتف.',
+      );
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _cloudProgress = 0;
+      _transcript = null;
+    });
+    _cloudCancelToken = CancelToken();
+    try {
+      final transcript =
+          await ref.read(cloudProviderServiceProvider).transcribeGemini(
+                apiKey: _cloudConfig.geminiApiKey,
+                model: _cloudConfig.geminiTextModel,
+                audioPath: path,
+                cancelToken: _cloudCancelToken,
+                onProgress: (sent, total) {
+                  if (mounted && total > 0) {
+                    setState(() => _cloudProgress = sent / total);
+                  }
+                },
+              );
+      if (mounted) setState(() => _transcript = transcript);
+    } on Object catch (error) {
+      if (mounted) showArabicError(context, error);
+    } finally {
+      _cloudCancelToken = null;
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _cloudProgress = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _applyEffect() async {
+    final path = _path;
+    if (path == null) return;
+    setState(() => _busy = true);
+    try {
+      final output = await ref
+          .read(localAudioServiceProvider)
+          .applyEffect(path, _effectPreset);
+      if (!mounted) return;
+      setState(() {
+        _path = output;
+        _ownedFile = true;
+        _localAnalysis = null;
+        _processedResult = <String, dynamic>{
+          'local_path': output,
+          'name': p.basename(output),
+          'engine': 'ffmpeg-local-effect',
+        };
+      });
+      await _analyzeLocal();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم تطبيق المؤثر وحفظ نسخة جديدة.')),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) showArabicError(context, error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _trim() async {
+    final path = _path;
+    if (path == null) return;
+    final start = double.tryParse(_trimStartController.text.trim()) ?? -1;
+    final end = double.tryParse(_trimEndController.text.trim()) ?? -1;
+    if (start < 0 || end < 0) {
+      showArabicError(context, 'أدخل قيم قص صحيحة بالثواني.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final output = await ref.read(localAudioServiceProvider).trim(
+            inputPath: path,
+            removeStartSeconds: start,
+            removeEndSeconds: end,
+          );
+      if (!mounted) return;
+      setState(() {
+        _path = output;
+        _ownedFile = true;
+        _localAnalysis = null;
+        _processedResult = <String, dynamic>{
+          'local_path': output,
+          'name': p.basename(output),
+          'engine': 'ffmpeg-local-trim',
+        };
+      });
+      await _analyzeLocal();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم قص الملف وحفظ نسخة جديدة.')),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) showArabicError(context, error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _changeVoice() async {
+    final path = _path;
+    if (path == null) return;
+    if (!_cloudConfig.hasElevenLabs) {
+      showArabicError(
+        context,
+        'أضف مفتاح ElevenLabs من الإعدادات لتشغيل مغير الصوت مباشرة.',
+      );
+      return;
+    }
+    if (_selectedElevenVoice.isEmpty) {
+      showArabicError(context, 'حمّل أصوات ElevenLabs واختر الصوت المطلوب.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _cloudProgress = 0;
+    });
+    _cloudCancelToken = CancelToken();
+    try {
+      final output =
+          await ref.read(cloudProviderServiceProvider).changeVoiceElevenLabs(
+                apiKey: _cloudConfig.elevenLabsApiKey,
+                model: _cloudConfig.elevenLabsStsModel,
+                voiceId: _selectedElevenVoice,
+                sourcePath: path,
+                removeBackgroundNoise: _removeVoiceNoise,
+                cancelToken: _cloudCancelToken,
+                onSendProgress: (sent, total) {
+                  if (mounted && total > 0) {
+                    setState(() => _cloudProgress = sent / total);
+                  }
+                },
+              );
+      if (!mounted) return;
+      setState(() {
+        _path = output;
+        _ownedFile = true;
+        _localAnalysis = null;
+        _processedResult = <String, dynamic>{
+          'local_path': output,
+          'name': p.basename(output),
+          'engine': 'elevenlabs-voice-changer',
+        };
+      });
+      await _analyzeLocal();
+    } on Object catch (error) {
+      if (mounted) showArabicError(context, error);
+    } finally {
+      _cloudCancelToken = null;
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _cloudProgress = null;
+        });
+      }
     }
   }
 
@@ -402,6 +646,15 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
                   label: const Text('تحليل محلي'),
                 ),
                 FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _transcribe,
+                  icon: const Icon(Icons.transcribe_rounded),
+                  label: Text(
+                    _cloudConfig.hasGemini
+                        ? 'تحويل إلى نص عبر Gemini'
+                        : 'تحويل إلى نص — أضف مفتاح Gemini',
+                  ),
+                ),
+                FilledButton.tonalIcon(
                   onPressed: _busy ? null : _convert,
                   icon: const Icon(Icons.transform_rounded),
                   label: const Text('تحويل محلي إلى WAV'),
@@ -415,16 +668,189 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
               ],
             ),
           ),
-        ],
-        if (_serverReference != null) ...<Widget>[
           const SizedBox(height: 12),
-          AudioAnalysisCard(analysis: _serverReference!.analysis),
+          SectionCard(
+            title: 'المؤثرات والمحرر المحلي',
+            icon: Icons.auto_fix_high_rounded,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                DropdownButtonFormField<String>(
+                  initialValue: _effectPreset,
+                  decoration: const InputDecoration(labelText: 'المؤثر الجاهز'),
+                  items: const <DropdownMenuItem<String>>[
+                    DropdownMenuItem(
+                      value: 'studio',
+                      child: Text('صوت استوديو'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'lecture',
+                      child: Text('محاضرة واضحة'),
+                    ),
+                    DropdownMenuItem(value: 'mosque', child: Text('صدى مسجد')),
+                    DropdownMenuItem(
+                      value: 'deep_voice',
+                      child: Text('صوت عميق'),
+                    ),
+                    DropdownMenuItem(value: 'podcast', child: Text('بودكاست')),
+                    DropdownMenuItem(
+                      value: 'video_commentary',
+                      child: Text('تعليق فيديو'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _effectPreset = value ?? 'studio'),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _applyEffect,
+                  icon: const Icon(Icons.graphic_eq_rounded),
+                  label: const Text('تطبيق المؤثر محليًا'),
+                ),
+                const Divider(height: 28),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextField(
+                        controller: _trimStartController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'حذف من البداية (ثانية)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _trimEndController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'حذف من النهاية (ثانية)',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _trim,
+                  icon: const Icon(Icons.content_cut_rounded),
+                  label: const Text('قص وحفظ نسخة جديدة'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'مغير الصوت عبر ElevenLabs',
+            icon: Icons.multitrack_audio_rounded,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                if (_cloudVoices.isEmpty)
+                  OutlinedButton.icon(
+                    onPressed: _loadCloudConfig,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text(
+                      _cloudConfig.hasElevenLabs
+                          ? 'تحميل أصوات ElevenLabs'
+                          : 'أضف مفتاح ElevenLabs ثم حدّث',
+                    ),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    initialValue: _cloudVoices.any(
+                      (voice) => voice.id == _selectedElevenVoice,
+                    )
+                        ? _selectedElevenVoice
+                        : _cloudVoices.first.id,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'الصوت الهدف',
+                    ),
+                    items: _cloudVoices
+                        .map(
+                          (voice) => DropdownMenuItem<String>(
+                            value: voice.id,
+                            child: Text(
+                              voice.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _selectedElevenVoice = value ?? ''),
+                  ),
+                SwitchListTile(
+                  value: _removeVoiceNoise,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('تنقية الضوضاء قبل تغيير الصوت'),
+                  onChanged: (value) =>
+                      setState(() => _removeVoiceNoise = value),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _changeVoice,
+                  icon: const Icon(Icons.record_voice_over_rounded),
+                  label: const Text('تغيير الصوت مباشرة'),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_cloudProgress != null) ...<Widget>[
+          const SizedBox(height: 12),
+          LinearProgressIndicator(value: _cloudProgress),
+          TextButton.icon(
+            onPressed: () => _cloudCancelToken?.cancel(),
+            icon: const Icon(Icons.cancel_rounded),
+            label: const Text('إلغاء تحويل الصوت إلى نص'),
+          ),
+        ],
+        if (_transcript != null) ...<Widget>[
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'النص المستخرج',
+            icon: Icons.article_rounded,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                SelectableText(_transcript!),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: _transcript!));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم نسخ النص.')),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('نسخ النص'),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_processedResult != null) ...<Widget>[
+          const SizedBox(height: 12),
+          AudioResultList(result: _processedResult!),
+        ],
+        if (_localAnalysis != null) ...<Widget>[
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: () => context.go('/clone'),
             icon: const Icon(Icons.record_voice_over_rounded),
             label: const Text('استخدامه في استنساخ الصوت Pro'),
           ),
+        ],
+        if (_serverReference != null) ...<Widget>[
+          const SizedBox(height: 12),
+          AudioAnalysisCard(analysis: _serverReference!.analysis),
         ],
         const SizedBox(height: 90),
       ],

@@ -97,6 +97,8 @@ jobs:
         run: timeout --signal=TERM 4m flutter test test/services_test.dart --reporter expanded
       - name: Run Flutter API workflow tests
         run: timeout --signal=TERM 4m flutter test test/api_workflow_test.dart --reporter expanded
+      - name: Run direct cloud provider tests
+        run: timeout --signal=TERM 4m flutter test test/cloud_provider_service_test.dart --reporter expanded
       - name: Run Flutter widget tests
         run: timeout --signal=TERM 4m flutter test test/widget_test.dart --reporter expanded
       - name: Detect complete signing configuration

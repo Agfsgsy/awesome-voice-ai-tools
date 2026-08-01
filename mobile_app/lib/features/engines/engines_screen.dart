@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
+import 'package:voice_ai_mobile/models/cloud_provider_models.dart';
 import 'package:voice_ai_mobile/models/mobile_models.dart';
 import 'package:voice_ai_mobile/services/local_tts_service.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
@@ -19,6 +20,8 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
   String? _error;
   String? _preparingJobId;
   LocalTtsStatus? _localStatus;
+  CloudProviderStatus? _geminiStatus;
+  CloudProviderStatus? _elevenLabsStatus;
 
   @override
   void initState() {
@@ -27,24 +30,51 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
   }
 
   Future<void> _load() async {
-    if (ref.read(appControllerProvider).session == null) {
-      final status = await ref.read(localTtsServiceProvider).status();
-      if (mounted) {
-        setState(() {
-          _localStatus = status;
-          _loading = false;
-        });
-      }
-      return;
-    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final engines = await ref.read(apiServiceProvider).engines();
+      final localStatus = await ref.read(localTtsServiceProvider).status();
+      final config = await ref.read(cloudProviderConfigProvider.future);
+      CloudProviderStatus? geminiStatus;
+      CloudProviderStatus? elevenLabsStatus;
+      try {
+        geminiStatus = await ref
+            .read(cloudProviderServiceProvider)
+            .checkGemini(
+              apiKey: config.geminiApiKey,
+              model: config.geminiModel,
+            );
+      } on Object catch (error) {
+        geminiStatus = CloudProviderStatus(
+          provider: 'gemini',
+          configured: config.hasGemini,
+          available: false,
+          message: error.toString(),
+        );
+      }
+      try {
+        elevenLabsStatus = await ref
+            .read(cloudProviderServiceProvider)
+            .checkElevenLabs(apiKey: config.elevenLabsApiKey);
+      } on Object catch (error) {
+        elevenLabsStatus = CloudProviderStatus(
+          provider: 'elevenlabs',
+          configured: config.hasElevenLabs,
+          available: false,
+          message: error.toString(),
+        );
+      }
+      var engines = const <EngineInfo>[];
+      if (ref.read(appControllerProvider).session != null) {
+        engines = await ref.read(apiServiceProvider).engines();
+      }
       if (mounted) {
         setState(() {
+          _localStatus = localStatus;
+          _geminiStatus = geminiStatus;
+          _elevenLabsStatus = elevenLabsStatus;
           _engines = engines;
           _loading = false;
         });
@@ -57,6 +87,31 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
         });
       }
     }
+  }
+
+  Widget _cloudEngineCard({
+    required String name,
+    required String tools,
+    required CloudProviderStatus? status,
+  }) {
+    final ready = status?.available == true;
+    final configured = status?.configured == true;
+    final color = ready ? Colors.green : Colors.orange;
+    return Card.filled(
+      child: ListTile(
+        leading: Icon(
+          ready ? Icons.cloud_done_rounded : Icons.key_rounded,
+          color: color,
+        ),
+        title: Text(name),
+        subtitle: Text('${status?.message ?? 'جارٍ الفحص...'}\n$tools'),
+        isThreeLine: true,
+        trailing: Text(
+          ready ? 'جاهز' : (configured ? 'تحقق' : 'أضف مفتاحًا'),
+          style: TextStyle(color: color),
+        ),
+      ),
+    );
   }
 
   Future<void> _prepare(EngineInfo engine) async {
@@ -125,6 +180,16 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
                       ),
                     ),
                   ),
+                  _cloudEngineCard(
+                    name: 'Gemini TTS المباشر',
+                    tools: 'توليد مرشحين وقراءة المستندات وأداء الشيلات',
+                    status: _geminiStatus,
+                  ),
+                  _cloudEngineCard(
+                    name: 'ElevenLabs المباشر',
+                    tools: 'توليد الصوت والاستنساخ الفوري ومغير الصوت',
+                    status: _elevenLabsStatus,
+                  ),
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: OutlinedButton.icon(
@@ -157,6 +222,25 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
                 ),
               ),
             ),
+          SectionCard(
+            title: 'محركات الهاتف والخدمات المباشرة',
+            icon: Icons.phone_android_rounded,
+            child: Column(
+              children: <Widget>[
+                _cloudEngineCard(
+                  name: 'Gemini TTS المباشر',
+                  tools: 'اتصال HTTPS من الهاتف دون وسيط',
+                  status: _geminiStatus,
+                ),
+                _cloudEngineCard(
+                  name: 'ElevenLabs المباشر',
+                  tools: 'توليد واستنساخ HTTPS من الهاتف دون وسيط',
+                  status: _elevenLabsStatus,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           SectionCard(
             title: 'المحركات والنماذج',
             icon: Icons.memory_rounded,

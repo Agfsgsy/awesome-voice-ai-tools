@@ -1,8 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
+import 'package:voice_ai_mobile/models/cloud_provider_models.dart';
+import 'package:voice_ai_mobile/services/cloud_provider_service.dart';
 import 'package:voice_ai_mobile/widgets/audio_result_list.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 import 'package:voice_ai_mobile/widgets/tracked_jobs_panel.dart';
@@ -28,15 +31,56 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
   String? _instrumentalFileId;
   bool _busy = false;
   double? _uploadProgress;
+  double? _cloudProgress;
   String? _jobId;
   Map<String, dynamic>? _result;
+  CancelToken? _cancelToken;
+  List<CloudVoice> _cloudVoices = const <CloudVoice>[];
+  CloudProviderConfig _cloudConfig = const CloudProviderConfig(
+    geminiApiKey: '',
+    geminiModel: 'gemini-3.1-flash-tts-preview',
+    geminiVoice: 'Kore',
+    elevenLabsApiKey: '',
+    elevenLabsModel: 'eleven_multilingual_v2',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_loadCloudProviders);
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _lyricsController.dispose();
     _voiceController.dispose();
+    _cancelToken?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadCloudProviders() async {
+    try {
+      final config = await ref.read(cloudProviderConfigProvider.future);
+      var voices = const <CloudVoice>[];
+      if (config.hasElevenLabs) {
+        try {
+          voices = await ref
+              .read(cloudProviderServiceProvider)
+              .listElevenLabsVoices(apiKey: config.elevenLabsApiKey);
+        } on Object {
+          voices = const <CloudVoice>[];
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _cloudConfig = config;
+          _cloudVoices = voices;
+        });
+      }
+    } on Object {
+      // تظهر رسالة الإعداد المطلوبة عند تشغيل المزود.
+    }
   }
 
   Future<void> _pickInstrumental() async {
@@ -80,7 +124,9 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
       _busy = true;
       _result = null;
       _jobId = null;
+      _cloudProgress = null;
     });
+    _cancelToken = CancelToken();
     try {
       if (_engine == 'local') {
         final vocal = await ref
@@ -102,6 +148,80 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
               'local_path': output,
               'name': p.basename(output),
               'engine': 'android-local-song',
+            },
+          );
+        }
+        return;
+      }
+      if (_engine == 'gemini_direct' || _engine == 'elevenlabs_direct') {
+        final isGemini = _engine == 'gemini_direct';
+        final cloudResult = await ref
+            .read(cloudProviderServiceProvider)
+            .synthesizeCandidates(
+              provider: _engine,
+              apiKey: isGemini
+                  ? _cloudConfig.geminiApiKey
+                  : _cloudConfig.elevenLabsApiKey,
+              model: isGemini
+                  ? _cloudConfig.geminiModel
+                  : _cloudConfig.elevenLabsModel,
+              voice: _voiceController.text.trim(),
+              text: _lyricsController.text.trim(),
+              candidateCount: _candidates,
+              style: isGemini
+                  ? '$_style، أداء لحني وإيقاعي عربي احترافي مع نطق واضح للكلمات'
+                  : null,
+              cancelToken: _cancelToken,
+              onProgress: (completed, total) {
+                if (mounted) {
+                  setState(() => _cloudProgress = completed / (total * 2));
+                }
+              },
+            );
+        final vocals =
+            (cloudResult['candidates'] as List<dynamic>? ?? const <dynamic>[])
+                .whereType<Map<String, dynamic>>()
+                .toList();
+        final mixed = <Map<String, dynamic>>[];
+        for (var index = 0; index < vocals.length; index++) {
+          if (_cancelToken?.isCancelled == true) {
+            throw const AppException('المهمة أُلغيت.', code: 'cancelled');
+          }
+          final vocalPath = vocals[index]['local_path'] as String?;
+          if (vocalPath == null || vocalPath.isEmpty) {
+            throw const AppException('الملف الناتج غير صالح.');
+          }
+          final output = await ref
+              .read(localAudioServiceProvider)
+              .createSongMix(
+                vocalPath: vocalPath,
+                title: '${_titleController.text.trim()}_${index + 1}',
+                instrumentalPath: _instrumentalPath,
+                tempo: _tempo,
+                pitchSemitones: _pitch,
+                reverb: _reverb,
+              );
+          mixed.add(<String, dynamic>{
+            'candidate_id': 'song_${index + 1}',
+            'local_path': output,
+            'name': p.basename(output),
+            'provider': _engine,
+          });
+          if (mounted) {
+            setState(
+              () => _cloudProgress = 0.5 + ((index + 1) / (vocals.length * 2)),
+            );
+          }
+        }
+        if (mixed.isEmpty) {
+          throw const AppException('لم يتم إنشاء أي نتيجة صوتية صالحة.');
+        }
+        if (mounted) {
+          setState(
+            () => _result = <String, dynamic>{
+              'candidates': mixed,
+              'best_candidate_id': mixed.first['candidate_id'],
+              'engine': _engine,
             },
           );
         }
@@ -136,18 +256,39 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     } finally {
+      _cancelToken = null;
       if (mounted) {
         setState(() {
           _busy = false;
           _uploadProgress = null;
+          _cloudProgress = null;
         });
       }
     }
   }
 
+  void _selectEngine(String? value) {
+    final engine = value ?? 'local';
+    setState(() {
+      _engine = engine;
+      if (engine == 'gemini_direct') {
+        _voiceController.text = _cloudConfig.geminiVoice;
+      } else if (engine == 'elevenlabs_direct') {
+        _voiceController.text = _cloudVoices.isEmpty
+            ? ''
+            : _cloudVoices.first.id;
+      } else if (engine == 'local') {
+        _voiceController.text = 'default';
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final localSelected = _engine == 'local';
+    final geminiSelected = _engine == 'gemini_direct';
+    final elevenLabsSelected = _engine == 'elevenlabs_direct';
+    final directCloudSelected = geminiSelected || elevenLabsSelected;
     final hasServer = ref.watch(
       appControllerProvider.select((state) => state.session != null),
     );
@@ -159,7 +300,7 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
             leading: const Icon(Icons.offline_bolt_rounded),
             title: const Text('استوديو الهاتف المحلي'),
             subtitle: const Text(
-              'ينشئ أداءً صوتيًا عربيًا ويطبّق السرعة والطبقة والصدى ويمزجه مع مسار موسيقي عبر FFmpeg، دون رفع الملفات.',
+              'يولّد الأداء محليًا أو مباشرة عبر Gemini وElevenLabs، ثم يطبّق السرعة والطبقة والصدى والمزج على الهاتف بواسطة FFmpeg.',
             ),
             trailing: TextButton(
               onPressed: () =>
@@ -228,6 +369,22 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
                           value: 'local',
                           child: Text('استوديو الهاتف — دون إنترنت'),
                         ),
+                        DropdownMenuItem(
+                          value: 'gemini_direct',
+                          child: Text(
+                            _cloudConfig.hasGemini
+                                ? 'Gemini TTS — مباشر'
+                                : 'Gemini TTS — يحتاج مفتاحًا',
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'elevenlabs_direct',
+                          child: Text(
+                            _cloudConfig.hasElevenLabs
+                                ? 'ElevenLabs — مباشر'
+                                : 'ElevenLabs — يحتاج مفتاحًا',
+                          ),
+                        ),
                         if (hasServer)
                           const DropdownMenuItem(
                             value: 'auto',
@@ -249,11 +406,72 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
                             child: Text('Gemini TTS عبر الخادم'),
                           ),
                       ],
-                      onChanged: (value) =>
-                          setState(() => _engine = value ?? 'local'),
+                      onChanged: _selectEngine,
                     ),
                   ),
-                  if (!localSelected)
+                  if (geminiSelected)
+                    SizedBox(
+                      width: 270,
+                      child: DropdownButtonFormField<String>(
+                        initialValue:
+                            CloudProviderService.geminiVoices.contains(
+                              _voiceController.text,
+                            )
+                            ? _voiceController.text
+                            : _cloudConfig.geminiVoice,
+                        decoration: const InputDecoration(
+                          labelText: 'صوت Gemini',
+                        ),
+                        items: CloudProviderService.geminiVoices
+                            .map(
+                              (voice) => DropdownMenuItem<String>(
+                                value: voice,
+                                child: Text(voice),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) => setState(
+                          () => _voiceController.text = value ?? 'Kore',
+                        ),
+                      ),
+                    )
+                  else if (elevenLabsSelected)
+                    SizedBox(
+                      width: 270,
+                      child: _cloudVoices.isEmpty
+                          ? OutlinedButton.icon(
+                              onPressed: _loadCloudProviders,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('تحميل أصوات ElevenLabs'),
+                            )
+                          : DropdownButtonFormField<String>(
+                              initialValue:
+                                  _cloudVoices.any(
+                                    (voice) =>
+                                        voice.id == _voiceController.text,
+                                  )
+                                  ? _voiceController.text
+                                  : _cloudVoices.first.id,
+                              decoration: const InputDecoration(
+                                labelText: 'صوت ElevenLabs',
+                              ),
+                              items: _cloudVoices
+                                  .map(
+                                    (voice) => DropdownMenuItem<String>(
+                                      value: voice.id,
+                                      child: Text(
+                                        voice.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setState(
+                                () => _voiceController.text = value ?? '',
+                              ),
+                            ),
+                    )
+                  else if (!localSelected)
                     SizedBox(
                       width: 270,
                       child: TextField(
@@ -281,6 +499,8 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
               ),
               if (_uploadProgress != null)
                 LinearProgressIndicator(value: _uploadProgress),
+              if (_cloudProgress != null)
+                LinearProgressIndicator(value: _cloudProgress),
               const SizedBox(height: 12),
               Text('الإيقاع: ${_tempo.toStringAsFixed(2)}×'),
               Slider(
@@ -316,20 +536,36 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
                       setState(() => _candidates = value.round()),
                 ),
               ],
-              FilledButton.icon(
-                onPressed: _busy ? null : _generate,
-                icon: _busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome_rounded),
-                label: Text(
-                  localSelected
-                      ? 'إنشاء المشروع على الهاتف'
-                      : 'إنشاء المشروع من الخادم',
-                ),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : _generate,
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.auto_awesome_rounded),
+                      label: Text(
+                        localSelected
+                            ? 'إنشاء المشروع على الهاتف'
+                            : (directCloudSelected
+                                  ? 'إنشاء مباشر ومزج على الهاتف'
+                                  : 'إنشاء المشروع من الخادم'),
+                      ),
+                    ),
+                  ),
+                  if (_busy && directCloudSelected) ...<Widget>[
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: 'إلغاء المهمة',
+                      onPressed: () => _cancelToken?.cancel(),
+                      icon: const Icon(Icons.cancel_rounded),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),

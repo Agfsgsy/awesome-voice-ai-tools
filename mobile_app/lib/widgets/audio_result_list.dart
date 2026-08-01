@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
+import 'package:voice_ai_mobile/models/mobile_models.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 
 class AudioResultList extends ConsumerStatefulWidget {
@@ -152,6 +153,66 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
     }
   }
 
+  Future<void> _addToProject(Map<String, dynamic> candidate) async {
+    try {
+      var projects = await ref.read(projectServiceProvider).list();
+      if (!mounted) return;
+      if (projects.isEmpty) {
+        final controller = TextEditingController();
+        final name = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('مشروع محلي جديد'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'اسم المشروع'),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, controller.text.trim()),
+                child: const Text('إنشاء'),
+              ),
+            ],
+          ),
+        );
+        controller.dispose();
+        if (name == null || name.isEmpty) return;
+        await ref.read(projectServiceProvider).create(name);
+        projects = await ref.read(projectServiceProvider).list();
+      }
+      if (!mounted || projects.isEmpty) return;
+      final selected = await showDialog<SavedProject>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('حفظ النتيجة في مشروع'),
+          children: projects
+              .map(
+                (project) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, project),
+                  child: Text(project.name),
+                ),
+              )
+              .toList(),
+        ),
+      );
+      if (selected == null) return;
+      final path = await _ensureLocal(candidate);
+      await ref.read(projectServiceProvider).addFile(selected.id, path);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حُفظ الملف في مشروع «${selected.name}».')),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) showArabicError(context, error);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final candidates = _candidates;
@@ -225,10 +286,26 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
             }),
             Align(
               alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: () => ref.read(playerServiceProvider).stop(),
-                icon: const Icon(Icons.stop_circle_outlined),
-                label: const Text('إيقاف التشغيل'),
+              child: Wrap(
+                spacing: 8,
+                children: <Widget>[
+                  TextButton.icon(
+                    onPressed: () => ref.read(playerServiceProvider).stop(),
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: const Text('إيقاف التشغيل'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      final selected = candidates.firstWhere(
+                        (candidate) => candidate['candidate_id'] == _selectedId,
+                        orElse: () => candidates.first,
+                      );
+                      _addToProject(selected);
+                    },
+                    icon: const Icon(Icons.create_new_folder_rounded),
+                    label: const Text('حفظ في مشروع'),
+                  ),
+                ],
               ),
             ),
           ],

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
+import 'package:voice_ai_mobile/models/cloud_provider_models.dart';
+import 'package:voice_ai_mobile/services/cloud_provider_service.dart';
 import 'package:voice_ai_mobile/services/local_tts_service.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 
@@ -17,15 +19,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _geminiModel = TextEditingController(
     text: 'gemini-3.1-flash-tts-preview',
   );
+  final _geminiTextModel = TextEditingController(text: 'gemini-3.6-flash');
   final _elevenLabsKey = TextEditingController();
   final _elevenLabsModel = TextEditingController(
     text: 'eleven_multilingual_v2',
+  );
+  final _elevenLabsStsModel = TextEditingController(
+    text: 'eleven_multilingual_sts_v2',
   );
   bool _loading = true;
   bool _saving = false;
   bool _showSecrets = false;
   bool _checkingVoice = false;
+  bool _testingGemini = false;
+  bool _testingElevenLabs = false;
+  String _geminiVoice = 'Kore';
   LocalTtsStatus? _voiceStatus;
+  CloudProviderStatus? _geminiStatus;
+  CloudProviderStatus? _elevenLabsStatus;
 
   @override
   void initState() {
@@ -37,8 +48,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void dispose() {
     _geminiKey.dispose();
     _geminiModel.dispose();
+    _geminiTextModel.dispose();
     _elevenLabsKey.dispose();
     _elevenLabsModel.dispose();
+    _elevenLabsStsModel.dispose();
     super.dispose();
   }
 
@@ -47,9 +60,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _geminiKey.text = await storage.readSecret('gemini_api_key') ?? '';
     _geminiModel.text =
         await storage.readSecret('gemini_model') ?? _geminiModel.text;
+    _geminiVoice = await storage.readSecret('gemini_voice') ?? 'Kore';
+    _geminiTextModel.text =
+        await storage.readSecret('gemini_text_model') ?? _geminiTextModel.text;
     _elevenLabsKey.text = await storage.readSecret('elevenlabs_api_key') ?? '';
     _elevenLabsModel.text =
         await storage.readSecret('elevenlabs_model') ?? _elevenLabsModel.text;
+    _elevenLabsStsModel.text =
+        await storage.readSecret('elevenlabs_sts_model') ??
+            _elevenLabsStsModel.text;
     if (!mounted) return;
     setState(() => _loading = false);
     await _checkLocalVoice();
@@ -71,9 +90,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final storage = ref.read(secureStorageProvider);
     await storage.writeSecret('gemini_api_key', _geminiKey.text);
     await storage.writeSecret('gemini_model', _geminiModel.text);
+    await storage.writeSecret('gemini_voice', _geminiVoice);
+    await storage.writeSecret('gemini_text_model', _geminiTextModel.text);
     await storage.writeSecret('elevenlabs_api_key', _elevenLabsKey.text);
     await storage.writeSecret('elevenlabs_model', _elevenLabsModel.text);
+    await storage.writeSecret(
+      'elevenlabs_sts_model',
+      _elevenLabsStsModel.text,
+    );
     ref.invalidate(providerHeadersProvider);
+    ref.invalidate(cloudProviderConfigProvider);
     if (mounted) {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,6 +107,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           content: Text('حُفظت الإعدادات مشفرة داخل مخزن النظام الآمن.'),
         ),
       );
+    }
+  }
+
+  Future<void> _testGemini() async {
+    setState(() {
+      _testingGemini = true;
+      _geminiStatus = null;
+    });
+    try {
+      final status = await ref.read(cloudProviderServiceProvider).checkGemini(
+            apiKey: _geminiKey.text.trim(),
+            model: _geminiModel.text.trim(),
+          );
+      if (mounted) setState(() => _geminiStatus = status);
+    } on Object catch (error) {
+      if (mounted) showArabicError(context, error);
+    } finally {
+      if (mounted) setState(() => _testingGemini = false);
+    }
+  }
+
+  Future<void> _testElevenLabs() async {
+    setState(() {
+      _testingElevenLabs = true;
+      _elevenLabsStatus = null;
+    });
+    try {
+      final status = await ref
+          .read(cloudProviderServiceProvider)
+          .checkElevenLabs(apiKey: _elevenLabsKey.text.trim());
+      if (mounted) setState(() => _elevenLabsStatus = status);
+    } on Object catch (error) {
+      if (mounted) showArabicError(context, error);
+    } finally {
+      if (mounted) setState(() => _testingElevenLabs = false);
     }
   }
 
@@ -113,8 +174,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   appState.online
                       ? 'الخادم متصل'
                       : (appState.session == null
-                            ? 'لا حاجة إلى خادم'
-                            : 'الخادم غير متصل'),
+                          ? 'لا حاجة إلى خادم'
+                          : 'الخادم غير متصل'),
                 ),
                 subtitle: Text(
                   appState.session?.serverUrl ??
@@ -189,8 +250,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onChanged: appState.session == null
                     ? null
                     : (value) => ref
-                          .read(appControllerProvider.notifier)
-                          .setLocalMode(value),
+                        .read(appControllerProvider.notifier)
+                        .setLocalMode(value),
               ),
             ],
           ),
@@ -256,13 +317,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
         const SizedBox(height: 12),
         SectionCard(
-          title: 'Gemini وElevenLabs',
+          title: 'Gemini وElevenLabs — اتصال مباشر',
           icon: Icons.key_rounded,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const Text(
-                'لا تُخزن المفاتيح في الكود أو الخادم. تُحفظ مشفرة في Android Keystore وتُرسل عبر HTTPS فقط عند استخدام المحرك.',
+                'تعمل الخدمتان مباشرة من الهاتف دون خادم وسيط أو QR. تُحفظ المفاتيح مشفرة في Android Keystore وتُرسل إلى نطاق المزود الرسمي عبر HTTPS فقط.',
               ),
               const SizedBox(height: 12),
               TextField(
@@ -283,6 +344,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 10),
               TextField(
+                controller: _geminiTextModel,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'Gemini Audio/STT Model',
+                  helperText: 'لتحويل التسجيلات إلى نص وتحليل الصوت',
+                ),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _geminiVoice,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'صوت Gemini الافتراضي',
+                ),
+                items: CloudProviderService.geminiVoices
+                    .map(
+                      (voice) => DropdownMenuItem<String>(
+                        value: voice,
+                        child: Text(voice, textDirection: TextDirection.ltr),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _geminiVoice = value ?? 'Kore'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _testingGemini ? null : _testGemini,
+                icon: _testingGemini
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.cloud_done_rounded),
+                label: const Text('اختبار اتصال Gemini'),
+              ),
+              if (_geminiStatus != null)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.green,
+                  ),
+                  title: Text(_geminiStatus!.message),
+                ),
+              const SizedBox(height: 10),
+              TextField(
                 controller: _elevenLabsKey,
                 obscureText: !_showSecrets,
                 enableSuggestions: false,
@@ -300,6 +409,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   labelText: 'ElevenLabs Model',
                 ),
               ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _elevenLabsStsModel,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'ElevenLabs Voice Changer Model',
+                ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _testingElevenLabs ? null : _testElevenLabs,
+                icon: _testingElevenLabs
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.cloud_done_rounded),
+                label: const Text('اختبار اتصال ElevenLabs'),
+              ),
+              if (_elevenLabsStatus != null)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.green,
+                  ),
+                  title: Text(_elevenLabsStatus!.message),
+                  subtitle: Text(
+                    <String>[
+                      if (_elevenLabsStatus!.plan != null)
+                        'الخطة: ${_elevenLabsStatus!.plan}',
+                      if (_elevenLabsStatus!.remainingCharacters != null)
+                        'المتبقي: ${_elevenLabsStatus!.remainingCharacters} حرف',
+                      if (_elevenLabsStatus!.canCloneVoice != null)
+                        _elevenLabsStatus!.canCloneVoice!
+                            ? 'الاستنساخ الفوري متاح'
+                            : 'الاستنساخ غير متاح في الخطة الحالية',
+                    ].join(' • '),
+                  ),
+                ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _showSecrets,

@@ -10,7 +10,7 @@ pinned: false
 
 # Voice AI Studio Arabic
 
-> تطبيق Android الأصلي متاح داخل `mobile_app/`. ابدأ من [دليل تطبيق الجوال](MOBILE_APP_README.md) أو [دليل تثبيت Android](MOBILE_ANDROID_INSTALL.md). تبقى نسخة الكمبيوتر وطريقة تشغيلها الحالية دون تغيير.
+> تطبيق Android الأصلي متاح داخل `mobile_app/` ويعمل مستقلًا، مع Gemini وElevenLabs مباشرة من الهاتف دون كمبيوتر، إضافة إلى وضع خادم اختياري لـ XTTS. ابدأ من [دليل تطبيق الجوال](MOBILE_APP_README.md) أو [دليل تثبيت Android](MOBILE_ANDROID_INSTALL.md). تبقى نسخة الكمبيوتر وطريقة تشغيلها الحالية دون تغيير.
 
 منصة صوتيات عربية لتوليد واستنساخ الصوت مفتوحة المصدر
 

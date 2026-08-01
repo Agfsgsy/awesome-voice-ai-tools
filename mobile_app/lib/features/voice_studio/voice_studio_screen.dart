@@ -1,9 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
+import 'package:voice_ai_mobile/models/cloud_provider_models.dart';
 import 'package:voice_ai_mobile/models/mobile_models.dart';
+import 'package:voice_ai_mobile/services/cloud_provider_service.dart';
 import 'package:voice_ai_mobile/widgets/audio_result_list.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 import 'package:voice_ai_mobile/widgets/tracked_jobs_panel.dart';
@@ -18,13 +21,26 @@ class VoiceStudioScreen extends ConsumerStatefulWidget {
 class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
   final _textController = TextEditingController();
   final _voiceController = TextEditingController(text: 'default');
+  final _styleController = TextEditingController(
+    text: 'بصوت عربي طبيعي وواضح وبأسلوب احترافي',
+  );
   List<EngineInfo> _engines = const <EngineInfo>[];
+  List<CloudVoice> _cloudVoices = const <CloudVoice>[];
+  CloudProviderConfig _cloudConfig = const CloudProviderConfig(
+    geminiApiKey: '',
+    geminiModel: 'gemini-3.1-flash-tts-preview',
+    geminiVoice: 'Kore',
+    elevenLabsApiKey: '',
+    elevenLabsModel: 'eleven_multilingual_v2',
+  );
   String _engine = 'local';
   double _speed = 1;
   int _candidates = 2;
   bool _loading = false;
   String? _jobId;
   Map<String, dynamic>? _result;
+  CancelToken? _cancelToken;
+  double? _progress;
 
   @override
   void initState() {
@@ -36,16 +52,37 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
   void dispose() {
     _textController.dispose();
     _voiceController.dispose();
+    _styleController.dispose();
+    _cancelToken?.cancel();
     super.dispose();
   }
 
   Future<void> _loadEngines() async {
-    if (ref.read(appControllerProvider).session == null) return;
     try {
-      final engines = await ref.read(apiServiceProvider).engines();
-      if (mounted) setState(() => _engines = engines);
+      final config = await ref.read(cloudProviderConfigProvider.future);
+      var voices = const <CloudVoice>[];
+      if (config.hasElevenLabs) {
+        try {
+          voices = await ref
+              .read(cloudProviderServiceProvider)
+              .listElevenLabsVoices(apiKey: config.elevenLabsApiKey);
+        } on Object {
+          voices = const <CloudVoice>[];
+        }
+      }
+      var engines = const <EngineInfo>[];
+      if (ref.read(appControllerProvider).session != null) {
+        engines = await ref.read(apiServiceProvider).engines();
+      }
+      if (mounted) {
+        setState(() {
+          _cloudConfig = config;
+          _cloudVoices = voices;
+          _engines = engines;
+        });
+      }
     } on Object {
-      // تظهر حالة الاتصال العامة، ويمكن إعادة المحاولة عند تنفيذ الطلب.
+      // تظهر رسالة دقيقة عند محاولة استخدام المحرك غير المجهز.
     }
   }
 
@@ -58,7 +95,9 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
       _loading = true;
       _result = null;
       _jobId = null;
+      _progress = null;
     });
+    _cancelToken = CancelToken();
     try {
       if (_engine == 'local') {
         final output = await ref
@@ -73,6 +112,37 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
             },
           );
         }
+        return;
+      }
+      if (_engine == 'gemini_direct' || _engine == 'elevenlabs_direct') {
+        final isGemini = _engine == 'gemini_direct';
+        final apiKey = isGemini
+            ? _cloudConfig.geminiApiKey
+            : _cloudConfig.elevenLabsApiKey;
+        final model = isGemini
+            ? _cloudConfig.geminiModel
+            : _cloudConfig.elevenLabsModel;
+        final voice = _voiceController.text.trim().isEmpty
+            ? (isGemini ? _cloudConfig.geminiVoice : '')
+            : _voiceController.text.trim();
+        final result = await ref
+            .read(cloudProviderServiceProvider)
+            .synthesizeCandidates(
+              provider: _engine,
+              apiKey: apiKey,
+              model: model,
+              voice: voice,
+              text: _textController.text.trim(),
+              candidateCount: _candidates,
+              style: isGemini ? _styleController.text.trim() : null,
+              cancelToken: _cancelToken,
+              onProgress: (completed, total) {
+                if (mounted) {
+                  setState(() => _progress = completed / total);
+                }
+              },
+            );
+        if (mounted) setState(() => _result = result);
         return;
       }
       if (ref.read(appControllerProvider).session == null) {
@@ -98,8 +168,30 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      _cancelToken = null;
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _progress = null;
+        });
+      }
     }
+  }
+
+  void _selectEngine(String? value) {
+    final engine = value ?? 'local';
+    setState(() {
+      _engine = engine;
+      if (engine == 'gemini_direct') {
+        _voiceController.text = _cloudConfig.geminiVoice;
+      } else if (engine == 'elevenlabs_direct') {
+        _voiceController.text = _cloudVoices.isEmpty
+            ? ''
+            : _cloudVoices.first.id;
+      } else if (engine == 'local') {
+        _voiceController.text = 'default';
+      }
+    });
   }
 
   @override
@@ -108,6 +200,9 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
         ? 0
         : _textController.text.trim().split(RegExp(r'\s+')).length;
     final localSelected = _engine == 'local';
+    final geminiSelected = _engine == 'gemini_direct';
+    final elevenLabsSelected = _engine == 'elevenlabs_direct';
+    final directCloudSelected = geminiSelected || elevenLabsSelected;
     final hasServer = ref.watch(
       appControllerProvider.select((state) => state.session != null),
     );
@@ -123,7 +218,7 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
-                    'محرك الهاتف هو الافتراضي ويُنشئ الملف محليًا. إذا لم تكن العربية مثبتة، نزّل بياناتها مرة واحدة من إعدادات Android.',
+                    'اختر محرك الهاتف للعمل دون إنترنت، أو Gemini وElevenLabs للعمل مباشرة من الهاتف عبر الإنترنت دون كمبيوتر.',
                   ),
                 ),
                 TextButton(
@@ -177,6 +272,22 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                             value: 'local',
                             child: Text('محرك الهاتف — دون إنترنت'),
                           ),
+                          DropdownMenuItem(
+                            value: 'gemini_direct',
+                            child: Text(
+                              _cloudConfig.hasGemini
+                                  ? 'Gemini TTS — مباشر من الهاتف'
+                                  : 'Gemini TTS — يحتاج مفتاحًا',
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'elevenlabs_direct',
+                            child: Text(
+                              _cloudConfig.hasElevenLabs
+                                  ? 'ElevenLabs — مباشر من الهاتف'
+                                  : 'ElevenLabs — يحتاج مفتاحًا',
+                            ),
+                          ),
                           if (hasServer)
                             const DropdownMenuItem(
                               value: 'auto',
@@ -192,11 +303,78 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                               ),
                             ),
                         ],
-                        onChanged: (value) =>
-                            setState(() => _engine = value ?? 'local'),
+                        onChanged: _selectEngine,
                       ),
                     ),
-                    if (!localSelected)
+                    if (geminiSelected)
+                      SizedBox(
+                        width: constraints.maxWidth > 620
+                            ? (constraints.maxWidth - 12) / 2
+                            : constraints.maxWidth,
+                        child: DropdownButtonFormField<String>(
+                          initialValue:
+                              CloudProviderService.geminiVoices.contains(
+                                _voiceController.text,
+                              )
+                              ? _voiceController.text
+                              : _cloudConfig.geminiVoice,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'صوت Gemini',
+                          ),
+                          items: CloudProviderService.geminiVoices
+                              .map(
+                                (voice) => DropdownMenuItem<String>(
+                                  value: voice,
+                                  child: Text(voice),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) => setState(
+                            () => _voiceController.text = value ?? 'Kore',
+                          ),
+                        ),
+                      )
+                    else if (elevenLabsSelected)
+                      SizedBox(
+                        width: constraints.maxWidth > 620
+                            ? (constraints.maxWidth - 12) / 2
+                            : constraints.maxWidth,
+                        child: _cloudVoices.isEmpty
+                            ? OutlinedButton.icon(
+                                onPressed: () => _loadEngines(),
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('تحميل أصوات ElevenLabs'),
+                              )
+                            : DropdownButtonFormField<String>(
+                                initialValue:
+                                    _cloudVoices.any(
+                                      (voice) =>
+                                          voice.id == _voiceController.text,
+                                    )
+                                    ? _voiceController.text
+                                    : _cloudVoices.first.id,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'صوت ElevenLabs',
+                                ),
+                                items: _cloudVoices
+                                    .map(
+                                      (voice) => DropdownMenuItem<String>(
+                                        value: voice.id,
+                                        child: Text(
+                                          '${voice.name} — ${voice.category}',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) => setState(
+                                  () => _voiceController.text = value ?? '',
+                                ),
+                              ),
+                      )
+                    else if (!localSelected)
                       SizedBox(
                         width: constraints.maxWidth > 620
                             ? (constraints.maxWidth - 12) / 2
@@ -212,6 +390,19 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                   ],
                 ),
               ),
+              if (geminiSelected) ...<Widget>[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _styleController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'أسلوب الأداء',
+                    helperText:
+                        'مثال: أسلوب حماسي، هادئ، وثائقي، أو قراءة قصصية.',
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               Text('السرعة: ${_speed.toStringAsFixed(1)}×'),
               Slider(
@@ -232,20 +423,40 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
                       setState(() => _candidates = value.round()),
                 ),
               ],
-              FilledButton.icon(
-                onPressed: _loading ? null : _generate,
-                icon: _loading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome_rounded),
-                label: Text(
-                  localSelected
-                      ? 'إنشاء الصوت على الهاتف'
-                      : 'توليد الصوت من الخادم',
-                ),
+              if (_progress != null) ...<Widget>[
+                LinearProgressIndicator(value: _progress),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _loading ? null : _generate,
+                      icon: _loading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.auto_awesome_rounded),
+                      label: Text(
+                        localSelected
+                            ? 'إنشاء الصوت على الهاتف'
+                            : (directCloudSelected
+                                  ? 'توليد مباشر من الهاتف'
+                                  : 'توليد الصوت من الخادم'),
+                      ),
+                    ),
+                  ),
+                  if (_loading) ...<Widget>[
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: 'إلغاء المهمة',
+                      onPressed: () => _cancelToken?.cancel(),
+                      icon: const Icon(Icons.cancel_rounded),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),

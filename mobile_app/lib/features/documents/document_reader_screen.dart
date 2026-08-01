@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -5,6 +6,8 @@ import 'package:voice_ai_mobile/core/constants/app_constants.dart';
 import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 import 'package:voice_ai_mobile/core/providers/providers.dart';
 import 'package:voice_ai_mobile/core/utils/arabic_text_normalizer.dart';
+import 'package:voice_ai_mobile/models/cloud_provider_models.dart';
+import 'package:voice_ai_mobile/services/cloud_provider_service.dart';
 import 'package:voice_ai_mobile/widgets/audio_result_list.dart';
 import 'package:voice_ai_mobile/widgets/responsive_page.dart';
 import 'package:voice_ai_mobile/widgets/tracked_jobs_panel.dart';
@@ -26,14 +29,55 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
   double _speed = 1;
   bool _normalize = true;
   bool _busy = false;
+  double? _progress;
   String? _jobId;
   Map<String, dynamic>? _result;
+  CancelToken? _cancelToken;
+  List<CloudVoice> _cloudVoices = const <CloudVoice>[];
+  CloudProviderConfig _cloudConfig = const CloudProviderConfig(
+    geminiApiKey: '',
+    geminiModel: 'gemini-3.1-flash-tts-preview',
+    geminiVoice: 'Kore',
+    elevenLabsApiKey: '',
+    elevenLabsModel: 'eleven_multilingual_v2',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_loadCloudProviders);
+  }
 
   @override
   void dispose() {
     _textController.dispose();
     _voiceController.dispose();
+    _cancelToken?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadCloudProviders() async {
+    try {
+      final config = await ref.read(cloudProviderConfigProvider.future);
+      var voices = const <CloudVoice>[];
+      if (config.hasElevenLabs) {
+        try {
+          voices = await ref
+              .read(cloudProviderServiceProvider)
+              .listElevenLabsVoices(apiKey: config.elevenLabsApiKey);
+        } on Object {
+          voices = const <CloudVoice>[];
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _cloudConfig = config;
+          _cloudVoices = voices;
+        });
+      }
+    } on Object {
+      // تظهر رسالة الإعداد المطلوبة عند اختيار الخدمة السحابية.
+    }
   }
 
   Future<void> _pickDocument() async {
@@ -67,16 +111,18 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
       _busy = true;
       _result = null;
       _jobId = null;
+      _progress = null;
     });
+    _cancelToken = CancelToken();
     try {
+      var text = _path == null
+          ? _textController.text.trim()
+          : (_extractedText ??
+                await ref
+                    .read(localDocumentServiceProvider)
+                    .extractText(_path!));
+      if (_normalize) text = const ArabicTextNormalizer().normalize(text);
       if (_engine == 'local') {
-        var text = _path == null
-            ? _textController.text.trim()
-            : (_extractedText ??
-                  await ref
-                      .read(localDocumentServiceProvider)
-                      .extractText(_path!));
-        if (_normalize) text = const ArabicTextNormalizer().normalize(text);
         final output = await ref
             .read(localTtsServiceProvider)
             .synthesizeToFile(text, speed: _speed);
@@ -89,6 +135,31 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
             },
           );
         }
+        return;
+      }
+      if (_engine == 'gemini_direct' || _engine == 'elevenlabs_direct') {
+        final isGemini = _engine == 'gemini_direct';
+        final result = await ref
+            .read(cloudProviderServiceProvider)
+            .synthesizeCandidates(
+              provider: _engine,
+              apiKey: isGemini
+                  ? _cloudConfig.geminiApiKey
+                  : _cloudConfig.elevenLabsApiKey,
+              model: isGemini
+                  ? _cloudConfig.geminiModel
+                  : _cloudConfig.elevenLabsModel,
+              voice: _voiceController.text.trim(),
+              text: text,
+              style: isGemini
+                  ? 'قراءة كتاب عربي واضحة وهادئة مع وقفات طبيعية بين الفقرات'
+                  : null,
+              cancelToken: _cancelToken,
+              onProgress: (completed, total) {
+                if (mounted) setState(() => _progress = completed / total);
+              },
+            );
+        if (mounted) setState(() => _result = result);
         return;
       }
       if (ref.read(appControllerProvider).session == null) {
@@ -115,13 +186,38 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _cancelToken = null;
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _progress = null;
+        });
+      }
     }
+  }
+
+  void _selectEngine(String? value) {
+    final engine = value ?? 'local';
+    setState(() {
+      _engine = engine;
+      if (engine == 'gemini_direct') {
+        _voiceController.text = _cloudConfig.geminiVoice;
+      } else if (engine == 'elevenlabs_direct') {
+        _voiceController.text = _cloudVoices.isEmpty
+            ? ''
+            : _cloudVoices.first.id;
+      } else if (engine == 'local') {
+        _voiceController.text = 'default';
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final localSelected = _engine == 'local';
+    final geminiSelected = _engine == 'gemini_direct';
+    final elevenLabsSelected = _engine == 'elevenlabs_direct';
+    final directCloudSelected = geminiSelected || elevenLabsSelected;
     final hasServer = ref.watch(
       appControllerProvider.select((state) => state.session != null),
     );
@@ -133,7 +229,7 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
             leading: const Icon(Icons.phone_android_rounded),
             title: const Text('قارئ محلي كامل'),
             subtitle: const Text(
-              'يستخرج نص TXT وDOCX وPDF ويحوّله إلى صوت عربي داخل الهاتف.',
+              'يستخرج TXT وDOCX وPDF محليًا، ثم يقرأه على الهاتف أو عبر Gemini وElevenLabs مباشرة دون كمبيوتر.',
             ),
             trailing: TextButton(
               onPressed: () =>
@@ -201,6 +297,22 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
                           value: 'local',
                           child: Text('محرك الهاتف — دون إنترنت'),
                         ),
+                        DropdownMenuItem(
+                          value: 'gemini_direct',
+                          child: Text(
+                            _cloudConfig.hasGemini
+                                ? 'Gemini TTS — مباشر'
+                                : 'Gemini TTS — يحتاج مفتاحًا',
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'elevenlabs_direct',
+                          child: Text(
+                            _cloudConfig.hasElevenLabs
+                                ? 'ElevenLabs — مباشر'
+                                : 'ElevenLabs — يحتاج مفتاحًا',
+                          ),
+                        ),
                         if (hasServer)
                           const DropdownMenuItem(
                             value: 'auto',
@@ -222,11 +334,72 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
                             child: Text('Gemini TTS عبر الخادم'),
                           ),
                       ],
-                      onChanged: (value) =>
-                          setState(() => _engine = value ?? 'local'),
+                      onChanged: _selectEngine,
                     ),
                   ),
-                  if (!localSelected)
+                  if (geminiSelected)
+                    SizedBox(
+                      width: 260,
+                      child: DropdownButtonFormField<String>(
+                        initialValue:
+                            CloudProviderService.geminiVoices.contains(
+                              _voiceController.text,
+                            )
+                            ? _voiceController.text
+                            : _cloudConfig.geminiVoice,
+                        decoration: const InputDecoration(
+                          labelText: 'صوت Gemini',
+                        ),
+                        items: CloudProviderService.geminiVoices
+                            .map(
+                              (voice) => DropdownMenuItem<String>(
+                                value: voice,
+                                child: Text(voice),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) => setState(
+                          () => _voiceController.text = value ?? 'Kore',
+                        ),
+                      ),
+                    )
+                  else if (elevenLabsSelected)
+                    SizedBox(
+                      width: 260,
+                      child: _cloudVoices.isEmpty
+                          ? OutlinedButton.icon(
+                              onPressed: _loadCloudProviders,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('تحميل أصوات ElevenLabs'),
+                            )
+                          : DropdownButtonFormField<String>(
+                              initialValue:
+                                  _cloudVoices.any(
+                                    (voice) =>
+                                        voice.id == _voiceController.text,
+                                  )
+                                  ? _voiceController.text
+                                  : _cloudVoices.first.id,
+                              decoration: const InputDecoration(
+                                labelText: 'صوت ElevenLabs',
+                              ),
+                              items: _cloudVoices
+                                  .map(
+                                    (voice) => DropdownMenuItem<String>(
+                                      value: voice.id,
+                                      child: Text(
+                                        voice.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setState(
+                                () => _voiceController.text = value ?? '',
+                              ),
+                            ),
+                    )
+                  else if (!localSelected)
                     SizedBox(
                       width: 260,
                       child: TextField(
@@ -251,20 +424,40 @@ class _DocumentReaderScreenState extends ConsumerState<DocumentReaderScreen> {
                 title: const Text('قراءة الأرقام والتواريخ والعملات بالعربية'),
                 onChanged: (value) => setState(() => _normalize = value),
               ),
-              FilledButton.icon(
-                onPressed: _busy ? null : _read,
-                icon: _busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_circle_rounded),
-                label: Text(
-                  localSelected
-                      ? 'إنشاء الصوت على الهاتف'
-                      : 'إنشاء الكتاب الصوتي من الخادم',
-                ),
+              if (_progress != null) ...<Widget>[
+                LinearProgressIndicator(value: _progress),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : _read,
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.play_circle_rounded),
+                      label: Text(
+                        localSelected
+                            ? 'إنشاء الصوت على الهاتف'
+                            : (directCloudSelected
+                                  ? 'قراءة مباشرة من الهاتف'
+                                  : 'إنشاء الكتاب الصوتي من الخادم'),
+                      ),
+                    ),
+                  ),
+                  if (_busy && directCloudSelected) ...<Widget>[
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: 'إلغاء المهمة',
+                      onPressed: () => _cancelToken?.cancel(),
+                      icon: const Icon(Icons.cancel_rounded),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),

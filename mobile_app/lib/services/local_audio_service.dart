@@ -104,6 +104,83 @@ class LocalAudioService {
     return output;
   }
 
+  Future<String> applyEffect(String inputPath, String preset) async {
+    if (!await File(inputPath).exists()) {
+      throw const AppException('الملف الصوتي المحدد غير موجود.');
+    }
+    final filter = switch (preset) {
+      'studio' =>
+        'highpass=f=75,lowpass=f=14000,afftdn=nf=-28,dynaudnorm=f=150:g=15',
+      'lecture' =>
+        'highpass=f=100,lowpass=f=9000,acompressor=threshold=-18dB:ratio=3:attack=20:release=250,loudnorm=I=-18',
+      'mosque' =>
+        'highpass=f=80,aecho=0.8:0.88:70:0.28,aecho=0.8:0.82:130:0.16,loudnorm=I=-18',
+      'deep_voice' =>
+        'asetrate=24000*0.890899,aresample=24000,atempo=1.122462,acompressor=threshold=-16dB:ratio=2.5',
+      'podcast' =>
+        'highpass=f=80,afftdn=nf=-30,acompressor=threshold=-20dB:ratio=4:attack=15:release=220,loudnorm=I=-16',
+      'video_commentary' =>
+        'highpass=f=90,acompressor=threshold=-18dB:ratio=3.5,equalizer=f=3500:t=q:w=1.2:g=3,loudnorm=I=-15',
+      _ => throw const AppException('المؤثر الصوتي المحدد غير معروف.'),
+    };
+    final output = await _processedOutput('effect_$preset');
+    final session = await FFmpegKit.execute(
+      '-y -i ${_quote(inputPath)} -af "$filter" -vn -ac 2 -ar 24000 -c:a pcm_s16le ${_quote(output)}',
+    );
+    final code = await session.getReturnCode();
+    if (!ReturnCode.isSuccess(code) ||
+        !await File(output).exists() ||
+        await File(output).length() <= 44) {
+      throw const AppException(
+        'تعذر تطبيق المؤثر؛ تأكد أن صيغة الملف قابلة للفك.',
+      );
+    }
+    return output;
+  }
+
+  Future<String> trim({
+    required String inputPath,
+    required double removeStartSeconds,
+    required double removeEndSeconds,
+  }) async {
+    if (!await File(inputPath).exists()) {
+      throw const AppException('الملف الصوتي المحدد غير موجود.');
+    }
+    final information = (await FFprobeKit.getMediaInformation(
+      inputPath,
+    )).getMediaInformation();
+    final duration = double.tryParse(information?.getDuration() ?? '') ?? 0;
+    final start = removeStartSeconds.clamp(0, duration).toDouble();
+    final end = removeEndSeconds.clamp(0, duration).toDouble();
+    final remaining = duration - start - end;
+    if (duration <= 0 || remaining < 0.25) {
+      throw const AppException(
+        'قيم القص تزيل التسجيل كاملًا؛ اترك ربع ثانية على الأقل.',
+      );
+    }
+    final output = await _processedOutput('trimmed');
+    final session = await FFmpegKit.execute(
+      '-y -ss ${start.toStringAsFixed(3)} -i ${_quote(inputPath)} -t ${remaining.toStringAsFixed(3)} -vn -ac 2 -ar 24000 -c:a pcm_s16le ${_quote(output)}',
+    );
+    final code = await session.getReturnCode();
+    if (!ReturnCode.isSuccess(code) ||
+        !await File(output).exists() ||
+        await File(output).length() <= 44) {
+      throw const AppException('تعذر قص الملف الصوتي محليًا.');
+    }
+    return output;
+  }
+
+  Future<String> _processedOutput(String prefix) async {
+    final documents = await getApplicationDocumentsDirectory();
+    final directory = Directory(p.join(documents.path, 'voice_ai_outputs'));
+    await directory.create(recursive: true);
+    return p.join(
+      directory.path,
+      '${prefix}_${DateTime.now().microsecondsSinceEpoch}.wav',
+    );
+  }
+
   Future<String> createSongMix({
     required String vocalPath,
     required String title,

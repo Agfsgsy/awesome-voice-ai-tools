@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voice_ai_mobile/core/constants/app_constants.dart';
 import 'package:voice_ai_mobile/core/errors/app_exception.dart';
+import 'package:voice_ai_mobile/models/cloud_provider_models.dart';
 import 'package:voice_ai_mobile/models/mobile_models.dart';
 import 'package:voice_ai_mobile/models/server_session.dart';
 import 'package:voice_ai_mobile/services/api_service.dart';
 import 'package:voice_ai_mobile/services/audio_player_service.dart';
 import 'package:voice_ai_mobile/services/audio_recorder_service.dart';
+import 'package:voice_ai_mobile/services/cloud_provider_service.dart';
 import 'package:voice_ai_mobile/services/document_picker_service.dart';
 import 'package:voice_ai_mobile/services/local_audio_service.dart';
 import 'package:voice_ai_mobile/services/local_document_service.dart';
@@ -24,6 +26,9 @@ final secureStorageProvider = Provider<SecureStorageService>(
   (ref) => SecureStorageService(),
 );
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
+final cloudProviderServiceProvider = Provider<CloudProviderService>(
+  (ref) => CloudProviderService(),
+);
 final recorderServiceProvider = Provider<AudioRecorderService>((ref) {
   final service = AudioRecorderService();
   ref.onDispose(service.dispose);
@@ -59,6 +64,25 @@ final projectServiceProvider = Provider<ProjectService>(
 );
 final connectivityProvider = Provider<Connectivity>((ref) => Connectivity());
 
+final cloudProviderConfigProvider = FutureProvider<CloudProviderConfig>((
+  ref,
+) async {
+  final storage = ref.watch(secureStorageProvider);
+  return CloudProviderConfig(
+    geminiApiKey: await storage.readSecret('gemini_api_key') ?? '',
+    geminiModel: await storage.readSecret('gemini_model') ??
+        'gemini-3.1-flash-tts-preview',
+    geminiVoice: await storage.readSecret('gemini_voice') ?? 'Kore',
+    geminiTextModel:
+        await storage.readSecret('gemini_text_model') ?? 'gemini-3.6-flash',
+    elevenLabsApiKey: await storage.readSecret('elevenlabs_api_key') ?? '',
+    elevenLabsModel: await storage.readSecret('elevenlabs_model') ??
+        'eleven_multilingual_v2',
+    elevenLabsStsModel: await storage.readSecret('elevenlabs_sts_model') ??
+        'eleven_multilingual_sts_v2',
+  );
+});
+
 class AppState {
   const AppState({
     this.initialized = false,
@@ -88,15 +112,16 @@ class AppState {
     bool clearSession = false,
     String? error,
     bool clearError = false,
-  }) => AppState(
-    initialized: initialized ?? this.initialized,
-    busy: busy ?? this.busy,
-    online: online ?? this.online,
-    localMode: localMode ?? this.localMode,
-    themeMode: themeMode ?? this.themeMode,
-    session: clearSession ? null : (session ?? this.session),
-    error: clearError ? null : (error ?? this.error),
-  );
+  }) =>
+      AppState(
+        initialized: initialized ?? this.initialized,
+        busy: busy ?? this.busy,
+        online: online ?? this.online,
+        localMode: localMode ?? this.localMode,
+        themeMode: themeMode ?? this.themeMode,
+        session: clearSession ? null : (session ?? this.session),
+        error: clearError ? null : (error ?? this.error),
+      );
 }
 
 class AppController extends StateNotifier<AppState> {
@@ -120,8 +145,7 @@ class AppController extends StateNotifier<AppState> {
   Future<void> initialize() async {
     final theme = await _storage.readPreference('theme');
     final session = await _storage.readSession();
-    final local =
-        session == null ||
+    final local = session == null ||
         await _storage.readPreference('local_mode') == 'true';
     if (session == null) await _storage.writePreference('local_mode', 'true');
     state = state.copyWith(
@@ -297,7 +321,7 @@ final appControllerProvider = StateNotifierProvider<AppController, AppState>((
 
 class JobController extends StateNotifier<Map<String, MobileJob>> {
   JobController(this._api, this._storage, this._notifications)
-    : super(const <String, MobileJob>{}) {
+      : super(const <String, MobileJob>{}) {
     unawaited(_restore());
   }
 
@@ -378,8 +402,8 @@ class JobController extends StateNotifier<Map<String, MobileJob>> {
   }
 
   Future<void> _persist() => _storage.savePendingJobs(
-    state.values.where((job) => !job.finished).map((job) => job.id),
-  );
+        state.values.where((job) => !job.finished).map((job) => job.id),
+      );
 
   @override
   void dispose() {
@@ -390,12 +414,12 @@ class JobController extends StateNotifier<Map<String, MobileJob>> {
 
 final jobControllerProvider =
     StateNotifierProvider<JobController, Map<String, MobileJob>>((ref) {
-      return JobController(
-        ref.watch(apiServiceProvider),
-        ref.watch(secureStorageProvider),
-        ref.watch(notificationServiceProvider),
-      );
-    });
+  return JobController(
+    ref.watch(apiServiceProvider),
+    ref.watch(secureStorageProvider),
+    ref.watch(notificationServiceProvider),
+  );
+});
 
 final selectedReferenceProvider = StateProvider<SelectedReference?>(
   (ref) => null,

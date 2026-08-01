@@ -93,7 +93,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 title: const Text('الهاتف يعمل مستقلًا'),
                 subtitle: const Text(
-                  'التسجيل وFFmpeg والتحليل والتحويل وتوليد الصوت العربي وقراءة المستندات تعمل على هذا الهاتف دون ربط.',
+                  'التسجيل وFFmpeg والتحليل والمزج تعمل محليًا، وGemini وElevenLabs يعملان مباشرة من الهاتف عبر الإنترنت دون ربط.',
                 ),
                 trailing: FilledButton.tonal(
                   onPressed: () => context.go('/settings'),
@@ -149,7 +149,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               runSpacing: 10,
               children: <Widget>[
                 _Shortcut(
-                  label: 'توليد صوت محلي',
+                  label: 'توليد الصوت',
                   icon: Icons.graphic_eq_rounded,
                   onTap: () => context.go('/studio'),
                 ),
@@ -159,7 +159,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   onTap: () => context.go('/record'),
                 ),
                 _Shortcut(
-                  label: 'استنساخ Pro اختياري',
+                  label: 'استنساخ الصوت Pro',
                   icon: Icons.record_voice_over_rounded,
                   onTap: () => context.go('/clone'),
                 ),
