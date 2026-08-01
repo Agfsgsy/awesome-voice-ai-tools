@@ -128,6 +128,10 @@ Widget _recorderHarness(List<Override> overrides) => ProviderScope(
       ),
     );
 
+void _deleteDirectory(Directory directory) {
+  if (directory.existsSync()) directory.deleteSync(recursive: true);
+}
+
 void main() {
   testWidgets('يشغّل التطبيق بالعربية RTL ويتنقل بين الصفحات', (tester) async {
     _usePhoneViewport(tester);
@@ -148,12 +152,12 @@ void main() {
 
   testWidgets('يسجل ويوقف مؤقتًا ويستكمل ويحلل ويشغل التسجيل', (tester) async {
     _usePhoneViewport(tester);
-    final directory = await Directory.systemTemp.createTemp('voice_ai_recorder_test');
+    final directory = Directory.systemTemp.createTempSync('voice_ai_recorder_test');
     final file = File('${directory.path}/recorded.wav');
-    await file.writeAsBytes(List<int>.filled(128, 1));
+    file.writeAsBytesSync(List<int>.filled(128, 1));
     final recorder = _FakeRecorder(file.path);
     final player = _FakePlayer();
-    addTearDown(() => directory.delete(recursive: true));
+    addTearDown(() => _deleteDirectory(directory));
 
     await tester.pumpWidget(_recorderHarness(_overrides(recorder: recorder, picker: _FakePicker(file.path), player: player)));
     await _pumpUntilVisible(tester, find.text('بدء التسجيل'));
@@ -174,14 +178,15 @@ void main() {
     expect(player.played, isTrue);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
+    _deleteDirectory(directory);
   });
 
   testWidgets('يختار ملفًا من مدير الملفات ويعرض نتيجة التحليل', (tester) async {
     _usePhoneViewport(tester);
-    final directory = await Directory.systemTemp.createTemp('voice_ai_picker_test');
+    final directory = Directory.systemTemp.createTempSync('voice_ai_picker_test');
     final file = File('${directory.path}/picked.mp3');
-    await file.writeAsBytes(List<int>.filled(256, 2));
-    addTearDown(() => directory.delete(recursive: true));
+    file.writeAsBytesSync(List<int>.filled(256, 2));
+    addTearDown(() => _deleteDirectory(directory));
 
     await tester.pumpWidget(_recorderHarness(_overrides(picker: _FakePicker(file.path))));
     await _pumpUntilVisible(tester, find.text('اختيار ملف'));
@@ -191,5 +196,6 @@ void main() {
     expect(find.text('تحليل جودة التسجيل'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
+    _deleteDirectory(directory);
   });
 }
