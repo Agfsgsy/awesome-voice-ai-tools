@@ -10,19 +10,22 @@ import 'package:voice_ai_mobile/models/mobile_models.dart';
 
 class LocalAudioService {
   Future<AudioAnalysis> analyze(String path) async {
-    if (!await File(path).exists())
+    if (!await File(path).exists()) {
       throw const AppException('الملف المحدد غير موجود.');
+    }
     final informationSession = await FFprobeKit.getMediaInformation(path);
     final information = informationSession.getMediaInformation();
-    if (information == null)
+    if (information == null) {
       throw const AppException('صيغة الملف غير قابلة للفك.');
+    }
     final duration = double.tryParse(information.getDuration() ?? '') ?? 0;
     final streams = information.getStreams();
     final audioStream = streams
         .where((stream) => stream.getType() == 'audio')
         .firstOrNull;
-    if (duration <= 0 || audioStream == null)
+    if (duration <= 0 || audioStream == null) {
       throw const AppException('الملف لا يحتوي صوتًا صالحًا.');
+    }
 
     final command =
         '-hide_banner -i ${_quote(path)} -af '
@@ -30,8 +33,9 @@ class LocalAudioService {
     final session = await FFmpegKit.execute(command);
     final returnCode = await session.getReturnCode();
     final output = await session.getOutput() ?? '';
-    if (!ReturnCode.isSuccess(returnCode))
+    if (!ReturnCode.isSuccess(returnCode)) {
       throw const AppException('صيغة الملف غير قابلة للفك.');
+    }
 
     final sampleRate = int.tryParse(audioStream.getSampleRate() ?? '') ?? 0;
     final rms =
@@ -108,8 +112,9 @@ class LocalAudioService {
     double pitchSemitones = 0,
     double reverb = 0.25,
   }) async {
-    if (!await File(vocalPath).exists())
+    if (!await File(vocalPath).exists()) {
       throw const AppException('الملف الصوتي المحلي غير موجود.');
+    }
     if (instrumentalPath != null && !await File(instrumentalPath).exists()) {
       throw const AppException('المسار الموسيقي المحدد غير موجود.');
     }

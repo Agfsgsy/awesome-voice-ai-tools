@@ -52,10 +52,11 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
   Future<void> _scanQr() async {
     final permission = await Permission.camera.request();
     if (!permission.isGranted) {
-      if (mounted)
+      if (mounted) {
         _showMessage(
           'يلزم السماح بالكاميرا لمسح رمز QR. ويمكن إدخال الرمز يدويًا.',
         );
+      }
       return;
     }
     if (!mounted) return;

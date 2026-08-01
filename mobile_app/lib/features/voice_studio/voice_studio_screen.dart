@@ -254,8 +254,9 @@ class _VoiceStudioScreenState extends ConsumerState<VoiceStudioScreen> {
           TrackedJobsPanel(
             onlyJobId: _jobId,
             onCompleted: (job) {
-              if (_result == null && job.result != null)
+              if (_result == null && job.result != null) {
                 setState(() => _result = job.result);
+              }
             },
           ),
         ],

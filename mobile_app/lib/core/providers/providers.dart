@@ -139,8 +139,9 @@ class AppController extends StateNotifier<AppState> {
       try {
         if (session.expiresAt.isBefore(
           DateTime.now().add(const Duration(minutes: 2)),
-        ))
+        )) {
           await refreshAccessToken();
+        }
         await _api.status();
         state = state.copyWith(online: true);
       } on Object {

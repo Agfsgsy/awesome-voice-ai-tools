@@ -61,8 +61,9 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
         .uploadResumable(
           _instrumentalPath!,
           onProgress: (sent, total) {
-            if (mounted)
+            if (mounted) {
               setState(() => _uploadProgress = total > 0 ? sent / total : null);
+            }
           },
         );
     _instrumentalFileId = id;
@@ -338,8 +339,9 @@ class _SongStudioScreenState extends ConsumerState<SongStudioScreen> {
           TrackedJobsPanel(
             onlyJobId: _jobId,
             onCompleted: (job) {
-              if (_result == null && job.result != null)
+              if (_result == null && job.result != null) {
                 setState(() => _result = job.result);
+              }
             },
           ),
         ],

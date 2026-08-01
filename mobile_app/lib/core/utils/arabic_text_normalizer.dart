@@ -46,8 +46,9 @@ class ArabicTextNormalizer {
         final day = int.parse(match.group(1)!);
         final month = int.parse(match.group(2)!);
         final year = int.parse(match.group(3)!);
-        if (day < 1 || day > 31 || month < 1 || month > 12)
+        if (day < 1 || day > 31 || month < 1 || month > 12) {
           return match.group(0)!;
+        }
         return protect(
           '${integerToWords(day)} من ${_months[month]} سنة ${integerToWords(year)}',
         );
@@ -59,8 +60,9 @@ class ArabicTextNormalizer {
       final year = int.parse(match.group(1)!);
       final month = int.parse(match.group(2)!);
       final day = int.parse(match.group(3)!);
-      if (day < 1 || day > 31 || month < 1 || month > 12)
+      if (day < 1 || day > 31 || month < 1 || month > 12) {
         return match.group(0)!;
+      }
       return protect(
         '${integerToWords(day)} من ${_months[month]} سنة ${integerToWords(year)}',
       );
@@ -108,12 +110,13 @@ class ArabicTextNormalizer {
   String integerToWords(int value) {
     if (value == 0) return _digitWords.first;
     if (value < 0) return 'سالب ${integerToWords(-value)}';
-    if (value > 999999999999999)
+    if (value > 999999999999999) {
       return value
           .toString()
           .split('')
           .map((digit) => _digitWords[int.parse(digit)])
           .join(' ');
+    }
     final groups = <String>[];
     var remaining = value;
     const scales = <({int value, String singular, String dual, String plural})>[

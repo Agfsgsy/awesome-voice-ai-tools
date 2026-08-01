@@ -162,12 +162,13 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
         _localAnalysis = null;
       });
       await _analyzeLocal();
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم التحويل محليًا إلى WAV بجودة 24 kHz.'),
           ),
         );
+      }
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     } finally {
@@ -199,8 +200,9 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
           path,
           cancelToken: _uploadCancelToken,
           onProgress: (sent, total) {
-            if (mounted)
+            if (mounted) {
               setState(() => _uploadProgress = total > 0 ? sent / total : null);
+            }
           },
         );
         reference = await api.analyzeReferenceId(fileId, path);
@@ -209,8 +211,9 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
           path,
           cancelToken: _uploadCancelToken,
           onProgress: (sent, total) {
-            if (mounted)
+            if (mounted) {
               setState(() => _uploadProgress = total > 0 ? sent / total : null);
+            }
           },
         );
       }

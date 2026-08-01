@@ -8,8 +8,9 @@ import 'package:voice_ai_mobile/core/errors/app_exception.dart';
 class LocalDocumentService {
   Future<String> extractText(String path) async {
     final file = File(path);
-    if (!await file.exists())
+    if (!await file.exists()) {
       throw const AppException('المستند المحدد غير موجود.');
+    }
     final extension = p.extension(path).toLowerCase();
     try {
       final text = switch (extension) {

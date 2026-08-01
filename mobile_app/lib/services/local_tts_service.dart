@@ -71,8 +71,9 @@ class LocalTtsService {
 
   Future<String> synthesizeToFile(String text, {double speed = 1}) async {
     final cleanText = text.trim();
-    if (cleanText.isEmpty)
+    if (cleanText.isEmpty) {
       throw const AppException('أدخل نصًا واضحًا لتحويله إلى صوت.');
+    }
     final language = await _findArabicLanguage(
       requireInstalled: Platform.isAndroid,
     );
@@ -83,8 +84,9 @@ class LocalTtsService {
     }
 
     final languageResult = await _tts.setLanguage(language);
-    if (!_succeeded(languageResult))
+    if (!_succeeded(languageResult)) {
       throw const AppException('تعذر تفعيل اللغة العربية في محرك صوت الهاتف.');
+    }
     await _selectOfflineVoice(language);
     await _tts.setVolume(1);
     await _tts.setPitch(1);
@@ -139,8 +141,9 @@ class LocalTtsService {
       }
       return output;
     } finally {
-      if (await workDirectory.exists())
+      if (await workDirectory.exists()) {
         await workDirectory.delete(recursive: true);
+      }
     }
   }
 
@@ -187,8 +190,9 @@ class LocalTtsService {
     for (final language in languages) {
       if (!requireInstalled ||
           !Platform.isAndroid ||
-          _succeeded(await _tts.isLanguageInstalled(language)))
+          _succeeded(await _tts.isLanguageInstalled(language))) {
         return language;
+      }
     }
     return null;
   }

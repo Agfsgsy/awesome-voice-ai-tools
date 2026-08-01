@@ -54,8 +54,10 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
   Future<String> _ensureLocal(Map<String, dynamic> candidate) async {
     final localPath = candidate['local_path'];
     if (localPath is String) {
-      if (await File(localPath).exists() && await File(localPath).length() > 44)
+      if (await File(localPath).exists() &&
+          await File(localPath).length() > 44) {
         return localPath;
+      }
       throw const AppException('الملف الناتج غير صالح أو لم يعد موجودًا.');
     }
     final id = candidate['file_id'] as String;
@@ -73,8 +75,9 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
           id,
           destination,
           onProgress: (received, total) {
-            if (mounted && total > 0)
+            if (mounted && total > 0) {
               setState(() => _progress = received / total);
+            }
           },
         );
     if (mounted) setState(() => _progress = null);
@@ -102,8 +105,9 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
     try {
       final localPath = candidate['local_path'];
       if (localPath is String) {
-        if (!p.equals(localPath, destination))
+        if (!p.equals(localPath, destination)) {
           await File(localPath).copy(destination);
+        }
       } else {
         await ref
             .read(apiServiceProvider)
@@ -111,15 +115,17 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
               candidate['file_id'] as String,
               destination,
               onProgress: (received, total) {
-                if (mounted && total > 0)
+                if (mounted && total > 0) {
                   setState(() => _progress = received / total);
+                }
               },
             );
       }
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('تم حفظ الملف بنجاح.')));
+      }
     } on Object catch (error) {
       if (mounted) showArabicError(context, error);
     } finally {
@@ -149,8 +155,9 @@ class _AudioResultListState extends ConsumerState<AudioResultList> {
   @override
   Widget build(BuildContext context) {
     final candidates = _candidates;
-    if (candidates.isEmpty)
+    if (candidates.isEmpty) {
       return const Text('اكتملت العملية، لكن لم يُنتج ملف صوتي صالح.');
+    }
     final best = widget.result['best_candidate_id'] as String?;
     _selectedId ??= best ?? candidates.first['candidate_id'] as String?;
     return SectionCard(
