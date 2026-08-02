@@ -127,11 +127,21 @@ jobs:
         shell: bash
         run: |
           if [[ "$MOBILE_SIGNING_ENABLED" != "true" ]]; then
+            fallback_keystore="$RUNNER_TEMP/mobile-fallback-debug.jks"
+            keytool -genkeypair -noprompt \
+              -keystore "$fallback_keystore" \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
             printf '%s\n' \
               "storePassword=android" \
               "keyPassword=android" \
               "keyAlias=androiddebugkey" \
-              "storeFile=$HOME/.android/debug.keystore" > android/key.properties
+              "storeFile=$fallback_keystore" > android/key.properties
             echo "PHONE_APK_USES_TEMP_DEBUG_SIGNING=true" >> "$GITHUB_ENV"
           else
             echo "PHONE_APK_USES_TEMP_DEBUG_SIGNING=false" >> "$GITHUB_ENV"
@@ -140,6 +150,7 @@ jobs:
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../dist/mobile/android/voice-ai-studio-android-arm64-v1.2.1-build4.apk
           if [[ "$MOBILE_SIGNING_ENABLED" != "true" ]]; then
             rm -f android/key.properties
+            rm -f "$fallback_keystore"
           fi
       - name: Build release APK
         run: flutter build apk --release
