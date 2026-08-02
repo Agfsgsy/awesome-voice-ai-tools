@@ -118,13 +118,29 @@ jobs:
             "keyPassword=$ANDROID_KEY_PASSWORD" \
             "keyAlias=$ANDROID_KEY_ALIAS" \
             "storeFile=upload-keystore.jks" > android/key.properties
-      - name: Build installable debug APKs
+      - name: Build installable debug APK
         run: |
           flutter build apk --debug
           mkdir -p ../dist/mobile/android
           cp build/app/outputs/flutter-apk/app-debug.apk ../dist/mobile/android/voice-ai-mobile-debug.apk
-          flutter build apk --debug --split-per-abi
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk ../dist/mobile/android/voice-ai-studio-android-arm64-v1.2.1-build4.apk
+      - name: Build optimized installable ARM64 phone APK
+        shell: bash
+        run: |
+          if [[ "$MOBILE_SIGNING_ENABLED" != "true" ]]; then
+            printf '%s\n' \
+              "storePassword=android" \
+              "keyPassword=android" \
+              "keyAlias=androiddebugkey" \
+              "storeFile=$HOME/.android/debug.keystore" > android/key.properties
+            echo "PHONE_APK_USES_TEMP_DEBUG_SIGNING=true" >> "$GITHUB_ENV"
+          else
+            echo "PHONE_APK_USES_TEMP_DEBUG_SIGNING=false" >> "$GITHUB_ENV"
+          fi
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../dist/mobile/android/voice-ai-studio-android-arm64-v1.2.1-build4.apk
+          if [[ "$MOBILE_SIGNING_ENABLED" != "true" ]]; then
+            rm -f android/key.properties
+          fi
       - name: Build release APK
         run: flutter build apk --release
       - name: Build release AAB
@@ -175,7 +191,9 @@ jobs:
 
   publish-arm64-prerelease:
     name: Publish direct ARM64 phone download
-    if: github.event_name == 'push' && github.ref == 'refs/heads/agent/mobile-app-full-version'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/agent/mobile-app-full-version') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'agent/mobile-app-full-version')
     runs-on: ubuntu-latest
     needs: build-android
     permissions:
@@ -189,6 +207,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TARGET: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           release_tag="mobile-v1.2.1-build4"
           apk_path="release-assets/voice-ai-studio-android-arm64-v1.2.1-build4.apk"
@@ -196,7 +215,7 @@ jobs:
             gh release upload "$release_tag" "$apk_path" --clobber
           else
             gh release create "$release_tag" "$apk_path" \
-              --target "$GITHUB_SHA" \
+              --target "$RELEASE_TARGET" \
               --title "Voice AI Studio Android 1.2.1+4" \
               --notes "نسخة ARM64 أصغر مخصصة لهواتف Android الحديثة. تتضمن إصلاح Gemini TTS والفحص الحقيقي لمفاتيح Gemini وElevenLabs. هذه نسخة تجريبية قابلة للتثبيت وليست إصدار Google Play." \
               --prerelease
