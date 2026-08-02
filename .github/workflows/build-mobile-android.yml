@@ -118,8 +118,13 @@ jobs:
             "keyPassword=$ANDROID_KEY_PASSWORD" \
             "keyAlias=$ANDROID_KEY_ALIAS" \
             "storeFile=upload-keystore.jks" > android/key.properties
-      - name: Build installable debug APK
-        run: flutter build apk --debug
+      - name: Build installable debug APKs
+        run: |
+          flutter build apk --debug
+          mkdir -p ../dist/mobile/android
+          cp build/app/outputs/flutter-apk/app-debug.apk ../dist/mobile/android/voice-ai-mobile-debug.apk
+          flutter build apk --debug --split-per-abi
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk ../dist/mobile/android/voice-ai-studio-android-arm64-v1.2.1-build4.apk
       - name: Build release APK
         run: flutter build apk --release
       - name: Build release AAB
@@ -128,7 +133,6 @@ jobs:
         shell: bash
         run: |
           mkdir -p ../dist/mobile/android
-          cp build/app/outputs/flutter-apk/app-debug.apk ../dist/mobile/android/voice-ai-mobile-debug.apk
           if [[ "$MOBILE_SIGNING_ENABLED" == "true" ]]; then
             cp build/app/outputs/flutter-apk/app-release.apk ../dist/mobile/android/voice-ai-mobile-release-signed.apk
             cp build/app/outputs/bundle/release/app-release.aab ../dist/mobile/android/voice-ai-mobile-release-signed.aab
@@ -154,6 +158,13 @@ jobs:
           path: dist/mobile/android/*.aab
           if-no-files-found: error
           retention-days: 30
+      - name: Upload phone-sized ARM64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-ai-mobile-arm64-apk
+          path: dist/mobile/android/voice-ai-studio-android-arm64-v1.2.1-build4.apk
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload checksums
         uses: actions/upload-artifact@v4
         with:
@@ -161,3 +172,32 @@ jobs:
           path: dist/mobile/android/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
+
+  publish-arm64-prerelease:
+    name: Publish direct ARM64 phone download
+    if: github.event_name == 'push' && github.ref == 'refs/heads/agent/mobile-app-full-version'
+    runs-on: ubuntu-latest
+    needs: build-android
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: voice-ai-mobile-arm64-apk
+          path: release-assets
+      - name: Publish stable direct-download URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          release_tag="mobile-v1.2.1-build4"
+          apk_path="release-assets/voice-ai-studio-android-arm64-v1.2.1-build4.apk"
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" "$apk_path" --clobber
+          else
+            gh release create "$release_tag" "$apk_path" \
+              --target "$GITHUB_SHA" \
+              --title "Voice AI Studio Android 1.2.1+4" \
+              --notes "نسخة ARM64 أصغر مخصصة لهواتف Android الحديثة. تتضمن إصلاح Gemini TTS والفحص الحقيقي لمفاتيح Gemini وElevenLabs. هذه نسخة تجريبية قابلة للتثبيت وليست إصدار Google Play." \
+              --prerelease
+          fi

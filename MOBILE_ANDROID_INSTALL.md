@@ -86,6 +86,11 @@ storeFile=/absolute/private/path/upload-keystore.jks
 
 ## تثبيت APK على الهاتف
 
+لهواتف Android الحديثة بمعمارية ARM64 استخدم الملف
+`voice-ai-studio-android-arm64-v1.2.1-build4.apk`. حجمه أصغر من APK الشامل،
+ويُنشر في GitHub Releases برابط تنزيل مباشر حتى لا يعتمد المستخدم على روابط
+المحادثة المؤقتة. لا تستخدم ملف AAB للتثبيت المباشر.
+
 1. وصّل الهاتف وفعّل USB debugging.
 2. ابنِ نسخة Debug القابلة للتثبيت.
 3. نفّذ:
