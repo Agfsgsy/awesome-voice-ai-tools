@@ -51,3 +51,19 @@ htmlcov/
 
 # Logs
 *.log
+
+# Mobile backend runtime data and secrets
+.mobile_data/
+
+# Flutter / Android generated and signing files
+mobile_app/.dart_tool/
+mobile_app/.flutter-plugins
+mobile_app/.flutter-plugins-dependencies
+mobile_app/.flutter
+mobile_app/build/
+mobile_app/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+mobile_app/android/.gradle/
+mobile_app/android/local.properties
+mobile_app/android/key.properties
+mobile_app/android/app/*.jks
+mobile_app/android/app/*.keystore

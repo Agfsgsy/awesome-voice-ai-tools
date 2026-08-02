@@ -1,0 +1,4 @@
+-keep class com.arthenica.** { *; }
+-dontwarn com.arthenica.**
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**

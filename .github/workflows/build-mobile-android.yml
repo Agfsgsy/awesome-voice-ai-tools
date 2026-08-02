@@ -1,0 +1,233 @@
+name: Build Mobile Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/mobile-app-full-version
+    paths:
+      - "mobile_app/**"
+      - "backend/mobile/**"
+      - "scripts/*mobile*"
+      - "scripts/build_android_app.py"
+      - ".github/workflows/build-mobile-android.yml"
+      - "main.py"
+      - "requirements-mobile-backend.txt"
+  pull_request:
+    paths:
+      - "mobile_app/**"
+      - "backend/mobile/**"
+      - "scripts/*mobile*"
+      - "scripts/build_android_app.py"
+      - ".github/workflows/build-mobile-android.yml"
+      - "main.py"
+      - "requirements-mobile-backend.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-desktop-and-mobile-backend:
+    name: Python compatibility tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt -r requirements-mobile-backend.txt -r requirements-dev.txt
+      - name: Lint mobile backend
+        run: python -m ruff check backend/mobile main.py tests/test_mobile_api.py tests/test_mobile_services.py
+      - name: Run Python tests
+        run: python -m pytest -q
+      - name: Verify desktop frontend
+        run: python test_frontend.py
+      - name: Reject unfinished markers in new source
+        run: |
+          if rg -n "T""ODO|F""IXME|H""ACK" backend/mobile mobile_app/lib scripts/setup_mobile_backend.py scripts/run_mobile_backend.py scripts/generate_mobile_pairing_qr.py scripts/build_android_app.py; then
+            echo "Unfinished marker found"
+            exit 1
+          fi
+
+  build-android:
+    name: Flutter analyze, test and Android build
+    runs-on: ubuntu-latest
+    needs: test-desktop-and-mobile-backend
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+    defaults:
+      run:
+        working-directory: mobile_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Complete Gradle wrapper without changing app sources
+        run: |
+          flutter create --platforms android --project-name wrapper_scaffold "$RUNNER_TEMP/flutter_wrapper"
+          cp "$RUNNER_TEMP/flutter_wrapper/android/gradle/wrapper/gradle-wrapper.jar" android/gradle/wrapper/gradle-wrapper.jar
+          cp "$RUNNER_TEMP/flutter_wrapper/android/gradlew" android/gradlew
+          cp "$RUNNER_TEMP/flutter_wrapper/android/gradlew.bat" android/gradlew.bat
+          chmod +x android/gradlew
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+      - name: Analyze Flutter source
+        run: flutter analyze --fatal-infos
+      - name: Run Flutter service tests
+        run: timeout --signal=TERM 4m flutter test test/services_test.dart --reporter expanded
+      - name: Run Flutter API workflow tests
+        run: timeout --signal=TERM 4m flutter test test/api_workflow_test.dart --reporter expanded
+      - name: Run direct cloud provider tests
+        run: timeout --signal=TERM 4m flutter test test/cloud_provider_service_test.dart --reporter expanded
+      - name: Run Flutter widget tests
+        run: timeout --signal=TERM 4m flutter test test/widget_test.dart --reporter expanded
+      - name: Detect complete signing configuration
+        shell: bash
+        run: |
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" && -n "$ANDROID_STORE_PASSWORD" ]]; then
+            echo "MOBILE_SIGNING_ENABLED=true" >> "$GITHUB_ENV"
+          else
+            echo "MOBILE_SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+          fi
+      - name: Configure release signing from GitHub Secrets
+        if: env.MOBILE_SIGNING_ENABLED == 'true'
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          printf '%s\n' \
+            "storePassword=$ANDROID_STORE_PASSWORD" \
+            "keyPassword=$ANDROID_KEY_PASSWORD" \
+            "keyAlias=$ANDROID_KEY_ALIAS" \
+            "storeFile=upload-keystore.jks" > android/key.properties
+      - name: Build installable debug APK
+        run: |
+          flutter build apk --debug
+          mkdir -p ../dist/mobile/android
+          cp build/app/outputs/flutter-apk/app-debug.apk ../dist/mobile/android/voice-ai-mobile-debug.apk
+      - name: Build optimized installable ARM64 phone APK
+        shell: bash
+        run: |
+          if [[ "$MOBILE_SIGNING_ENABLED" != "true" ]]; then
+            fallback_keystore="$RUNNER_TEMP/mobile-fallback-debug.jks"
+            keytool -genkeypair -noprompt \
+              -keystore "$fallback_keystore" \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+            printf '%s\n' \
+              "storePassword=android" \
+              "keyPassword=android" \
+              "keyAlias=androiddebugkey" \
+              "storeFile=$fallback_keystore" > android/key.properties
+            echo "PHONE_APK_USES_TEMP_DEBUG_SIGNING=true" >> "$GITHUB_ENV"
+          else
+            echo "PHONE_APK_USES_TEMP_DEBUG_SIGNING=false" >> "$GITHUB_ENV"
+          fi
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../dist/mobile/android/voice-ai-studio-android-arm64-v1.2.1-build4.apk
+          if [[ "$MOBILE_SIGNING_ENABLED" != "true" ]]; then
+            rm -f android/key.properties
+            rm -f "$fallback_keystore"
+          fi
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: Build release AAB
+        run: flutter build appbundle --release
+      - name: Collect Android artifacts
+        shell: bash
+        run: |
+          mkdir -p ../dist/mobile/android
+          if [[ "$MOBILE_SIGNING_ENABLED" == "true" ]]; then
+            cp build/app/outputs/flutter-apk/app-release.apk ../dist/mobile/android/voice-ai-mobile-release-signed.apk
+            cp build/app/outputs/bundle/release/app-release.aab ../dist/mobile/android/voice-ai-mobile-release-signed.aab
+          else
+            cp build/app/outputs/flutter-apk/app-release.apk ../dist/mobile/android/voice-ai-mobile-release-unsigned.apk
+            cp build/app/outputs/bundle/release/app-release.aab ../dist/mobile/android/voice-ai-mobile-release-unsigned.aab
+          fi
+          sha256sum ../dist/mobile/android/* > ../dist/mobile/android/SHA256SUMS.txt
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/app/upload-keystore.jks android/key.properties
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-ai-mobile-apk
+          path: dist/mobile/android/*.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-ai-mobile-aab
+          path: dist/mobile/android/*.aab
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload phone-sized ARM64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-ai-mobile-arm64-apk
+          path: dist/mobile/android/voice-ai-studio-android-arm64-v1.2.1-build4.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-ai-mobile-checksums
+          path: dist/mobile/android/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-arm64-prerelease:
+    name: Publish direct ARM64 phone download
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/agent/mobile-app-full-version') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'agent/mobile-app-full-version')
+    runs-on: ubuntu-latest
+    needs: build-android
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: voice-ai-mobile-arm64-apk
+          path: release-assets
+      - name: Publish stable direct-download URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TARGET: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          release_tag="mobile-v1.2.1-build4"
+          apk_path="release-assets/voice-ai-studio-android-arm64-v1.2.1-build4.apk"
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" "$apk_path" --clobber
+          else
+            gh release create "$release_tag" "$apk_path" \
+              --target "$RELEASE_TARGET" \
+              --title "Voice AI Studio Android 1.2.1+4" \
+              --notes "نسخة ARM64 أصغر مخصصة لهواتف Android الحديثة. تتضمن إصلاح Gemini TTS والفحص الحقيقي لمفاتيح Gemini وElevenLabs. هذه نسخة تجريبية قابلة للتثبيت وليست إصدار Google Play." \
+              --prerelease
+          fi
