@@ -31,6 +31,8 @@ class CloudProviderStatus {
     this.plan,
     this.remainingCharacters,
     this.canCloneVoice,
+    this.capabilities = const <String>[],
+    this.verifiedByGeneration = false,
   });
 
   final String provider;
@@ -40,6 +42,8 @@ class CloudProviderStatus {
   final String? plan;
   final int? remainingCharacters;
   final bool? canCloneVoice;
+  final List<String> capabilities;
+  final bool verifiedByGeneration;
 }
 
 class CloudVoice {

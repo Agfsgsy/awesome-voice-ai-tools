@@ -49,6 +49,9 @@ class CloudProviderService {
   Future<CloudProviderStatus> checkGemini({
     required String apiKey,
     required String model,
+    String textModel = 'gemini-3.6-flash',
+    String voice = 'Kore',
+    bool verifyGeneration = false,
     CancelToken? cancelToken,
   }) async {
     if (apiKey.trim().isEmpty) {
@@ -63,21 +66,107 @@ class CloudProviderService {
       model,
       fallback: 'gemini-3.1-flash-tts-preview',
     );
+    final selectedTextModel = _normalizeGeminiModel(
+      textModel,
+      fallback: 'gemini-3.6-flash',
+    );
     try {
-      await _dio.get<dynamic>(
-        '$_geminiBaseUrl/v1beta/models/${Uri.encodeComponent(selectedModel)}',
-        options: Options(headers: <String, String>{'x-goog-api-key': apiKey}),
-        cancelToken: cancelToken,
-      );
+      await Future.wait(<Future<void>>[
+        _getGeminiModel(
+          apiKey: apiKey,
+          model: selectedModel,
+          cancelToken: cancelToken,
+        ),
+        if (selectedTextModel != selectedModel)
+          _getGeminiModel(
+            apiKey: apiKey,
+            model: selectedTextModel,
+            cancelToken: cancelToken,
+          ),
+      ]);
+      final capabilities = <String>[
+        'مفتاح Gemini صالح لدى Google',
+        'نموذج الصوت $selectedModel متاح',
+        'نموذج التحليل $selectedTextModel متاح',
+      ];
+      if (verifyGeneration) {
+        final audio = await _requestGeminiAudio(
+          apiKey: apiKey,
+          model: selectedModel,
+          voice: voice,
+          prompt: 'اقرأ بوضوح: اختبار اتصال ناجح.',
+          cancelToken: cancelToken,
+        );
+        _decodeGeminiAudio(audio);
+        capabilities.add('تم إنشاء عينة صوت حقيقية والتحقق من سلامتها');
+      }
       return CloudProviderStatus(
         provider: 'gemini',
         configured: true,
         available: true,
-        message: 'Gemini متصل والنموذج $selectedModel جاهز.',
+        message: verifyGeneration
+            ? 'Gemini متصل فعليًا 100% وتم توليد عينة صوت ناجحة.'
+            : 'Gemini متصل والمفتاح والنماذج متاحة.',
+        capabilities: capabilities,
+        verifiedByGeneration: verifyGeneration,
       );
     } on DioException catch (error) {
       throw _mapProviderError(error, 'Gemini');
     }
+  }
+
+  Future<void> _getGeminiModel({
+    required String apiKey,
+    required String model,
+    CancelToken? cancelToken,
+  }) async {
+    await _dio.get<dynamic>(
+      '$_geminiBaseUrl/v1beta/models/${Uri.encodeComponent(model)}',
+      options: Options(
+        headers: <String, String>{'x-goog-api-key': apiKey.trim()},
+      ),
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<_GeminiAudio> _requestGeminiAudio({
+    required String apiKey,
+    required String model,
+    required String voice,
+    required String prompt,
+    CancelToken? cancelToken,
+  }) async {
+    final selectedVoice = geminiVoices.contains(voice) ? voice : 'Kore';
+    final response = await _dio.post<dynamic>(
+      '$_geminiBaseUrl/v1beta/models/${Uri.encodeComponent(model)}:generateContent',
+      data: <String, dynamic>{
+        'contents': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'parts': <Map<String, String>>[
+              <String, String>{'text': prompt},
+            ],
+          },
+        ],
+        'generationConfig': <String, dynamic>{
+          'responseModalities': <String>['AUDIO'],
+          'speechConfig': <String, dynamic>{
+            'voiceConfig': <String, dynamic>{
+              'prebuiltVoiceConfig': <String, String>{
+                'voiceName': selectedVoice,
+              },
+            },
+          },
+        },
+      },
+      options: Options(
+        headers: <String, String>{
+          'x-goog-api-key': apiKey.trim(),
+          Headers.contentTypeHeader: Headers.jsonContentType,
+        },
+      ),
+      cancelToken: cancelToken,
+    );
+    return _extractGeminiAudio(_asMap(response.data));
   }
 
   Future<String> transcribeGemini({
@@ -176,6 +265,9 @@ class CloudProviderService {
 
   Future<CloudProviderStatus> checkElevenLabs({
     required String apiKey,
+    String ttsModel = 'eleven_multilingual_v2',
+    String stsModel = 'eleven_multilingual_sts_v2',
+    bool verifyGeneration = false,
     CancelToken? cancelToken,
   }) async {
     if (apiKey.trim().isEmpty) {
@@ -195,23 +287,114 @@ class CloudProviderService {
         ))
             .data,
       );
+      final modelsResponse = await _dio.get<dynamic>(
+        '$_elevenLabsBaseUrl/v1/models',
+        options: Options(headers: <String, String>{'xi-api-key': apiKey}),
+        cancelToken: cancelToken,
+      );
+      final models = _asMapList(modelsResponse.data);
+      final selectedTtsModel = _findElevenLabsModel(models, ttsModel);
+      if (selectedTtsModel['can_do_text_to_speech'] == false) {
+        throw AppException(
+          'نموذج ElevenLabs $ttsModel لا يدعم توليد الصوت.',
+        );
+      }
+      final selectedStsModel = _findElevenLabsModel(models, stsModel);
+      if (selectedStsModel['can_do_voice_conversion'] == false) {
+        throw AppException(
+          'نموذج ElevenLabs $stsModel لا يدعم تغيير الصوت.',
+        );
+      }
       final used = (data['character_count'] as num?)?.toInt();
       final limit = (data['character_limit'] as num?)?.toInt();
       final remaining = used == null || limit == null ? null : limit - used;
+      final capabilities = <String>[
+        'مفتاح ElevenLabs صالح والحساب قابل للوصول',
+        'نموذج التوليد $ttsModel متاح',
+        'نموذج مغير الصوت $stsModel متاح',
+      ];
+      if (verifyGeneration) {
+        final voices = await listElevenLabsVoices(
+          apiKey: apiKey,
+          cancelToken: cancelToken,
+        );
+        final bytes = await _requestElevenLabsAudio(
+          apiKey: apiKey,
+          model: ttsModel,
+          voiceId: voices.first.id,
+          text: 'اختبار',
+          cancelToken: cancelToken,
+        );
+        if (bytes.length < 128) {
+          throw const AppException(
+            'اتصل المفتاح لكن ElevenLabs أعادت عينة صوت غير صالحة.',
+          );
+        }
+        capabilities.add('تم إنشاء عينة صوت حقيقية والتحقق من سلامتها');
+      }
       return CloudProviderStatus(
         provider: 'elevenlabs',
         configured: true,
         available: data['status'] != 'past_due',
         message: data['status'] == 'past_due'
             ? 'حساب ElevenLabs يحتاج مراجعة الفوترة.'
-            : 'ElevenLabs متصل وجاهز للتوليد والاستنساخ.',
+            : verifyGeneration
+                ? 'ElevenLabs متصل فعليًا 100% وتم توليد عينة صوت ناجحة.'
+                : 'ElevenLabs متصل والمفتاح والنماذج متاحة.',
         plan: data['tier']?.toString(),
         remainingCharacters: remaining?.clamp(0, 1 << 31).toInt(),
         canCloneVoice: data['can_use_instant_voice_cloning'] as bool?,
+        capabilities: capabilities,
+        verifiedByGeneration: verifyGeneration,
       );
     } on DioException catch (error) {
       throw _mapProviderError(error, 'ElevenLabs');
     }
+  }
+
+  Map<String, dynamic> _findElevenLabsModel(
+    List<Map<String, dynamic>> models,
+    String requestedModel,
+  ) {
+    final normalized = requestedModel.trim();
+    for (final model in models) {
+      if (model['model_id'] == normalized) return model;
+    }
+    throw AppException(
+      'نموذج ElevenLabs $normalized غير متاح لهذا المفتاح أو الحساب.',
+    );
+  }
+
+  Future<List<int>> _requestElevenLabsAudio({
+    required String apiKey,
+    required String model,
+    required String voiceId,
+    required String text,
+    int? seed,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _dio.post<List<int>>(
+      '$_elevenLabsBaseUrl/v1/text-to-speech/${Uri.encodeComponent(voiceId)}',
+      queryParameters: const <String, dynamic>{
+        'output_format': 'mp3_44100_128',
+      },
+      data: <String, dynamic>{
+        'text': text,
+        'model_id': model,
+        'apply_text_normalization': 'on',
+        if (seed != null) 'seed': seed & 0xffffffff,
+      },
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: <String, String>{
+          'xi-api-key': apiKey.trim(),
+          Headers.contentTypeHeader: Headers.jsonContentType,
+          'Accept': 'audio/mpeg',
+        },
+      ),
+      cancelToken: cancelToken,
+    );
+    return response.data ?? const <int>[];
   }
 
   Future<List<CloudVoice>> listElevenLabsVoices({
@@ -399,41 +582,17 @@ class CloudProviderService {
         'قدّم أداءً طبيعيًا بديلًا رقم ${candidateIndex + 1}.',
     ].join('\n');
     try {
-      final response = await _dio.post<dynamic>(
-        '$_geminiBaseUrl/v1beta/interactions',
-        data: <String, dynamic>{
-          'model': _normalizeGeminiModel(
-            model,
-            fallback: 'gemini-3.1-flash-tts-preview',
-          ),
-          'input': prompt,
-          'response_format': <String, dynamic>{
-            'type': 'audio',
-            'mime_type': 'audio/wav',
-            'delivery': 'inline',
-            'sample_rate': 24000,
-          },
-          'generation_config': <String, dynamic>{
-            'speech_config': <Map<String, String>>[
-              <String, String>{'voice': selectedVoice, 'language': 'ar'},
-            ],
-          },
-          'store': false,
-        },
-        options: Options(
-          headers: <String, String>{
-            'x-goog-api-key': apiKey,
-            'Api-Revision': '2026-05-20',
-            Headers.contentTypeHeader: Headers.jsonContentType,
-          },
+      final audio = await _requestGeminiAudio(
+        apiKey: apiKey,
+        model: _normalizeGeminiModel(
+          model,
+          fallback: 'gemini-3.1-flash-tts-preview',
         ),
+        voice: selectedVoice,
+        prompt: prompt,
         cancelToken: cancelToken,
       );
-      final audio = _extractGeminiAudio(_asMap(response.data));
-      final bytes = base64Decode(audio.data);
-      final normalized = audio.mimeType == 'audio/l16' || !_isWave(bytes)
-          ? _wrapPcmAsWave(bytes, sampleRate: audio.sampleRate ?? 24000)
-          : bytes;
+      final normalized = _decodeGeminiAudio(audio);
       return _saveOutput(normalized, 'gemini', 'wav');
     } on FormatException {
       throw const AppException('أعاد Gemini ملفًا صوتيًا غير صالح.');
@@ -457,29 +616,15 @@ class CloudProviderService {
       throw const AppException('اختر صوتًا من أصوات ElevenLabs أولًا.');
     }
     try {
-      final response = await _dio.post<List<int>>(
-        '$_elevenLabsBaseUrl/v1/text-to-speech/${Uri.encodeComponent(voiceId)}',
-        queryParameters: const <String, dynamic>{
-          'output_format': 'mp3_44100_128',
-        },
-        data: <String, dynamic>{
-          'text': text,
-          'model_id': model,
-          'apply_text_normalization': 'on',
-          if (seed != null) 'seed': seed & 0xffffffff,
-        },
-        options: Options(
-          responseType: ResponseType.bytes,
-          headers: <String, String>{
-            'xi-api-key': apiKey,
-            Headers.contentTypeHeader: Headers.jsonContentType,
-            'Accept': 'audio/mpeg',
-          },
-        ),
+      final bytes = await _requestElevenLabsAudio(
+        apiKey: apiKey,
+        model: model,
+        voiceId: voiceId,
+        text: text,
+        seed: seed,
         cancelToken: cancelToken,
       );
-      final bytes = response.data;
-      if (bytes == null || bytes.length < 128) {
+      if (bytes.length < 128) {
         throw const AppException('أعادت ElevenLabs ملفًا صوتيًا غير صالح.');
       }
       return _saveOutput(bytes, 'elevenlabs', 'mp3');
@@ -564,7 +709,58 @@ class CloudProviderService {
     return file.path;
   }
 
+  Uint8List _decodeGeminiAudio(_GeminiAudio audio) {
+    final List<int> bytes;
+    try {
+      bytes = base64Decode(audio.data);
+    } on FormatException {
+      throw const AppException('أعاد Gemini بيانات صوتية تالفة.');
+    }
+    if (bytes.length < 128) {
+      throw const AppException('أعاد Gemini عينة صوت فارغة أو غير صالحة.');
+    }
+    if (_isWave(bytes)) return Uint8List.fromList(bytes);
+    final mimeType = audio.mimeType.toLowerCase();
+    if (!mimeType.contains('l16') && !mimeType.contains('pcm')) {
+      throw AppException(
+        'أعاد Gemini صيغة صوت غير مدعومة: ${audio.mimeType}.',
+      );
+    }
+    return _wrapPcmAsWave(
+      bytes,
+      sampleRate: audio.sampleRate ??
+          _sampleRateFromMime(audio.mimeType) ??
+          24000,
+    );
+  }
+
   _GeminiAudio _extractGeminiAudio(Map<String, dynamic> response) {
+    final candidates = response['candidates'] as List<dynamic>?;
+    if (candidates != null) {
+      for (final candidate in candidates) {
+        if (candidate is! Map<String, dynamic>) continue;
+        final content = candidate['content'];
+        if (content is! Map<String, dynamic>) continue;
+        final parts = content['parts'] as List<dynamic>? ?? const <dynamic>[];
+        for (final part in parts) {
+          if (part is! Map<String, dynamic>) continue;
+          final inline = part['inlineData'] ?? part['inline_data'];
+          if (inline is! Map<String, dynamic>) continue;
+          final data = inline['data'] as String?;
+          if (data == null || data.isEmpty) continue;
+          final mimeType = inline['mimeType'] as String? ??
+              inline['mime_type'] as String? ??
+              'audio/L16;codec=pcm;rate=24000';
+          return _GeminiAudio(
+            data: data,
+            mimeType: mimeType,
+            sampleRate: (inline['sampleRate'] as num?)?.toInt() ??
+                (inline['sample_rate'] as num?)?.toInt() ??
+                _sampleRateFromMime(mimeType),
+          );
+        }
+      }
+    }
     final steps = response['steps'] as List<dynamic>? ?? const <dynamic>[];
     for (final step in steps.reversed) {
       if (step is! Map<String, dynamic>) continue;
@@ -573,21 +769,31 @@ class CloudProviderService {
         if (item is Map<String, dynamic> && item['type'] == 'audio') {
           final data = item['data'] as String?;
           if (data != null && data.isNotEmpty) {
+            final mimeType = item['mime_type'] as String? ??
+                item['mimeType'] as String? ??
+                'audio/L16;codec=pcm;rate=24000';
             return _GeminiAudio(
               data: data,
-              mimeType: item['mime_type'] as String? ?? 'audio/l16',
-              sampleRate: (item['sample_rate'] as num?)?.toInt(),
+              mimeType: mimeType,
+              sampleRate: (item['sample_rate'] as num?)?.toInt() ??
+                  (item['sampleRate'] as num?)?.toInt() ??
+                  _sampleRateFromMime(mimeType),
             );
           }
         }
       }
     }
-    final legacy = response['output_audio'];
+    final legacy = response['output_audio'] ?? response['outputAudio'];
     if (legacy is Map<String, dynamic> && legacy['data'] is String) {
+      final mimeType = legacy['mime_type'] as String? ??
+          legacy['mimeType'] as String? ??
+          'audio/L16;codec=pcm;rate=24000';
       return _GeminiAudio(
         data: legacy['data'] as String,
-        mimeType: legacy['mime_type'] as String? ?? 'audio/l16',
-        sampleRate: (legacy['sample_rate'] as num?)?.toInt(),
+        mimeType: mimeType,
+        sampleRate: (legacy['sample_rate'] as num?)?.toInt() ??
+            (legacy['sampleRate'] as num?)?.toInt() ??
+            _sampleRateFromMime(mimeType),
       );
     }
     throw const AppException('لم يُرجع Gemini بيانات صوتية.');
@@ -742,6 +948,18 @@ class CloudProviderService {
   bool _isWave(List<int> bytes) =>
       bytes.length > 44 && ascii.decode(bytes.take(4).toList()) == 'RIFF';
 
+  int? _sampleRateFromMime(String mimeType) {
+    for (final part in mimeType.split(';')) {
+      final pair = part.trim().split('=');
+      if (pair.length != 2) continue;
+      final key = pair.first.toLowerCase();
+      if (key == 'rate' || key == 'samplerate' || key == 'sample_rate') {
+        return int.tryParse(pair.last.trim());
+      }
+    }
+    return null;
+  }
+
   Uint8List _wrapPcmAsWave(List<int> pcm, {required int sampleRate}) {
     final output = BytesBuilder(copy: false);
     void text(String value) => output.add(ascii.encode(value));
@@ -795,6 +1013,25 @@ class CloudProviderService {
     if (status == 413) {
       return const AppException('الملف كبير جدًا للرفع إلى الخدمة.');
     }
+    if (status == 400) {
+      if (detail?.toLowerCase().contains('mime_type') == true ||
+          detail?.toLowerCase().contains('response_format') == true) {
+        return AppException(
+          'صيغة طلب الصوت غير متوافقة مع واجهة $provider الحالية. حدّث التطبيق ثم أعد المحاولة.',
+          code: '${provider.toLowerCase()}_request_format',
+        );
+      }
+      return AppException(
+        'رفضت خدمة $provider إعدادات الطلب أو اسم النموذج. راجع النموذج ثم أعد الفحص.',
+        code: '${provider.toLowerCase()}_bad_request',
+      );
+    }
+    if (status == 404) {
+      return AppException(
+        'النموذج المطلوب غير موجود أو غير متاح لمفتاح $provider.',
+        code: '${provider.toLowerCase()}_model_not_found',
+      );
+    }
     if (status == 422) {
       return AppException(detail ?? 'رفضت الخدمة الملف أو الإعدادات المرسلة.');
     }
@@ -840,6 +1077,20 @@ class CloudProviderService {
       return value.map((key, item) => MapEntry(key.toString(), item));
     }
     throw const AppException('استجابة الخدمة السحابية غير صالحة.');
+  }
+
+  List<Map<String, dynamic>> _asMapList(Object? value) {
+    if (value is! List<dynamic>) {
+      throw const AppException('قائمة نماذج الخدمة السحابية غير صالحة.');
+    }
+    return value
+        .whereType<Map<dynamic, dynamic>>()
+        .map(
+          (item) => item.map(
+            (key, entry) => MapEntry(key.toString(), entry),
+          ),
+        )
+        .toList();
   }
 }
 

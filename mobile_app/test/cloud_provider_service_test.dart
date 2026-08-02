@@ -17,6 +17,10 @@ class _CloudFixture {
   bool sawCloneUpload = false;
   bool sawResumableUpload = false;
   bool deletedGeminiFile = false;
+  bool sawGeminiGenerateContent = false;
+  bool sentUnsupportedGeminiResponseFormat = false;
+  bool sawElevenLabsGeneration = false;
+  String geminiGenerateBody = '';
 
   String get url => 'http://${server.address.address}:${server.port}';
 
@@ -71,10 +75,50 @@ class _CloudFixture {
       await _json(request.response, HttpStatus.ok, const <String, Object>{});
       return;
     }
+    if (path.startsWith('/v1beta/models/') &&
+        path.endsWith(':generateContent')) {
+      final body = await utf8.decoder.bind(request).join();
+      geminiGenerateBody = body;
+      sawGeminiGenerateContent = true;
+      sentUnsupportedGeminiResponseFormat =
+          body.contains('response_format') || body.contains('mime_type');
+      await _json(request.response, HttpStatus.ok, <String, Object>{
+        'candidates': <Map<String, Object>>[
+          <String, Object>{
+            'content': <String, Object>{
+              'parts': <Map<String, Object>>[
+                <String, Object>{
+                  'inlineData': <String, String>{
+                    'data': base64Encode(List<int>.filled(256, 3)),
+                    'mimeType': 'audio/L16;codec=pcm;rate=24000',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+      return;
+    }
     if (path.startsWith('/v1beta/models/')) {
       await _json(request.response, HttpStatus.ok, <String, String>{
         'name': 'models/gemini-3.1-flash-tts-preview',
       });
+      return;
+    }
+    if (path == '/v1/models') {
+      await _json(request.response, HttpStatus.ok, <Map<String, Object>>[
+        <String, Object>{
+          'model_id': 'eleven_multilingual_v2',
+          'can_do_text_to_speech': true,
+          'can_do_voice_conversion': false,
+        },
+        <String, Object>{
+          'model_id': 'eleven_multilingual_sts_v2',
+          'can_do_text_to_speech': false,
+          'can_do_voice_conversion': true,
+        },
+      ]);
       return;
     }
     if (path == '/v1/user/subscription') {
@@ -114,6 +158,7 @@ class _CloudFixture {
     }
     if (path.startsWith('/v1/text-to-speech/')) {
       await request.drain<void>();
+      sawElevenLabsGeneration = true;
       final bytes = <int>[0x49, 0x44, 0x33, ...List<int>.filled(253, 7)];
       request.response
         ..statusCode = HttpStatus.ok
@@ -196,18 +241,32 @@ void main() {
     final gemini = await service.checkGemini(
       apiKey: 'gemini-test-key',
       model: 'gemini-3.1-flash-tts-preview',
+      textModel: 'gemini-3.6-flash',
+      verifyGeneration: true,
     );
-    final eleven = await service.checkElevenLabs(apiKey: 'eleven-test-key');
+    final eleven = await service.checkElevenLabs(
+      apiKey: 'eleven-test-key',
+      ttsModel: 'eleven_multilingual_v2',
+      stsModel: 'eleven_multilingual_sts_v2',
+      verifyGeneration: true,
+    );
     final voices = await service.listElevenLabsVoices(
       apiKey: 'eleven-test-key',
     );
 
     expect(gemini.available, isTrue);
+    expect(gemini.verifiedByGeneration, isTrue);
     expect(eleven.remainingCharacters, 900);
     expect(eleven.canCloneVoice, isTrue);
+    expect(eleven.verifiedByGeneration, isTrue);
     expect(voices.single.id, 'voice-1');
     expect(fixture.sawGeminiKey, isTrue);
     expect(fixture.sawElevenLabsKey, isTrue);
+    expect(fixture.sawGeminiGenerateContent, isTrue);
+    expect(fixture.sentUnsupportedGeminiResponseFormat, isFalse);
+    expect(fixture.geminiGenerateBody, contains('responseModalities'));
+    expect(fixture.geminiGenerateBody, contains('voiceName'));
+    expect(fixture.sawElevenLabsGeneration, isTrue);
   });
 
   test('يولّد Gemini WAV وElevenLabs MP3 ويحفظهما محليًا', () async {
@@ -239,6 +298,8 @@ void main() {
     final geminiBytes = await File(geminiPath).readAsBytes();
     expect(ascii.decode(geminiBytes.take(4).toList()), 'RIFF');
     expect(await File(elevenPath).length(), greaterThan(128));
+    expect(fixture.sawGeminiGenerateContent, isTrue);
+    expect(fixture.sentUnsupportedGeminiResponseFormat, isFalse);
   });
 
   test('يستنسخ صوت ElevenLabs بعد رفع المرجع', () async {

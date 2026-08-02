@@ -45,6 +45,8 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
             .checkGemini(
               apiKey: config.geminiApiKey,
               model: config.geminiModel,
+              textModel: config.geminiTextModel,
+              voice: config.geminiVoice,
             );
       } on Object catch (error) {
         geminiStatus = CloudProviderStatus(
@@ -57,7 +59,11 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
       try {
         elevenLabsStatus = await ref
             .read(cloudProviderServiceProvider)
-            .checkElevenLabs(apiKey: config.elevenLabsApiKey);
+            .checkElevenLabs(
+              apiKey: config.elevenLabsApiKey,
+              ttsModel: config.elevenLabsModel,
+              stsModel: config.elevenLabsStsModel,
+            );
       } on Object catch (error) {
         elevenLabsStatus = CloudProviderStatus(
           provider: 'elevenlabs',
@@ -104,7 +110,13 @@ class _EnginesScreenState extends ConsumerState<EnginesScreen> {
           color: color,
         ),
         title: Text(name),
-        subtitle: Text('${status?.message ?? 'جارٍ الفحص...'}\n$tools'),
+        subtitle: Text(
+          <String>[
+            status?.message ?? 'جارٍ الفحص...',
+            if (status != null) ...status.capabilities.map((item) => '✓ $item'),
+            tools,
+          ].join('\n'),
+        ),
         isThreeLine: true,
         trailing: Text(
           ready ? 'جاهز' : (configured ? 'تحقق' : 'أضف مفتاحًا'),
