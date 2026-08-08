@@ -200,6 +200,15 @@ async def api_model_delete(engine: str, model_name: str):
     from backend.core.model_manager import model_manager
     return model_manager.delete_model(engine, model_name)
 
+@router.post("/api/models/verify")
+async def api_model_verify():
+    from backend.core.model_manager import model_manager
+    # Check if models are available. Expandable to hashes etc.
+    downloaded_models = model_manager.list_downloaded_models()
+    if not downloaded_models:
+         return {"success": False, "message": "No models downloaded."}
+    return {"success": True, "message": f"Verified {len(downloaded_models)} models."}
+
 @router.get("/api/voices")
 async def api_voices():
     from backend.core.voice_manager import voice_manager
