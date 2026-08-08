@@ -52,7 +52,8 @@ def run_post_tests():
         ("/api/tts", {"text": "مرحبا", "engine": "fallback"}),
         ("/api/speech", {"text": "مرحبا", "engine": "fallback"}),
         ("/api/plugins/check", {"engine": "piper"}),
-        ("/api/plugins/install", {"engine": "piper"})
+        ("/api/plugins/install", {"engine": "piper"}),
+        ("/api/models/verify", {})
     ]
 
     for ep, payload in json_endpoints:

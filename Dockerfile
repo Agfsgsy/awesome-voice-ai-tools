@@ -14,7 +14,7 @@ COPY . .
 
 RUN mkdir -p uploads outputs cache logs models voices downloads config
 
-EXPOSE 7860
+EXPOSE 8000
 
 ENV APP_HOST=0.0.0.0
 ENV APP_PORT=8000
